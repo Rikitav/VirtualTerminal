@@ -1,0 +1,85 @@
+﻿<UserControl x:Class="VirtualTerminal.VirtualTerminalView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:VirtualTerminal"
+             mc:Ignorable="d" x:Name="this"
+             FontFamily="Consolas" FontSize="13" Cursor="Arrow"
+             d:DesignHeight="450" d:DesignWidth="800">
+    <Border
+        Background="{Binding Background, ElementName=this}"
+        BorderBrush="{Binding BorderBrush, ElementName=this}"
+        BorderThickness="{Binding BorderThickness, ElementName=this}">
+        
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Output area with scrolling -->
+            <ScrollViewer
+                x:Name="PART_ScrollViewer"
+                Grid.Row="0"
+                VerticalScrollBarVisibility="Auto"
+                HorizontalScrollBarVisibility="Disabled"
+                Background="Black"
+                ScrollChanged="PART_ScrollViewer_ScrollChanged">
+
+                <local:VirtualTerminalScreen
+                    x:Name="PART_Output"
+                    Margin="4"
+                    VerticalAlignment="Top"/>
+            </ScrollViewer>
+
+            <!-- Scroll to bottom button -->
+            <Button
+                x:Name="PART_ScrollToBottomButton" Grid.Row="0" Panel.ZIndex="100"
+                Click="PART_ScrollToBottomButton_Click" Style="{DynamicResource scrollToBottom}"
+                Content="▼" FontSize="20" Background="#333333"
+                HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                Margin="0,0,30,20" Width="40" Height="40">
+
+                <Button.Clip>
+                    <EllipseGeometry Center="20,20" RadiusX="19" RadiusY="19"/>
+                </Button.Clip>
+            </Button>
+        </Grid>
+    </Border>
+
+    <UserControl.Resources>
+        <Style TargetType="Button" x:Key="scrollToBottom">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Button
+                            Background="{TemplateBinding Background}"
+                            Foreground="{TemplateBinding Foreground}"
+                            Content="{TemplateBinding Content}"/>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsVisible" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="0.7" Duration="0:0:0.3"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.7" To="0" Duration="0:0:0.3"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+</UserControl>

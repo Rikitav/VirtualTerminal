@@ -1,0 +1,32 @@
+﻿<Window x:Class="VirtualTerminal.TestApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:VirtualTerminal.TestApp"
+        xmlns:vt="clr-namespace:VirtualTerminal;assembly=VirtualTerminal"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="450" Width="800">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="30"/>
+        </Grid.RowDefinitions>
+
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition/>
+        </Grid.ColumnDefinitions>
+        
+        <vt:VirtualTerminalView 
+            x:Name="PART_Terminal_Left"
+            Grid.Row="0" Grid.Column="0"
+            AllowDirectInput="True"
+            CursorBlinking="True"
+            ScreenForeground="Blue"/>
+
+        <vt:PromptBox
+            x:Name="PART_Prompt_Left"
+            Grid.Row="1" Grid.Column="0"
+            Prompt=">"/>
+    </Grid>
+</Window>

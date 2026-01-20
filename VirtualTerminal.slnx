@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="VirtualTerminal.CommandLine/VirtualTerminal.CommandLine.csproj" Id="9742926d-7fb1-4c74-bff3-80d6aa3299de" />
+  <Project Path="VirtualTerminal.SecureShell/VirtualTerminal.SecureShell.csproj" Id="fec70be4-fcf2-41b4-aaa1-db2de5421502" />
+  <Project Path="VirtualTerminal.TestApp/VirtualTerminal.TestApp.csproj" />
+  <Project Path="VirtualTerminal/VirtualTerminal.csproj" />
+</Solution>
