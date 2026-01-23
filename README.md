@@ -16,11 +16,13 @@ This repository contains three main projects:
 Here I listed issues, that i'm aware of and working on patching them!
 
 - Backspace removing whole line, instead of one character
-- Cursor in console maybe mismathing his position in certain scenarios
+- Cursor in console maybe mismathcing his position in certain scenarios
 - No auto scrolling to prompt
 
 Please share your feedback if you encountered any problems!
 Also, im planning migration to new ANSI escape sequence encoder engine!
+
+---
 
 ## Getting started
 
