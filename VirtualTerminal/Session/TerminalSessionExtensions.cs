@@ -10,7 +10,7 @@ namespace VirtualTerminal.Session;
 /// </summary>
 public static class TerminalSessionExtensions
 {
-    private static readonly string _newLine = KeyHelper.Convert(Key.Enter)!;
+    private static readonly string _newLine = KeyHelper.ConvertToVT(Key.Enter)!;
     private static readonly string _clearSeq = "\x1b[2J\x1b[H";
 
     /// <summary>

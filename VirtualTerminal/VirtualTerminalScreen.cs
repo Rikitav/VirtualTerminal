@@ -1,6 +1,8 @@
-﻿using System.Globalization;
+﻿using System.ComponentModel;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Threading;
 using VirtualTerminal.Helpers;
 using VirtualTerminal.Interop;
 
@@ -13,16 +15,24 @@ namespace VirtualTerminal;
 public class VirtualTerminalScreen : FrameworkElement
 {
     //private static readonly COORD INVALID_CURSOR = new COORD(-1, -1);
-    private static readonly ConsoleCharacterAttributes defaultAttr = ConsoleCharacterAttributes.ForegroundBlue | ConsoleCharacterAttributes.ForegroundGreen | ConsoleCharacterAttributes.ForegroundRed;
+    private static readonly Color defaultForeground = Color.FromArgb(0xFF, 0x80, 0x80, 0x80);
+    private static readonly Color defaultBackground = Color.FromArgb(0xFF, 0x00, 0x00, 0x00);
 
+    private readonly DispatcherTimer? _blinkTimer;
     private readonly VisualCollection _children;
     private readonly List<DrawingVisual> _rowVisuals;
-    private readonly Lock _renderLock = new Lock();
+    private readonly DrawingVisual _cursorVisual;
+    private readonly Lock _renderLock;
 
-    private CONSOLE_SCREEN_BUFFER_INFO lastInfo = default;
+    private CONSOLE_SCREEN_BUFFER_INFO? lastInfo = null;
     private CHAR_INFO[] lastBuffer = null!;
+    private bool cursorVisible = true;
+    private bool cursorState = true;
 
     private Typeface Typeface => new Typeface(FontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+
+    /// <inheritdoc/>
+    protected override int VisualChildrenCount => _children.Count;
 
     /// <summary>
     /// Gets or sets the font family used to render terminal text.
@@ -65,26 +75,52 @@ public class VirtualTerminalScreen : FrameworkElement
     /// </summary>
     public VirtualTerminalScreen()
     {
-        _children = new VisualCollection(this);
+        _renderLock = new Lock();
+        _cursorVisual = new DrawingVisual();
         _rowVisuals = [];
-    }
+        _children = new VisualCollection(this) { _cursorVisual };
 
-    /// <inheritdoc/>
-    protected override int VisualChildrenCount => _children.Count;
+        _blinkTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(530), DispatcherPriority.Background, DispatcherBlinkHandler, Dispatcher);
+        //_blinkTimer.Start();
+    }
 
     /// <inheritdoc/>
     protected override Visual GetVisualChild(int index) => _children[index];
 
     /// <inheritdoc/>
-    protected override void OnRender(DrawingContext drawingContext)
+    protected override Size MeasureOverride(Size availableSize)
     {
-        InvalidateScreen();
+        if (lastInfo == null)
+            return new Size(0, 0);
+
+        Size size = GetCellSize();
+        double width = size.Width * lastInfo.Value.dwSize.X;
+        double height = size.Height * (lastInfo.Value.srWindow.Bottom + 3);
+        return new Size(width, height);
     }
 
     /// <inheritdoc/>
-    protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
+    protected override void OnRender(DrawingContext drawingContext)
     {
-        InvalidateScreen();
+        drawingContext.DrawRectangle(new SolidColorBrush(Background), new Pen(), new Rect(0, 0, RenderSize.Width, RenderSize.Height));
+        if (DesignerProperties.GetIsInDesignMode(this))
+            drawingContext.DrawText(Format("If you see this message, that means you're in a Designer mode! :P", new SolidColorBrush(Foreground)), new Point(0, 0));
+
+        if (lastInfo == null || lastBuffer == null)
+            return;
+
+        //RenderScreen(lastInfo.Value, lastBuffer);
+        //InvalidateScreen();
+    }
+
+    /// <summary>
+    /// Returns <see cref="Size"/> of terminals' cell from current Font settings
+    /// </summary>
+    /// <returns></returns>
+    public Size GetCellSize()
+    {
+        FormattedText formattedText = Format("M", Brushes.Black);
+        return new Size(formattedText.WidthIncludingTrailingWhitespace, formattedText.Height);
     }
 
     /// <summary>
@@ -96,32 +132,85 @@ public class VirtualTerminalScreen : FrameworkElement
     {
         lock (_renderLock)
         {
-            //int width = newInfo.dwSize.X;
-            
-
-            CorrectVisualsCount(newInfo);
-            if (NeedScreenInvalidation(newInfo, out _, out _))
+            bool lastCursorVisible = cursorVisible;
+            try
             {
-                lastInfo = newInfo;
-                lastBuffer = buffer;
-                InvalidateVisual();
-                return;
-            }
+                cursorVisible = false;
+                CorrectVisualsCount(newInfo);
 
-            RenderScreen(newInfo, buffer);
+                if (RequiresInvalidation(newInfo, out _, out _))
+                {
+                    lastInfo = newInfo;
+                    lastBuffer = buffer;
+
+                    InvalidateMeasure();
+                    InvalidateScreen();
+                    return;
+                }
+
+                /*
+                if (RequiresRemeasure(newInfo, out _, out _))
+                {
+                    lastInfo = newInfo;
+
+                    InvalidateMeasure();
+                    RenderScreen(newInfo, buffer);
+                }
+                */
+
+                lastInfo = newInfo;
+                InvalidateMeasure();
+                RenderScreen(newInfo, buffer);
+            }
+            finally
+            {
+                cursorVisible = lastCursorVisible;
+            }
         }
     }
 
-    private bool NeedScreenInvalidation(CONSOLE_SCREEN_BUFFER_INFO newInfo, out bool invalidateRows, out bool invalidateLines)
+    private bool RequiresInvalidation(CONSOLE_SCREEN_BUFFER_INFO newInfo, out bool invalidateRows, out bool invalidateColumns)
     {
-        invalidateLines = lastInfo.dwSize.X != newInfo.dwSize.X;
-        invalidateRows = lastInfo.dwSize.Y != newInfo.dwSize.Y;
-        return invalidateLines || invalidateRows;
+        if (lastInfo == null)
+        {
+            invalidateColumns = true;
+            invalidateRows = true;
+            return true;
+        }
+
+        invalidateColumns = lastInfo.Value.dwSize.X != newInfo.dwSize.X;
+        invalidateRows = lastInfo.Value.dwSize.Y != newInfo.dwSize.Y;
+        return invalidateColumns || invalidateRows;
     }
+
+    /*
+    private bool RequiresRemeasure(CONSOLE_SCREEN_BUFFER_INFO newInfo, out bool invalidateRows, out bool invalidateColumns)
+    {
+        if (lastInfo == null)
+        {
+            invalidateColumns = true;
+            invalidateRows = true;
+            return true;
+        }
+
+        int oldWidth = lastInfo.Value.srWindow.Left + lastInfo.Value.srWindow.Right;
+        int oldHeight = lastInfo.Value.srWindow.Top + lastInfo.Value.srWindow.Bottom;
+
+        int newWidth = newInfo.srWindow.Left + newInfo.srWindow.Right;
+        int newHeight = newInfo.srWindow.Top + newInfo.srWindow.Bottom;
+
+        invalidateColumns = oldWidth != newWidth;
+        invalidateRows = oldHeight != newHeight;
+        return invalidateColumns || invalidateRows;
+    }
+    */
 
     private void CorrectVisualsCount(CONSOLE_SCREEN_BUFFER_INFO info)
     {
-        int difference = info.dwSize.Y - lastInfo.dwSize.Y;
+        int difference = info.dwSize.Y;
+        if (lastInfo != null)
+            difference -= lastInfo.Value.dwSize.Y;
+
         if (difference == 0)
             return;
 
@@ -131,7 +220,7 @@ public class VirtualTerminalScreen : FrameworkElement
             {
                 DrawingVisual newVisual = new DrawingVisual();
                 _rowVisuals.Add(newVisual);
-                _children.Add(newVisual);
+                _children.Insert(_children.Count - 1, newVisual);
             }
         }
         else if (difference < 0)
@@ -139,7 +228,46 @@ public class VirtualTerminalScreen : FrameworkElement
             for (int i = 0; i < difference; i++)
             {
                 _rowVisuals.RemoveAt(_rowVisuals.Count - 1);
-                _children.RemoveAt(_rowVisuals.Count - 1);
+                _children.RemoveAt(_children.Count - 2);
+            }
+        }
+    }
+
+    private void InvalidateScreen()
+    {
+        if (lastBuffer == null)
+            return;
+
+        if (lastInfo == null)
+            return;
+
+        lock (_renderLock)
+        {
+            int height = lastInfo.Value.dwSize.Y; //srWindow.Bottom;
+            int width = lastInfo.Value.dwSize.X;
+            Size cellSize = GetCellSize();
+
+            for (int y = 0; y < height; y++)
+            {
+                try
+                {
+                    int bufferOffset = y * width;
+                    double verticalOffset = y * cellSize.Height;
+
+                    DrawingVisual visual = _rowVisuals[y];
+                    visual.Offset = new Vector(0, verticalOffset);
+
+                    Span<CHAR_INFO> rowSpan = lastBuffer.AsSpan(bufferOffset, width);
+                    RenderRow(visual, rowSpan, cellSize);
+
+                    if (lastInfo.Value.dwCursorPosition.Y == y)
+                        UpdateCursorPosition(lastInfo.Value.dwCursorPosition, lastInfo.Value.dwSize);
+                }
+                catch
+                {
+                    // fucked up somewhere
+                    _ = 0xBAD + 0xC0DE;
+                }
             }
         }
     }
@@ -148,17 +276,17 @@ public class VirtualTerminalScreen : FrameworkElement
     {
         lock (_renderLock)
         {
-            int height = info.dwSize.Y;
+            int height = info.dwSize.Y; //info.srWindow.Bottom;
             int width = info.dwSize.X;
             Size cellSize = GetCellSize();
-
-            int bufferOffset = 0;
-            double verticalOffset = 0;
 
             for (int y = 0; y < height; y++)
             {
                 try
                 {
+                    int bufferOffset = y * width;
+                    double verticalOffset = y * cellSize.Height;
+
                     DrawingVisual visual = _rowVisuals[y];
                     visual.Offset = new Vector(0, verticalOffset);
 
@@ -169,56 +297,13 @@ public class VirtualTerminalScreen : FrameworkElement
                         newRowSpan.CopyTo(rowSpan);
 
                     RenderRow(visual, rowSpan, cellSize);
+                    if (info.dwCursorPosition.Y == y)
+                        UpdateCursorPosition(info.dwCursorPosition, info.dwSize);
                 }
                 catch
                 {
                     // fucked up somewhere
                     _ = 0xBAD + 0xC0DE;
-                }
-                finally
-                {
-                    bufferOffset += width;
-                    verticalOffset += cellSize.Height;
-                }
-            }
-
-            Height = verticalOffset;
-        }
-    }
-
-    private void InvalidateScreen()
-    {
-        lock (_renderLock)
-        {
-            if (lastBuffer == null)
-                return;
-
-            int height = lastInfo.dwSize.Y;
-            int width = lastInfo.dwSize.X;
-            Size cellSize = GetCellSize();
-
-            int bufferOffset = 0;
-            double verticalOffset = 0;
-
-            for (int y = 0; y < height; y++)
-            {
-                try
-                {
-                    DrawingVisual visual = _rowVisuals[y];
-                    visual.Offset = new Vector(0, verticalOffset);
-
-                    Span<CHAR_INFO> rowSpan = lastBuffer.AsSpan(bufferOffset, width);
-                    RenderRow(visual, rowSpan, cellSize);
-                }
-                catch
-                {
-                    // fucked up somewhere
-                    _ = 0xBAD + 0xC0DE;
-                }
-                finally
-                {
-                    bufferOffset += width;
-                    verticalOffset += cellSize.Height;
                 }
             }
         }
@@ -239,31 +324,28 @@ public class VirtualTerminalScreen : FrameworkElement
                     int runLength = TakeWhileSameAttributes(remainingSlice);
                     x += runLength;
 
-                    ConsoleCharacterAttributes attr = remainingSlice[0].Attributes;
-                    Brush foreground = new SolidColorBrush(attr == defaultAttr
-                        ? Foreground : ColorHelper.ConvertToColor(attr, false));
-
                     Span<CHAR_INFO> runSpan = remainingSlice.Slice(0, runLength);
                     Span<char> textSpan = new char[runLength];
 
                     for (int i = 0; i < runLength; i++)
                         textSpan[i] = (char)runSpan[i].Char;
 
-                    FormattedText formatted = new FormattedText(new string(textSpan),
-                        CultureInfo.CurrentCulture,
-                        FlowDirection.LeftToRight,
-                        Typeface, FontSize, foreground,
-                        VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                    ConsoleCharacterAttributes attr = remainingSlice[0].Attributes;
+                    Color fore = ColorHelper.ConvertToColor(attr, false);
+                    Color back = ColorHelper.ConvertToColor(attr, true);
+
+                    FormattedText formatted = Format(new string(textSpan), new SolidColorBrush(fore == defaultForeground ? Foreground : fore));
+                    if (back != defaultBackground)
+                        dc.DrawRectangle(new SolidColorBrush(back), new Pen(), new Rect(horizontalOffset, 0, formatted.WidthIncludingTrailingWhitespace, formatted.Height));
 
                     dc.DrawText(formatted, new Point(horizontalOffset, 0));
+                    horizontalOffset += formatted.Width;
                 }
                 catch
                 {
                     // fucked up somewhere
                     _ = 0xBAD + 0xC0DE;
                 }
-
-                horizontalOffset = x * cellSize.Width;
             }
         }
     }
@@ -285,19 +367,82 @@ public class VirtualTerminalScreen : FrameworkElement
         return span.Length;
     }
 
-    /// <summary>
-    /// Returns <see cref="Size"/> of terminals' cell from current Font settings
-    /// </summary>
-    /// <returns></returns>
-    public Size GetCellSize()
+    private void DispatcherBlinkHandler(object? sender, EventArgs e)
     {
-        FormattedText formattedText = new FormattedText("M",
-            CultureInfo.CurrentCulture,
-            FlowDirection.LeftToRight,
-            Typeface, FontSize, Brushes.Black,
-            VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        if (!cursorVisible)
+            return;
 
-        return new Size(formattedText.WidthIncludingTrailingWhitespace, formattedText.Height);
+        if (!lastInfo.HasValue)
+            return;
+
+        if (lastBuffer == null)
+            return;
+
+        lock (_renderLock)
+        {
+            cursorState = !cursorState;
+            RenderCursor(
+                lastInfo.Value.dwCursorPosition,
+                lastInfo.Value.dwSize);
+        }
+    }
+
+    private void UpdateCursorPosition(COORD cursorPos, COORD bufferSize)
+    {
+        Size cellSize = GetCellSize();
+        Point point = new Point(cursorPos.X * cellSize.Width, cursorPos.Y * cellSize.Height);
+        _cursorVisual.Offset = (Vector)point;
+    }
+
+    private void RenderCursorState(COORD cursorPos, COORD bufferSize)
+    {
+        cursorPos.X -= 1;
+        int linearIndex = bufferSize.X * cursorPos.Y + cursorPos.X;
+        CHAR_INFO charInfo = lastBuffer.ElementAt(linearIndex + 1);
+
+        // Classic style cursor
+        /*
+        SolidColorBrush foreground = new SolidColorBrush(cursorState ? Background : Foreground);
+        SolidColorBrush background = new SolidColorBrush(cursorState ? Foreground : Background);
+
+        using DrawingContext dc = _cursorVisual.RenderOpen();
+        FormattedText formatted = Format(new string((char)charInfo.Char, 1), foreground);
+
+        dc.DrawRectangle(background, new Pen(), new Rect(0, 0, formatted.WidthIncludingTrailingWhitespace, formatted.Height));
+        dc.DrawText(formatted, new Point(0, 0));
+        */
+
+        // Modern style cursor
+        using DrawingContext dc = _cursorVisual.RenderOpen();
+        FormattedText formatted = Format(new string((char)charInfo.Char, 1), new SolidColorBrush(Foreground));
+
+        SolidColorBrush background = new SolidColorBrush(cursorState ? Foreground : Colors.Transparent);
+        dc.DrawRectangle(background, new Pen(), new Rect(0, 0, 1, formatted.Height));
+        dc.DrawText(formatted, new Point(0, 0));
+    }
+
+    private void RenderCursor(COORD cursorPos, COORD bufferSize)
+    {
+        lock (_renderLock)
+        {
+            try
+            {
+                UpdateCursorPosition(cursorPos, bufferSize);
+                RenderCursorState(cursorPos, bufferSize);
+            }
+            catch
+            {
+                // fucked up somewhere
+                _ = 0xBAD + 0xC0DE;
+            }
+        }
+    }
+
+    private FormattedText Format(string text, Brush foreground)
+    {
+        return new FormattedText(
+            text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            Typeface, FontSize, foreground,  VisualTreeHelper.GetDpi(this).PixelsPerDip);
     }
 
     private static void OnFontFamilyChanged(DependencyObject d, DependencyPropertyChangedEventArgs args)

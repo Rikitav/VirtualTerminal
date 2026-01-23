@@ -9,6 +9,7 @@
         Title="MainWindow" Height="450" Width="800">
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="40"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="30"/>
         </Grid.RowDefinitions>
@@ -16,17 +17,40 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition/>
         </Grid.ColumnDefinitions>
+
+        <Border Grid.Row="0" Grid.Column="0" BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Margin="5">
+            <DockPanel>
+                <TextBlock
+                    Text="CMD : "
+                    VerticalAlignment="Center"
+                    Margin="5,0,0,0"/>
+                
+                <Button
+                    DockPanel.Dock="Right"
+                    Content="Start"
+                    Click="Button_Click"/>
+                
+                <TextBox
+                    x:Name="PART_CommandLineName"
+                    VerticalContentAlignment="Center"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    Text="powershell.exe"/>
+            </DockPanel>
+        </Border>
         
         <vt:VirtualTerminalView 
             x:Name="PART_Terminal_Left"
-            Grid.Row="0" Grid.Column="0"
+            Grid.Row="1" Grid.Column="0"
             AllowDirectInput="True"
             CursorBlinking="True"
-            ScreenForeground="Blue"/>
+            FontFamily="Cascadia Mono "
+            ScreenBackground="Black"
+            ScreenForeground="White"/>
 
         <vt:PromptBox
             x:Name="PART_Prompt_Left"
-            Grid.Row="1" Grid.Column="0"
+            Grid.Row="2" Grid.Column="0"
             Prompt=">"/>
     </Grid>
 </Window>

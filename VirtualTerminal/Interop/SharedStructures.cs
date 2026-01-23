@@ -56,25 +56,42 @@ public enum ConsoleCharacterAttributes : ushort
 /// Win32 COORD structure used to represent buffer sizes and coordinates in console APIs.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
-public struct COORD(short x, short y)
+public struct COORD(short x, short y) : IEquatable<COORD>
 {
+    public static readonly COORD Invalid = new COORD(-1, -1);
+
     public short X = x;
     public short Y = y;
 
     public COORD(int x, int y)
         : this((short)x, (short)y) { }
+
+    public readonly bool Equals(COORD other)
+        => X == other.X && Y == other.Y;
+
+    public override readonly bool Equals(object? obj)
+        => obj is COORD coord && Equals(coord);
+
+    public static bool operator ==(COORD left, COORD right)
+        => left.Equals(right);
+
+    public static bool operator !=(COORD left, COORD right)
+        => !(left == right);
+
+    public override readonly int GetHashCode()
+        => HashCode.Combine(X.GetHashCode(), Y.GetHashCode());
 }
 
 /// <summary>
 /// Win32 SMALL_RECT structure used to represent a rectangular region in console APIs.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
-public struct SMALL_RECT
+public struct SMALL_RECT(short left, short top, short right, short bottom)
 {
-    public short Left;
-    public short Top;
-    public short Right;
-    public short Bottom;
+    public short Left = left;
+    public short Top = top;
+    public short Right = right;
+    public short Bottom = bottom;
 }
 
 /// <summary>

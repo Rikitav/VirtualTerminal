@@ -19,11 +19,8 @@ public partial class VirtualTerminalView : UserControl, IDisposable
 {
     private readonly Lock _renderLock = new Lock();
     private readonly DispatcherTimer? _renderTimer;
-    //private readonly DispatcherTimer? _blinkTimer;
 
-    private bool _renderPending;
-    private bool _cursorVisible = true;
-    private COORD _cursorPosition = new COORD(-1, -1);
+    private bool renderPending;
 
     /// <summary>
     /// Gets or sets the active <see cref="ITerminalSession"/> displayed by this control.
@@ -115,27 +112,18 @@ public partial class VirtualTerminalView : UserControl, IDisposable
         AutoScrolling = true;
 
         _renderTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Background, DispatcherRenderHandler, Dispatcher);
-        //_blinkTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(530), DispatcherPriority.Background, DispatcherBlinkHandler, Dispatcher);
-
         _renderTimer.Start();
-        //_blinkTimer.Start();
 
         Unloaded += (o, e) => Dispose();
-    }
-
-    private void DispatcherBlinkHandler(object? sender, EventArgs e)
-    {
-        _cursorVisible = !_cursorVisible;
-        ScheduleRender();
     }
 
     private void DispatcherRenderHandler(object? sender, EventArgs e)
     {
         lock (_renderLock)
         {
-            if (_renderPending)
+            if (renderPending)
             {
-                _renderPending = false;
+                renderPending = false;
                 RenderOutput();
             }
         }
@@ -143,7 +131,7 @@ public partial class VirtualTerminalView : UserControl, IDisposable
 
     private void ScheduleRender()
     {
-        _renderPending = true;
+        renderPending = true;
     }
 
     private void RenderOutput()
@@ -204,7 +192,7 @@ public partial class VirtualTerminalView : UserControl, IDisposable
 
         try
         {
-            string? result = KeyHelper.Convert(e);
+            string? result = KeyHelper.ConvertToVT(e);
             if (result == null)
                 return;
 

@@ -25,7 +25,7 @@ public class BufferStreamWriter : TextWriter
     {
         _buffer = buffer;
 
-        NewLine = KeyHelper.Convert(Key.Enter);
+        NewLine = KeyHelper.ConvertToVT(Key.Enter);
     }
 
     /// <inheritdoc />
@@ -78,7 +78,7 @@ public class BufferStreamWriter : TextWriter
     /// <param name="value">Key to encode.</param>
     public void Write(Key value)
     {
-        string? result = KeyHelper.Convert(value);
+        string? result = KeyHelper.ConvertToVT(value);
         if (result == null)
             return;
 

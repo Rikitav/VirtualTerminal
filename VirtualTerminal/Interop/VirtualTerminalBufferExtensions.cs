@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace VirtualTerminal.Interop;
 
@@ -9,6 +10,79 @@ namespace VirtualTerminal.Interop;
 /// </summary>
 public static partial class VirtualTerminalBufferExtensions
 {
+    /// <summary>
+    /// Writes raw bytes encoded from <paramref name="encoding"/> into the console screen buffer via <c>WriteConsoleW</c>.
+    /// </summary>
+    /// <param name="buffer"></param>
+    /// <param name="encoding"></param>
+    /// <param name="data"></param>
+    public static void WriteFromEncoding(this VirtualTerminalBuffer buffer, Encoding encoding, ReadOnlySpan<byte> data)
+    {
+        int maxCharCount = encoding.GetMaxCharCount(data.Length);
+        Span<char> charBuffer = stackalloc char[maxCharCount];
+
+        int charsWritten = encoding.GetChars(data, charBuffer);
+        if (charsWritten == 0)
+            return;
+
+        buffer.Write(charBuffer.Slice(0, charsWritten));
+        return;
+    }
+
+    /// <summary>
+    /// Writes character into the console screen buffer via <c>WriteConsoleW</c> in <see cref="VirtualTerminalBuffer.Encoding"/>.
+    /// </summary>
+    /// <param name="buffer"></param>
+    /// <param name="data"></param>
+    public static void Write(this VirtualTerminalBuffer buffer, ReadOnlySpan<char> data)
+    {
+        int bytesCount = VirtualTerminalBuffer.Encoding.GetMaxByteCount(data.Length);
+        Span<byte> bytes = stackalloc byte[bytesCount];
+        
+        int bytesWritten = VirtualTerminalBuffer.Encoding.GetBytes(data, bytes);
+        if (bytesCount == 0)
+            return;
+
+        buffer.Write(bytes.Slice(0, bytesWritten));
+    }
+
+    /// <summary>
+    /// Writes character into the console screen buffer via <c>WriteConsoleW</c> in <see cref="VirtualTerminalBuffer.Encoding"/>.
+    /// </summary>
+    /// <param name="buffer"></param>
+    /// <param name="data"></param>
+    /// <param name="offset"></param>
+    /// <param name="length"></param>
+    public static void Write(this VirtualTerminalBuffer buffer, ReadOnlySpan<char> data, int offset, int length)
+    {
+        buffer.Write(data.Slice(offset, length));
+    }
+
+    /// <summary>
+    /// Writes raw bytes into the console screen buffer via <c>WriteConsoleW</c>.
+    /// </summary>
+    /// <param name="buffer"></param>
+    /// <param name="data"></param>
+    /// <param name="offset"></param>
+    /// <param name="length"></param>
+    public static void Write(this VirtualTerminalBuffer buffer, ReadOnlySpan<byte> data, int offset, int length)
+    {
+        buffer.Write(data.Slice(offset, length));
+    }
+
+    /// <summary>
+    /// Writes raw bytes into the console screen buffer via <c>WriteConsoleW</c>.
+    /// </summary>
+    /// <param name="buffer"></param>
+    /// <param name="encoding"></param>
+    /// <param name="data"></param>
+    /// <param name="offset"></param>
+    /// <param name="length"></param>
+    public static void WriteFromEncoding(this VirtualTerminalBuffer buffer, Encoding encoding, ReadOnlySpan<byte> data, int offset, int length)
+    {
+        buffer.WriteFromEncoding(encoding, data.Slice(offset, length));
+    }
+
     /// <summary>
     /// Enables console input mode flags on <see cref="VirtualTerminalBuffer.InputHandle"/>.
     /// </summary>
@@ -84,6 +158,49 @@ public static partial class VirtualTerminalBufferExtensions
         return lpConsoleCursorInfo.bVisible;
     }
 
+    /// <summary>
+    /// Returns console cursor position for this buffer
+    /// </summary>
+    /// <param name="buffer"></param>
+    /// <returns></returns>
+    public static COORD GetCursorPosition(this VirtualTerminalBuffer buffer)
+    {
+        return buffer.GetBufferInfo().dwCursorPosition;
+    }
+
+    /// <summary>
+    /// Sets console cursor position for this buffer
+    /// </summary>
+    /// <param name="buffer"></param>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <exception cref="ObjectDisposedException"></exception>
+    /// <exception cref="Win32Exception"></exception>
+    public static void SetCursorPosition(this VirtualTerminalBuffer buffer, int x, int y)
+    {
+        if (buffer.IsDisposed)
+            throw new ObjectDisposedException(nameof(VirtualTerminalBuffer));
+
+        if (!NativeMethods.SetConsoleCursorPosition(buffer.OutputHandle, new COORD(x, y)))
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "GetConsoleCursorInfo failed");
+    }
+
+    /// <summary>
+    /// Sets console cursor position for this buffer
+    /// </summary>
+    /// <param name="buffer"></param>
+    /// <param name="coord"></param>
+    /// <exception cref="ObjectDisposedException"></exception>
+    /// <exception cref="Win32Exception"></exception>
+    public static void SetCursorPosition(this VirtualTerminalBuffer buffer, COORD coord)
+    {
+        if (buffer.IsDisposed)
+            throw new ObjectDisposedException(nameof(VirtualTerminalBuffer));
+
+        if (!NativeMethods.SetConsoleCursorPosition(buffer.OutputHandle, coord))
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "GetConsoleCursorInfo failed");
+    }
+
     private static partial class NativeMethods
     {
         [LibraryImport("kernel32.dll", SetLastError = true)]
@@ -101,6 +218,10 @@ public static partial class VirtualTerminalBufferExtensions
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool GetConsoleCursorInfo(IntPtr hConsoleOutput, ref CONSOLE_CURSOR_INFO lpConsoleCursorInfo);
+
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static partial bool SetConsoleCursorPosition(IntPtr hConsoleOutput, COORD dwCursorPosition);
     }
 
     [StructLayout(LayoutKind.Sequential)]

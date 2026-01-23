@@ -21,12 +21,14 @@ public static partial class ConsoleHelper
 
         if (NativeMethods.GetConsoleWindow() == IntPtr.Zero)
         {
+            /*
             ALLOC_CONSOLE_OPTIONS options = new ALLOC_CONSOLE_OPTIONS()
             {
                 Mode = AllocConsoleMode.NoWindow,
                 UseShowWindow = 1, // TRUE
                 showWindow = SW_HIDE,
             };
+            */
 
             if (!NativeMethods.AllocConsole())
             {
@@ -70,6 +72,9 @@ public static partial class ConsoleHelper
         [return: MarshalAs(UnmanagedType.Bool)]
         public static partial bool AllocConsole();
 
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        public static partial int AllocConsoleWithOptions(ref ALLOC_CONSOLE_OPTIONS options, out AllocConsoleResult result);
+
         [LibraryImport("kernel32.dll")]
         public static partial IntPtr GetConsoleWindow();
 
@@ -86,11 +91,18 @@ public static partial class ConsoleHelper
         public static partial bool SetConsoleCP(uint wCodePageID);
     }
 
-    private enum AllocConsoleMode
+    private enum AllocConsoleMode : short
     {
         Default = 0,
         NewWindow = 1,
         NoWindow = 2
+    }
+
+    private enum AllocConsoleResult : short
+    {
+        NoConsole = 0,
+        NewConsole = 1,
+        ExistingConsole = 2
     }
 
     private struct ALLOC_CONSOLE_OPTIONS

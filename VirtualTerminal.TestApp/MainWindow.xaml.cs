@@ -12,13 +12,22 @@ public partial class MainWindow : Window
         InitializeComponent();
     }
 
-    /// <inheritdoc/>
-    protected override async void OnInitialized(EventArgs e)
+    private void Button_Click(object sender, RoutedEventArgs e)
     {
-        base.OnInitialized(e);
+        if (string.IsNullOrEmpty(PART_CommandLineName.Text))
+            return;
 
-        CommandLineSession session = new CommandLineSession("cmd.exe");
-        PART_Terminal_Left.Session = session;
-        PART_Prompt_Left.Session = session;
+        try
+        {
+            PART_Terminal_Left.Session?.Dispose();
+            
+            CommandLineSession session = new CommandLineSession(PART_CommandLineName.Text);
+            PART_Terminal_Left.Session = session;
+            PART_Prompt_Left.Session = session;
+        }
+        catch
+        {
+
+        }
     }
 }

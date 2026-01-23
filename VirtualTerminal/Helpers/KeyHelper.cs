@@ -15,15 +15,15 @@ public static partial class KeyHelper
     /// <summary>
     /// Converts a WPF key event into a VT/ANSI string (when possible).
     /// </summary>
-    public static string? Convert(KeyEventArgs e)
+    public static string? ConvertToVT(KeyEventArgs e)
     {
-        return Convert(e.Key);
+        return ConvertToVT(e.Key);
     }
 
     /// <summary>
     /// Converts a WPF <see cref="Key"/> into a VT200 control sequence (for special keys) or a printable character.
     /// </summary>
-    public static string? Convert(Key key)
+    public static string? ConvertToVT(Key key)
     {
         string? vtCode = GetVT200Code(key);
         if (vtCode != null)
@@ -31,6 +31,17 @@ public static partial class KeyHelper
 
         return GetCharFromKey(key);
     }
+
+    /*
+    public static string? ConvertToCmd(Key key)
+    {
+        string? vtCode = GetVT200Code(key);
+        if (vtCode != null)
+            return vtCode;
+
+        return GetCharFromKey(key);
+    }
+    */
 
     /// <summary>
     /// Returns a VT200 escape sequence for special keys (arrows, function keys, etc.), or <c>null</c> if not mapped.
@@ -63,7 +74,7 @@ public static partial class KeyHelper
             Key.F12 => Csi + "24~",
             Key.Enter => "\r", // "\n"
             Key.Tab => "\t",
-            Key.Back => "\b", // Csi + "K",
+            Key.Back => "\x0008", // Csi + "K",
             Key.Escape => Esc,
             _ => null,
         };

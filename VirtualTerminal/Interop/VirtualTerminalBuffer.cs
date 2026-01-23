@@ -59,6 +59,7 @@ public partial class VirtualTerminalBuffer : IDisposable
     public VirtualTerminalBuffer()
     {
         InitializeConsoleBuffer();
+        ResizeBuffer(120, 400);
     }
 
     /// <summary>
@@ -140,7 +141,7 @@ public partial class VirtualTerminalBuffer : IDisposable
                 info.srWindow.Top = (short)(info.srWindow.Bottom - windowHeight + 1);
             }
             */
-            SMALL_RECT readRegion = info.srWindow;
+            SMALL_RECT readRegion = new SMALL_RECT(0, 0, info.dwSize.X, info.dwSize.Y); //info.srWindow;
             CHAR_INFO[] buffer = new CHAR_INFO[windowWidth * windowHeight];
             COORD bufferSize = new COORD(windowWidth, windowHeight);
             COORD bufferCoord = new COORD(0, 0);
@@ -257,14 +258,6 @@ public partial class VirtualTerminalBuffer : IDisposable
         public static partial bool SetConsoleScreenBufferSize(
             IntPtr hConsoleOutput,
             COORD dwSize);
-
-        /*
-        [LibraryImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static partial bool SetConsoleCursorPosition(
-            IntPtr hConsoleOutput,
-            COORD dwCursorPosition);
-        */
 
         [LibraryImport("kernel32.dll", EntryPoint = "WriteConsoleW", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]

@@ -8,6 +8,7 @@
              FontFamily="Consolas" FontSize="13" Cursor="Arrow"
              d:DesignHeight="450" d:DesignWidth="800">
     <Border
+        Focusable="False"
         Background="{Binding Background, ElementName=this}"
         BorderBrush="{Binding BorderBrush, ElementName=this}"
         BorderThickness="{Binding BorderThickness, ElementName=this}">
@@ -24,13 +25,13 @@
                 Grid.Row="0"
                 VerticalScrollBarVisibility="Auto"
                 HorizontalScrollBarVisibility="Disabled"
-                Background="Black"
+                Background="Transparent"
                 ScrollChanged="PART_ScrollViewer_ScrollChanged">
 
                 <local:VirtualTerminalScreen
                     x:Name="PART_Output"
-                    Margin="4"
-                    VerticalAlignment="Top"/>
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"/>
             </ScrollViewer>
 
             <!-- Scroll to bottom button -->
@@ -47,6 +48,17 @@
             </Button>
         </Grid>
     </Border>
+
+    <!--UserControl.Style>
+        <Style TargetType="UserControl">
+            <Style.Triggers>
+                <Trigger Property="IsFocused" Value="True">
+                    <Setter Property="BorderThickness" Value="5"/>
+                    <Setter Property="BorderBrush" Value="Cyan"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Style-->
 
     <UserControl.Resources>
         <Style TargetType="Button" x:Key="scrollToBottom">
