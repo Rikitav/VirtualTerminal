@@ -26,13 +26,21 @@ public class VirtualTerminalScreen : FrameworkElement
 
     private CONSOLE_SCREEN_BUFFER_INFO? lastInfo = null;
     private CHAR_INFO[] lastBuffer = null!;
-    private bool cursorVisible = true;
     private bool cursorState = true;
 
     private Typeface Typeface => new Typeface(FontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
 
     /// <inheritdoc/>
     protected override int VisualChildrenCount => _children.Count;
+
+    /// <summary>
+    /// Gets or sets the font family used to render terminal text.
+    /// </summary>
+    public bool CursorVisible
+    {
+        get => (bool)GetValue(CursorVisibleProperty);
+        set => SetValue(CursorVisibleProperty, value);
+    }
 
     /// <summary>
     /// Gets or sets the font family used to render terminal text.
@@ -81,7 +89,7 @@ public class VirtualTerminalScreen : FrameworkElement
         _children = new VisualCollection(this) { _cursorVisual };
 
         _blinkTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(530), DispatcherPriority.Background, DispatcherBlinkHandler, Dispatcher);
-        //_blinkTimer.Start();
+        _blinkTimer.Start();
     }
 
     /// <inheritdoc/>
@@ -132,10 +140,10 @@ public class VirtualTerminalScreen : FrameworkElement
     {
         lock (_renderLock)
         {
-            bool lastCursorVisible = cursorVisible;
+            bool lastCursorVisible = CursorVisible;
             try
             {
-                cursorVisible = false;
+                CursorVisible = false;
                 CorrectVisualsCount(newInfo);
 
                 if (RequiresInvalidation(newInfo, out _, out _))
@@ -164,7 +172,7 @@ public class VirtualTerminalScreen : FrameworkElement
             }
             finally
             {
-                cursorVisible = lastCursorVisible;
+                CursorVisible = lastCursorVisible;
             }
         }
     }
@@ -369,9 +377,6 @@ public class VirtualTerminalScreen : FrameworkElement
 
     private void DispatcherBlinkHandler(object? sender, EventArgs e)
     {
-        if (!cursorVisible)
-            return;
-
         if (!lastInfo.HasValue)
             return;
 
@@ -380,6 +385,16 @@ public class VirtualTerminalScreen : FrameworkElement
 
         lock (_renderLock)
         {
+            if (!CursorVisible)
+            {
+                cursorState = false;
+                RenderCursor(
+                    lastInfo.Value.dwCursorPosition,
+                    lastInfo.Value.dwSize);
+
+                return;
+            }
+
             cursorState = !cursorState;
             RenderCursor(
                 lastInfo.Value.dwCursorPosition,
@@ -445,6 +460,11 @@ public class VirtualTerminalScreen : FrameworkElement
             Typeface, FontSize, foreground,  VisualTreeHelper.GetDpi(this).PixelsPerDip);
     }
 
+    private static void OnCursorVisibleChanged(DependencyObject d, DependencyPropertyChangedEventArgs args)
+    {
+
+    }
+
     private static void OnFontFamilyChanged(DependencyObject d, DependencyPropertyChangedEventArgs args)
     {
 
@@ -464,6 +484,13 @@ public class VirtualTerminalScreen : FrameworkElement
     {
 
     }
+
+    /// <summary>
+    /// Identifies the <see cref="FontFamily"/> dependency property.
+    /// </summary>
+    public static readonly DependencyProperty CursorVisibleProperty = DependencyProperty.Register(
+        nameof(CursorVisible), typeof(bool), typeof(VirtualTerminalScreen),
+        new FrameworkPropertyMetadata(true, OnFontFamilyChanged));
 
     /// <summary>
     /// Identifies the <see cref="FontFamily"/> dependency property.

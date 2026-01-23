@@ -110,6 +110,7 @@ public partial class VirtualTerminalView : UserControl, IDisposable
     {
         InitializeComponent();
         AutoScrolling = true;
+        PART_Output.CursorVisible = false;
 
         _renderTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Background, DispatcherRenderHandler, Dispatcher);
         _renderTimer.Start();
@@ -179,6 +180,20 @@ public partial class VirtualTerminalView : UserControl, IDisposable
     private bool IsScrollAtBottom()
     {
         return PART_ScrollViewer.VerticalOffset + PART_ScrollViewer.ViewportHeight >= PART_ScrollViewer.ExtentHeight - 1.0;
+    }
+
+    /// <inheritdoc/>
+    protected override void OnLostKeyboardFocus(KeyboardFocusChangedEventArgs e)
+    {
+        base.OnLostKeyboardFocus(e);
+        PART_Output.CursorVisible = false;
+    }
+
+    /// <inheritdoc/>
+    protected override void OnGotKeyboardFocus(KeyboardFocusChangedEventArgs e)
+    {
+        base.OnLostKeyboardFocus(e);
+        PART_Output.CursorVisible = true;
     }
 
     /// <inheritdoc/>
