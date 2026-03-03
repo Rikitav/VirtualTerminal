@@ -121,7 +121,7 @@ public class TerminalScreenBuffer(int initCols, int initRows) : IDisposable, IEn
     public int RowsCount { get; set; } = initRows;
     public TerminalCellInfo[] Cells { get; } = new TerminalCellInfo[initCols * initRows];
 
-    public Encoding Encoding => Encoding.ASCII;
+    public static Encoding Encoding => Encoding.ASCII;
 
     public TerminalScreenBuffer()
         : this(30, 120) { }

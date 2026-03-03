@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Media3D;
 using System.Windows.Threading;
 using VirtualTerminal.Engine;
 using VirtualTerminal.Engine.Components;
@@ -26,11 +27,10 @@ public class VirtualTerminalScreen : FrameworkElement, ITerminalScreenView
     private IBufferedDecoder? currentDecoder = null;
     private TerminalScreenBuffer? currentBuffer = null;
     private Coord currentCursorPosition = new Coord(0, 0);
+
     private bool needsFullInvalidation = false;
     private bool cursorState = true;
     
-    private Typeface Typeface => new Typeface(FontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
-
     /// <inheritdoc/>
     protected override int VisualChildrenCount => _children.Count;
 
@@ -384,10 +384,10 @@ public class VirtualTerminalScreen : FrameworkElement, ITerminalScreenView
     {
         if (sender?.Buffer == null)
             return;
-            
+
         currentDecoder = sender;
         currentBuffer = sender.Buffer;
-        
+
         // Invalidate current row where cursor is
         int row = sender.CursorPosition.Y;
         InvalidateRow(row);
@@ -404,7 +404,7 @@ public class VirtualTerminalScreen : FrameworkElement, ITerminalScreenView
 
         if (sender?.Buffer == null)
             return;
-            
+
         currentDecoder = sender;
         currentBuffer = sender.Buffer;
 
@@ -589,10 +589,12 @@ public class VirtualTerminalScreen : FrameworkElement, ITerminalScreenView
                         VisualTreeHelper.GetDpi(this).PixelsPerDip);
                     
                     if (firstCell.Background != defaultBackground)
+                    {
                         dc.DrawRectangle(new SolidColorBrush(
                             TerminalCellInfo.TextColorToColor(firstCell.Foreground)),
                             new Pen(),
                             new Rect(horizontalOffset, 0, formatted.WidthIncludingTrailingWhitespace, formatted.Height));
+                    }
 
                     dc.DrawText(formatted, new Point(horizontalOffset, 0));
                     horizontalOffset += formatted.Width;
@@ -688,9 +690,10 @@ public class VirtualTerminalScreen : FrameworkElement, ITerminalScreenView
 
     private FormattedText Format(string text, Brush foreground)
     {
+        Typeface typeface = new Typeface(FontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
         return new FormattedText(
             text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-            Typeface, FontSize, foreground,  VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            typeface, FontSize, foreground,  VisualTreeHelper.GetDpi(this).PixelsPerDip);
     }
 
     private static void OnCursorVisibleChanged(DependencyObject d, DependencyPropertyChangedEventArgs args)

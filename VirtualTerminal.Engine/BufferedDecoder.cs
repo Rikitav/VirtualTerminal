@@ -120,7 +120,7 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
 
             case 'm':
                 {
-                    GraphicRendition[] commands = parameters.Select(p => (GraphicRendition)p).ToArray();
+                    GraphicRendition[] commands = [.. parameters.Select(p => (GraphicRendition)p)];
                     SetGraphicRendition(this, commands);
                     break;
                 }

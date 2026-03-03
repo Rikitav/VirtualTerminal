@@ -13,6 +13,14 @@ public static class TerminalSessionExtensions
     private static readonly string _newLine = KeyHelper.ConvertToVT(Key.Enter)!;
     private static readonly string _clearSeq = "\x1b[2J\x1b[H";
 
+    extension(Console)
+    {
+        public static void RedirectToSession(ITerminalSession session)
+        {
+            session.RedirectConsole();
+        }
+    }
+
     /// <summary>
     /// Appends text to the session input, encoding it with <see cref="ITerminalSession.InputEncoding"/>.
     /// </summary>

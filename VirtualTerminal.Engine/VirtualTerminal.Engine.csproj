@@ -8,7 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Parsing\" />
+    <Compile Remove="Parsing\**" />
+    <EmbeddedResource Remove="Parsing\**" />
+    <None Remove="Parsing\**" />
+    <Page Remove="Parsing\**" />
   </ItemGroup>
 
 </Project>

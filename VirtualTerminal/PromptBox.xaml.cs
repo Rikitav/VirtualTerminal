@@ -1,5 +1,4 @@
-﻿using System.Text;
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -7,17 +6,6 @@ using VirtualTerminal.Interop;
 using VirtualTerminal.Session;
 
 namespace VirtualTerminal;
-
-/// <summary>
-/// Routed event handler for <see cref="PromptBox.CommandSubmitted"/>. Raised when the user submits a command
-/// (Enter key or clicking the submit button).
-/// </summary>
-public delegate void CommandSubmittedEventHandler(object sender, CommandSubmittedEventArgs e);
-
-/// <summary>
-/// Routed event handler for <see cref="PromptBox.KeyPressed"/>. Intended for forwarding raw key input to listeners.
-/// </summary>
-public delegate void KeyPressedEventHandler(object sender, KeyPressedEventArgs e);
 
 /// <summary>
 /// Routed event arguments for <see cref="PromptBox.CommandSubmitted"/>, containing the submitted command text.
@@ -87,7 +75,7 @@ public partial class PromptBox : UserControl
     /// <summary>
     /// Occurs when a special key (VT sequence) is pressed and forwarded. Routed event (bubbling).
     /// </summary>
-    public event KeyPressedEventHandler KeyPressed
+    public event EventHandler<KeyPressedEventArgs> KeyPressed
     {
         add => AddHandler(KeyPressedEvent, value);
         remove => RemoveHandler(KeyPressedEvent, value);
@@ -96,7 +84,7 @@ public partial class PromptBox : UserControl
     /// <summary>
     /// Occurs when the user submits a command (Enter or submit button). Routed event (bubbling).
     /// </summary>
-    public event CommandSubmittedEventHandler CommandSubmitted
+    public event EventHandler<CommandSubmittedEventArgs> CommandSubmitted
     {
         add => AddHandler(CommandSubmittedEvent, value);
         remove => RemoveHandler(CommandSubmittedEvent, value);
@@ -224,12 +212,12 @@ public partial class PromptBox : UserControl
     /// </summary>
     public static readonly RoutedEvent CommandSubmittedEvent = EventManager.RegisterRoutedEvent(
         nameof(CommandSubmitted), RoutingStrategy.Bubble,
-        typeof(CommandSubmittedEventHandler), typeof(PromptBox));
+        typeof(EventHandler<CommandSubmittedEventArgs>), typeof(PromptBox));
 
     /// <summary>
     /// Identifies the <see cref="KeyPressed"/> routed event.
     /// </summary>
     public static readonly RoutedEvent KeyPressedEvent = EventManager.RegisterRoutedEvent(
         nameof(KeyPressed), RoutingStrategy.Bubble,
-        typeof(KeyPressedEventHandler), typeof(PromptBox));
+        typeof(EventHandler<KeyPressedEventArgs>), typeof(PromptBox));
 }

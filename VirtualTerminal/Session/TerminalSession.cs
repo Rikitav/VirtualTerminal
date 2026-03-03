@@ -22,7 +22,7 @@ public abstract class TerminalSession : ITerminalSession
     public event EventHandler? Disconnected;
 
     /// <inheritdoc />
-    public TerminalScreenBuffer Buffer => _decoder.Buffer; // Use decoder's buffer
+    public TerminalScreenBuffer Buffer => _decoder.Buffer;
 
     /// <inheritdoc />
     public IBufferedDecoder Decoder => _decoder;
@@ -46,7 +46,6 @@ public abstract class TerminalSession : ITerminalSession
     public TerminalSession()
     {
         _decoder = new BufferedDecoder();
-        // AnsiDecoder creates its own buffer
         InputEncoding = Encoding.UTF8;
     }
 
@@ -57,7 +56,6 @@ public abstract class TerminalSession : ITerminalSession
     public TerminalSession(Encoding encoding)
     {
         _decoder = new BufferedDecoder();
-        // AnsiDecoder creates its own buffer
         InputEncoding = encoding;
     }
 
