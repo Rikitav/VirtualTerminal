@@ -15,6 +15,10 @@ public static class TerminalSessionExtensions
 
     extension(Console)
     {
+        /// <summary>
+        /// Redirects <see cref="Console.Out"/> to the session buffer, so <see cref="Console.WriteLine(string?)"/> output becomes visible in the terminal UI.
+        /// </summary>
+        /// <param name="session"></param>
         public static void RedirectToSession(ITerminalSession session)
         {
             session.RedirectConsole();
@@ -28,15 +32,7 @@ public static class TerminalSessionExtensions
     /// <param name="text">Text to send.</param>
     public static void Append(this ITerminalSession session, string text)
     {
-        /*
-        Span<byte> data = stackalloc byte[text.Length * session.InputEncoding.GetCharSize()];
-        int count = session.InputEncoding.GetBytes(text, data);
-
-        if (count == 0)
-            return;
-        */
-
-        Span<byte> data = session.InputEncoding.GetBytes(text);
+        byte[] data = session.InputEncoding.GetBytes(text);
         session.WriteInput(data);
     }
 
