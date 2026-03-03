@@ -1,10 +1,12 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using VirtualTerminal.Engine;
 using VirtualTerminal.Helpers;
 using VirtualTerminal.Interop;
 using VirtualTerminal.Session;
@@ -12,7 +14,7 @@ using VirtualTerminal.Session;
 namespace VirtualTerminal;
 
 /// <summary>
-/// WPF control that renders a <see cref="ITerminalSession"/>'s <see cref="VirtualTerminalBuffer"/> and optionally
+/// WPF control that renders a <see cref="ITerminalSession"/>'s <see cref="TerminalScreenBuffer"/> and optionally
 /// forwards direct keyboard input to the session using VT key sequences.
 /// </summary>
 public partial class VirtualTerminalView : UserControl, IDisposable
@@ -98,9 +100,9 @@ public partial class VirtualTerminalView : UserControl, IDisposable
     /// <summary>
     /// Gets the encoding used by the underlying console buffer.
     /// </summary>
-    public static Encoding Encoding
+    public Encoding? Encoding
     {
-        get => VirtualTerminalBuffer.Encoding;
+        get => Session?.Buffer?.Encoding;
     }
 
     /// <summary>
@@ -112,8 +114,8 @@ public partial class VirtualTerminalView : UserControl, IDisposable
         AutoScrolling = true;
         PART_Output.CursorVisible = false;
 
-        _renderTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Background, DispatcherRenderHandler, Dispatcher);
-        _renderTimer.Start();
+        //_renderTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Background, DispatcherRenderHandler, Dispatcher);
+        //_renderTimer.Start();
 
         Unloaded += (o, e) => Dispose();
     }
@@ -137,6 +139,7 @@ public partial class VirtualTerminalView : UserControl, IDisposable
 
     private void RenderOutput()
     {
+        /*
         lock (_renderLock)
         {
             if (Session?.Buffer == null)
@@ -153,6 +156,7 @@ public partial class VirtualTerminalView : UserControl, IDisposable
                 Debug.WriteLine(ex.Message);
             }
         }
+        */
     }
 
     private void UpdateScrollDownVisibility()
@@ -286,10 +290,31 @@ public partial class VirtualTerminalView : UserControl, IDisposable
         lock (terminal._renderLock)
         {
             if (e.OldValue is TerminalSession oldSess)
+            {
                 oldSess.BufferUpdated -= terminal.OnBufferUpdated;
+                // Disconnect old decoder from screen
+                if (oldSess.Decoder != null)
+                {
+                    oldSess.Decoder.OuterView = null;
+                }
+            }
 
             if (e.NewValue is TerminalSession newSess)
+            {
                 newSess.BufferUpdated += terminal.OnBufferUpdated;
+                
+                // Connect new decoder to screen
+                if (newSess.Decoder != null)
+                {
+                    terminal.PART_Output.SetDecoder(newSess.Decoder);
+                    newSess.Decoder.OuterView = terminal.PART_Output;
+                }
+            }
+            else
+            {
+                // Clear decoder if session is null
+                terminal.PART_Output.SetDecoder(null);
+            }
 
             terminal.ScheduleRender();
         }

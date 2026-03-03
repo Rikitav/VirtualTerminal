@@ -1,16 +1,17 @@
 ﻿using System.Diagnostics;
 using System.Text;
-using VirtualTerminal.Interop;
+using VirtualTerminal.Engine;
+using VirtualTerminal.Engine.Components;
 
 namespace VirtualTerminal.Session;
 
 /// <summary>
-/// Base implementation of <see cref="ITerminalSession"/> that owns a <see cref="VirtualTerminalBuffer"/>
+/// Base implementation of <see cref="ITerminalSession"/> that owns a <see cref="TerminalScreenBuffer"/>
 /// and exposes helper notifications for UI updates and disconnect events.
 /// </summary>
 public abstract class TerminalSession : ITerminalSession
 {
-    private readonly VirtualTerminalBuffer _buffer;
+    private readonly IBufferedDecoder _decoder;
 
     private bool _disposed;
 
@@ -21,7 +22,10 @@ public abstract class TerminalSession : ITerminalSession
     public event EventHandler? Disconnected;
 
     /// <inheritdoc />
-    public VirtualTerminalBuffer Buffer => _buffer;
+    public TerminalScreenBuffer Buffer => _decoder.Buffer; // Use decoder's buffer
+
+    /// <inheritdoc />
+    public IBufferedDecoder Decoder => _decoder;
 
     /// <inheritdoc />
     public virtual Encoding InputEncoding { get; set; }
@@ -37,34 +41,39 @@ public abstract class TerminalSession : ITerminalSession
     }
 
     /// <summary>
-    /// Initializes a new session with a fresh <see cref="VirtualTerminalBuffer"/> and default input encoding.
+    /// Initializes a new session with a fresh <see cref="TerminalScreenBuffer"/> and default input encoding.
     /// </summary>
     public TerminalSession()
     {
-        _buffer = new VirtualTerminalBuffer();
-        InputEncoding = VirtualTerminalBuffer.Encoding;
+        _decoder = new BufferedDecoder();
+        // AnsiDecoder creates its own buffer
+        InputEncoding = Encoding.UTF8;
     }
 
     /// <summary>
-    /// Initializes a new session with a fresh <see cref="VirtualTerminalBuffer"/> and the specified input encoding.
+    /// Initializes a new session with a fresh <see cref="TerminalScreenBuffer"/> and the specified input encoding.
     /// </summary>
     /// <param name="encoding">Encoding used for <see cref="WriteInput(ReadOnlySpan{byte})"/>.</param>
     public TerminalSession(Encoding encoding)
     {
-        _buffer = new VirtualTerminalBuffer();
+        _decoder = new BufferedDecoder();
+        // AnsiDecoder creates its own buffer
         InputEncoding = encoding;
     }
 
     /// <inheritdoc />
     public virtual void Resize(int columns, int rows)
     {
-        _buffer.ResizeBuffer(columns, rows);
+        _decoder.Buffer.ColumnsCount = columns;
+        _decoder.Buffer.RowsCount = rows;
+        // TODO: Implement proper resize logic in TerminalScreenBuffer
     }
 
     /// <inheritdoc />
     public virtual void WriteInput(ReadOnlySpan<byte> data)
     {
-        _buffer.Write(data);
+        _decoder.Write(data);
+        NotifyBufferUpdated();
     }
 
     /// <summary>
@@ -90,14 +99,14 @@ public abstract class TerminalSession : ITerminalSession
     protected abstract void Dispose(bool disposing);
 
     /// <summary>
-    /// Disposes the session and its underlying <see cref="VirtualTerminalBuffer"/>.
+    /// Disposes the session and its underlying <see cref="TerminalScreenBuffer"/>.
     /// </summary>
     public void Dispose()
     {
         if (_disposed)
             return;
 
-        _buffer.Dispose();
+        _decoder.Buffer.Dispose();
         Dispose(true);
 
         GC.SuppressFinalize(this);

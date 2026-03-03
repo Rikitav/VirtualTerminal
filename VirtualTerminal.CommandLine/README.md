@@ -71,7 +71,7 @@ Located in `CommandLineSession.cs` (namespace `VirtualTerminal`).
 ### Purpose
 
 - Concrete `TerminalSession` implementation backed by Windows ConPTY:
-  - Connects a `VirtualTerminalBuffer` to a pseudoconsole.
+  - Connects a `TerminalScreenBuffer` to a pseudoconsole.
   - Spawns a child process (e.g. `cmd.exe`) attached to that pseudoconsole.
   - Forwards user input into the process, and process output into the buffer.
 
@@ -98,7 +98,7 @@ Internally, `CommandLineSession`:
 
 - Starts a long-running background task `ReadOutputLoop()`:
   - Reads from `PseudoConsole.Reader`.
-  - Converts from `InputEncoding` to `VirtualTerminalBuffer.Encoding`.
+  - Converts from `InputEncoding` to `TerminalScreenBuffer.Encoding`.
   - Writes into `Buffer` and calls `NotifyBufferUpdated()` to trigger UI re-rendering.
 - Overrides **`WriteInput(ReadOnlySpan<byte> data)`**:
   - Writes input bytes into `PseudoConsole.Writer`.
@@ -120,13 +120,13 @@ _session?.Dispose();
 
 ## PseudoConsole and interop
 
-`VirtualTerminal.CommandLine.Interop` contains the plumbing that connects the Windows pseudoconsole to the `VirtualTerminalBuffer`:
+`VirtualTerminal.CommandLine.Interop` contains the plumbing that connects the Windows pseudoconsole to the `TerminalScreenBuffer`:
 
 ### `PseudoConsoleFactory`
 
 Located in `Interop/PseudoConsoleFactory.cs`.
 
-- **`static PseudoConsole Start(VirtualTerminalBuffer buffer, ProcessCreationInfo processInfo)`**
+- **`static PseudoConsole Start(TerminalScreenBuffer buffer, ProcessCreationInfo processInfo)`**
   - Creates anonymous pipes for stdin/stdout.
   - Calls `CreatePseudoConsole` with buffer dimensions.
   - Starts a child process via `Win32ProcessFactory.Start(processInfo, handle)`.
@@ -166,5 +166,5 @@ All VT-compatible output from the tool will be rendered in the `VirtualTerminalV
 
 - **Windows-only**: ConPTY is available on modern Windows 10+; the library targets `net10.0-windows`.
 - **Encoding**: `CommandLineSession` uses UTF‑8 for input and converts output into the Unicode buffer encoding.
-- **Resizing**: When the WPF control resizes and calls `Resize`, the underlying `VirtualTerminalBuffer` size is updated. The child process will see the new console dimensions via ConPTY.
+- **Resizing**: When the WPF control resizes and calls `Resize`, the underlying `TerminalScreenBuffer` size is updated. The child process will see the new console dimensions via ConPTY.
 

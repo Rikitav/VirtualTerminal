@@ -100,7 +100,7 @@ Located in `VirtualTerminalView.xaml` / `VirtualTerminalView.xaml.cs`.
 
 **Purpose**
 
-- Displays the content of a `VirtualTerminalBuffer` in a WPF UI using `VirtualTerminalScreen`.
+- Displays the content of a `TerminalScreenBuffer` in a WPF UI using `VirtualTerminalScreen`.
 - Bridges user input (keyboard) to an attached `TerminalSession`.
 
 **Key properties**
@@ -122,7 +122,7 @@ Located in `VirtualTerminalView.xaml` / `VirtualTerminalView.xaml.cs`.
 - **`bool AutoScrolling`** (`DependencyProperty`, default `true`)
   - Indicates whether scroll is pinned to bottom (auto-scroll on new data).
 - **`static Encoding Encoding`**
-  - Exposes `VirtualTerminalBuffer.Encoding` – the encoding used for the screen buffer (UTF‑16 / Unicode).
+  - Exposes `TerminalScreenBuffer.Encoding` – the encoding used for the screen buffer (UTF‑16 / Unicode).
 
 **Key behavior**
 
@@ -200,14 +200,14 @@ Located in `Session/ITerminalSession.cs`.
 
 **Purpose**
 
-- Minimal interface for anything that can supply data to a `VirtualTerminalBuffer`.
+- Minimal interface for anything that can supply data to a `TerminalScreenBuffer`.
 - The UI (`VirtualTerminalView`) is written against `TerminalSession` but you can build other UI against `ITerminalSession` directly.
 
 **Members**
 
 - **`event EventHandler? BufferUpdated`**
   - Must be raised whenever the underlying buffer content changes and the UI should re-render.
-- **`VirtualTerminalBuffer Buffer { get; }`**
+- **`TerminalScreenBuffer Buffer { get; }`**
   - Screen buffer containing the current console image.
 - **`Encoding InputEncoding { get; }`**
   - Encoding expected by `WriteInput`.
@@ -225,14 +225,14 @@ Located in `Session/TerminalSession.cs`.
 **Purpose**
 
 - Base class implementing `ITerminalSession` and common logic:
-  - Manages `VirtualTerminalBuffer`.
+  - Manages `TerminalScreenBuffer`.
   - Implements default `Resize` and `WriteInput` that write directly into the buffer.
   - Implements `IDisposable` pattern.
 
 **Key members**
 
-- **`VirtualTerminalBuffer Buffer { get; }`** – created in constructor.
-- **`virtual Encoding InputEncoding { get; set; }`** – defaults to `VirtualTerminalBuffer.Encoding`.
+- **`TerminalScreenBuffer Buffer { get; }`** – created in constructor.
+- **`virtual Encoding InputEncoding { get; set; }`** – defaults to `TerminalScreenBuffer.Encoding`.
 - **`virtual string Title { get; }`** – uses current process name and PID.
 - **`virtual void Resize(int columns, int rows)`**
   - Calls `Buffer.ResizeBuffer(columns, rows)`.
@@ -272,9 +272,9 @@ Located in `Session/TerminalSessionExtensions.cs`.
 > **RedirectConsole feature**  
 > Call `session.RedirectConsole();` once, and then any `Console.Write*` in your process will be routed into the terminal buffer (and thus into the UI).
 
-### `VirtualTerminalBuffer` – console buffer wrapper
+### `TerminalScreenBuffer` – console buffer wrapper
 
-Located in `Interop/VirtualTerminalBuffer.cs`.
+Located in `Interop/TerminalScreenBuffer.cs`.
 
 **Purpose**
 
@@ -300,21 +300,21 @@ Located in `Interop/VirtualTerminalBuffer.cs`.
 - **`void ResizeBuffer(int cols, int rows)`**
   - Changes console screen buffer size.
 
-Internally, `VirtualTerminalBuffer` uses `ConsoleHelper` to allocate a hidden console and enable Unicode + VT processing.
+Internally, `TerminalScreenBuffer` uses `ConsoleHelper` to allocate a hidden console and enable Unicode + VT processing.
 
-### `VirtualTerminalBufferExtensions`
+### `TerminalScreenBufferExtensions`
 
-Located in `Interop/VirtualTerminalBufferExtensions.cs`.
+Located in `Interop/TerminalScreenBufferExtensions.cs`.
 
 **Key extension methods**
 
-- **`EnableInputFlags(this VirtualTerminalBuffer buffer, ConsoleInputFlags flags)` / `DisableInputFlags(...)`**
+- **`EnableInputFlags(this TerminalScreenBuffer buffer, ConsoleInputFlags flags)` / `DisableInputFlags(...)`**
   - Enables/disables specific input flags on the console input handle.
-- **`EnableOutputFlags(this VirtualTerminalBuffer buffer, ConsoleOutputFlags flags)` / `DisableOutputFlags(...)`**
+- **`EnableOutputFlags(this TerminalScreenBuffer buffer, ConsoleOutputFlags flags)` / `DisableOutputFlags(...)`**
   - Enables/disables output flags on the output handle.
-- **`void BindActive(this VirtualTerminalBuffer buffer)`**
+- **`void BindActive(this TerminalScreenBuffer buffer)`**
   - Calls `SetConsoleActiveScreenBuffer` to make this buffer the active console buffer.
-- **`bool IsCursorVisible(this VirtualTerminalBuffer buffer)`**
+- **`bool IsCursorVisible(this TerminalScreenBuffer buffer)`**
   - Returns current cursor visibility by querying `GetConsoleCursorInfo`.
 
 These are mostly for advanced scenarios where you need more control over the underlying console.
@@ -393,7 +393,7 @@ public sealed class MyCustomSession : TerminalSession
     private void OnOutputReceived(byte[] data)
     {
         // Convert from your backend encoding into buffer encoding
-        byte[] conv = Encoding.Convert(InputEncoding, VirtualTerminalBuffer.Encoding, data);
+        byte[] conv = Encoding.Convert(InputEncoding, TerminalScreenBuffer.Encoding, data);
         Buffer.Write(conv);
         NotifyBufferUpdated();
     }
@@ -430,7 +430,7 @@ Terminal.Session = session;
 
 3. **Wire output events and call `NotifyBufferUpdated()`**
 
-- When your backend receives data, convert it into `VirtualTerminalBuffer.Encoding` and call:
+- When your backend receives data, convert it into `TerminalScreenBuffer.Encoding` and call:
   - `Buffer.Write(...)`
   - `NotifyBufferUpdated();`
 
@@ -440,10 +440,10 @@ This is what both `CommandLineSession` and `SecureShellSession` do internally.
 
 If you need maximum control, you can implement `ITerminalSession` directly:
 
-- Maintain your own `VirtualTerminalBuffer` instance.
+- Maintain your own `TerminalScreenBuffer` instance.
 - Implement the `BufferUpdated` event.
 - Implement `Resize`/`WriteInput` to talk to your backend.
-- Use `VirtualTerminalBufferExtensions` for advanced console features if you choose to use a Windows console internally.
+- Use `TerminalScreenBufferExtensions` for advanced console features if you choose to use a Windows console internally.
 
 ---
 

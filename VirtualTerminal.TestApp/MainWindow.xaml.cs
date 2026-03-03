@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using System.Reflection;
 
 namespace VirtualTerminal.TestApp;
 
@@ -10,9 +11,15 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        SecureShellSession session = new SecureShellSession("shardscript.ru", 2222, "tim", "tim");
+        PART_Terminal_Left.Session = session;
+        PART_Prompt_Left.Session = session;
+
+        _ = session.ConnectAsync();
     }
 
-    private void Button_Click(object sender, RoutedEventArgs e)
+    private void Button_Click_Start(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrEmpty(PART_CommandLineName.Text))
             return;
@@ -29,5 +36,11 @@ public partial class MainWindow : Window
         {
 
         }
+    }
+
+    private void Button_Click_Invalidate(object sender, RoutedEventArgs e)
+    {
+        VirtualTerminalScreen? screen = PART_Terminal_Left.GetType().GetField("PART_Output", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(PART_Terminal_Left) as VirtualTerminalScreen;
+        screen?.InvalidateVisual();
     }
 }

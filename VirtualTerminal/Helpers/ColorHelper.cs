@@ -8,6 +8,7 @@ namespace VirtualTerminal.Helpers;
 /// </summary>
 public static class ColorHelper
 {
+    /*
     /// <summary>
     /// Converts console character attributes into a WPF color.
     /// </summary>
@@ -43,6 +44,7 @@ public static class ColorHelper
        
         return Color.FromRgb(r, g, b);
     }
+    */
 
     /// <summary>
     /// Checks whether the specified color is representable in the standard Windows console palette
@@ -62,6 +64,7 @@ public static class ColorHelper
         return true;
     }
 
+    /*
     /// <summary>
     /// Converts a WPF color (console palette) into console character attribute flags.
     /// </summary>
@@ -93,4 +96,5 @@ public static class ColorHelper
 
         return attributes;
     }
+    */
 }

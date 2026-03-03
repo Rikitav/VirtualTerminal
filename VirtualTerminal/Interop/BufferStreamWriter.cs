@@ -1,29 +1,34 @@
 ﻿using System.IO;
 using System.Text;
 using System.Windows.Input;
+using VirtualTerminal.Engine;
+using VirtualTerminal.Engine.Components;
 using VirtualTerminal.Session;
 
 namespace VirtualTerminal.Interop;
 
 /// <summary>
-/// A <see cref="TextWriter"/> implementation that writes text into a <see cref="VirtualTerminalBuffer"/>.
+/// A <see cref="TextWriter"/> implementation that writes text into a <see cref="TerminalScreenBuffer"/>.
 /// Used by <see cref="TerminalSessionExtensions.RedirectConsole"/> to redirect
 /// <see cref="Console.Out"/> into a terminal session buffer.
 /// </summary>
 public class BufferStreamWriter : TextWriter
 {
-    private readonly VirtualTerminalBuffer _buffer;
+    private readonly TerminalScreenBuffer _buffer;
+    private readonly IBufferedDecoder _decoder;
 
     /// <inheritdoc />
-    public override Encoding Encoding => VirtualTerminalBuffer.Encoding;
+    public override Encoding Encoding => _buffer.Encoding;
 
     /// <summary>
     /// Initializes a new writer for the specified <paramref name="buffer"/>.
     /// </summary>
     /// <param name="buffer">Target terminal buffer.</param>
-    public BufferStreamWriter(VirtualTerminalBuffer buffer)
+    /// <param name="decoder"></param>
+    public BufferStreamWriter(TerminalScreenBuffer buffer, IBufferedDecoder decoder)
     {
         _buffer = buffer;
+        _decoder = decoder;
 
         NewLine = KeyHelper.ConvertToVT(Key.Enter);
     }
@@ -38,7 +43,7 @@ public class BufferStreamWriter : TextWriter
         if (charCount == 0)
             return;
 
-        _buffer.Write(writeData);
+        _decoder.Write(writeData);
     }
 
     /// <inheritdoc />
@@ -50,7 +55,7 @@ public class BufferStreamWriter : TextWriter
         if (charCount == 0)
             return;
 
-        _buffer.Write(writeData);
+        _decoder.Write(writeData);
     }
 
     /// <inheritdoc />
@@ -69,7 +74,7 @@ public class BufferStreamWriter : TextWriter
         if (charCount == 0)
             return;
 
-        _buffer.Write(writeData);
+        _decoder.Write(writeData);
     }
 
     /// <summary>
@@ -100,7 +105,7 @@ public class BufferStreamWriter : TextWriter
         if (charCount == 0)
             return;
 
-        _buffer.Write(writeData);
+        _decoder.Write(writeData);
         WriteLine();
     }
 

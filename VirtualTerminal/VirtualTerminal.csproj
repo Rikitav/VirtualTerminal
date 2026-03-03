@@ -25,4 +25,8 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\VirtualTerminal.Engine\VirtualTerminal.Engine.csproj" />
+  </ItemGroup>
+
 </Project>

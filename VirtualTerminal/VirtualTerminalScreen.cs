@@ -3,20 +3,19 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
-using VirtualTerminal.Helpers;
-using VirtualTerminal.Interop;
+using VirtualTerminal.Engine;
+using VirtualTerminal.Engine.Components;
 
 namespace VirtualTerminal;
 
 /// <summary>
-/// Low-level WPF rendering element that draws a Windows console screen buffer (<see cref="CHAR_INFO"/>)
+/// Low-level WPF rendering element that draws a terminal screen buffer (<see cref="TerminalScreenBuffer"/>)
 /// using a row-per-visual strategy for performance.
 /// </summary>
-public class VirtualTerminalScreen : FrameworkElement
+public class VirtualTerminalScreen : FrameworkElement, ITerminalScreenView
 {
-    //private static readonly COORD INVALID_CURSOR = new COORD(-1, -1);
-    private static readonly Color defaultForeground = Color.FromArgb(0xFF, 0x80, 0x80, 0x80);
-    private static readonly Color defaultBackground = Color.FromArgb(0xFF, 0x00, 0x00, 0x00);
+    private static readonly TextColor defaultForeground = TextColor.White;
+    private static readonly TextColor defaultBackground = TextColor.Black;
 
     private readonly DispatcherTimer? _blinkTimer;
     private readonly VisualCollection _children;
@@ -24,10 +23,12 @@ public class VirtualTerminalScreen : FrameworkElement
     private readonly DrawingVisual _cursorVisual;
     private readonly Lock _renderLock;
 
-    private CONSOLE_SCREEN_BUFFER_INFO? lastInfo = null;
-    private CHAR_INFO[] lastBuffer = null!;
+    private IBufferedDecoder? currentDecoder = null;
+    private TerminalScreenBuffer? currentBuffer = null;
+    private Coord currentCursorPosition = new Coord(0, 0);
+    private bool needsFullInvalidation = false;
     private bool cursorState = true;
-
+    
     private Typeface Typeface => new Typeface(FontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
 
     /// <inheritdoc/>
@@ -98,12 +99,12 @@ public class VirtualTerminalScreen : FrameworkElement
     /// <inheritdoc/>
     protected override Size MeasureOverride(Size availableSize)
     {
-        if (lastInfo == null)
+        if (currentBuffer == null)
             return new Size(0, 0);
 
         Size size = GetCellSize();
-        double width = size.Width * lastInfo.Value.dwSize.X;
-        double height = size.Height * (lastInfo.Value.srWindow.Bottom + 3);
+        double width = size.Width * currentBuffer.ColumnsCount;
+        double height = size.Height * currentBuffer.RowsCount;
         return new Size(width, height);
     }
 
@@ -114,11 +115,33 @@ public class VirtualTerminalScreen : FrameworkElement
         if (DesignerProperties.GetIsInDesignMode(this))
             drawingContext.DrawText(Format("If you see this message, that means you're in a Designer mode! :P", new SolidColorBrush(Foreground)), new Point(0, 0));
 
-        if (lastInfo == null || lastBuffer == null)
+        if (currentBuffer != null && needsFullInvalidation)
+        {
+            RenderFullBuffer();
+            needsFullInvalidation = false;
+        }
+    }
+    
+    private void RenderFullBuffer()
+    {
+        if (currentBuffer == null)
             return;
 
-        //RenderScreen(lastInfo.Value, lastBuffer);
-        //InvalidateScreen();
+        lock (_renderLock)
+        {
+            CorrectVisualsCountForBuffer(currentBuffer);
+            
+            for (int y = 0; y < currentBuffer.RowsCount && y < _rowVisuals.Count; y++)
+            {
+                RenderRowFromBuffer(y);
+            }
+            
+            if (currentDecoder != null)
+            {
+                currentCursorPosition = currentDecoder.CursorPosition;
+                UpdateCursorPositionFromBuffer();
+            }
+        }
     }
 
     /// <summary>
@@ -131,93 +154,310 @@ public class VirtualTerminalScreen : FrameworkElement
         return new Size(formattedText.WidthIncludingTrailingWhitespace, formattedText.Height);
     }
 
-    /// <summary>
-    /// Updates the rendered content to match the provided console screen buffer snapshot.
-    /// </summary>
-    /// <param name="newInfo">Console buffer info (size, window region, etc.).</param>
-    /// <param name="buffer">Character and attribute data for the visible region.</param>
-    public void UpdateBuffer(CONSOLE_SCREEN_BUFFER_INFO newInfo, CHAR_INFO[] buffer)
+    /// <inheritdoc/>
+    public void Characters(IBufferedDecoder sender, ReadOnlySpan<char> chars)
     {
+        if (sender?.Buffer == null)
+            return;
+            
+        currentDecoder = sender;
+        currentBuffer = sender.Buffer;
+
+        // Invalidate affected rows - must be on UI thread
+        InvalidateRowsFromBuffer();
+    }
+
+    /// <inheritdoc/>
+    public void SaveCursor(IBufferedDecoder sernder)
+    {
+        // No visual change needed
+    }
+
+    /// <inheritdoc/>
+    public void RestoreCursor(IBufferedDecoder sender)
+    {
+        if (sender?.Buffer == null)
+            return;
+            
+        currentDecoder = sender;
+        currentBuffer = sender.Buffer;
+        currentCursorPosition = sender.CursorPosition;
+        
+        InvalidateCursor();
+    }
+
+    /// <inheritdoc/>
+    public Size GetSize(IBufferedDecoder sender)
+    {
+        if (sender?.Buffer == null)
+            return new Size(0, 0);
+            
+        return new Size(sender.Buffer.ColumnsCount, sender.Buffer.RowsCount);
+    }
+
+    /// <inheritdoc/>
+    public void MoveCursor(IBufferedDecoder sender, Direction direction, int amount)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => MoveCursor(sender, direction, amount));
+            return;
+        }
+
+        if (sender?.Buffer == null)
+            return;
+            
+        currentDecoder = sender;
+        currentBuffer = sender.Buffer;
+        currentCursorPosition = sender.CursorPosition;
+
+        InvalidateCursor();
+    }
+
+    /// <inheritdoc/>
+    public void MoveCursorToBeginningOfLineBelow(IBufferedDecoder sender, int lineNumberRelativeToCurrentLine)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => MoveCursorToBeginningOfLineAbove(sender, lineNumberRelativeToCurrentLine));
+            return;
+        }
+
+        if (sender?.Buffer == null)
+            return;
+            
+        currentDecoder = sender;
+        currentBuffer = sender.Buffer;
+        currentCursorPosition = sender.CursorPosition;
+
+        InvalidateCursor();
+    }
+
+    /// <inheritdoc/>
+    public void MoveCursorToBeginningOfLineAbove(IBufferedDecoder sender, int lineNumberRelativeToCurrentLine)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => MoveCursorToBeginningOfLineAbove(sender, lineNumberRelativeToCurrentLine));
+            return;
+        }
+
+        if (sender?.Buffer == null)
+            return;
+            
+        currentDecoder = sender;
+        currentBuffer = sender.Buffer;
+        currentCursorPosition = sender.CursorPosition;
+
+        InvalidateCursor();
+    }
+
+    /// <inheritdoc/>
+    public void MoveCursorToColumn(IBufferedDecoder sender, int columnNumber)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => MoveCursorToColumn(sender, columnNumber));
+            return;
+        }
+
+        if (sender?.Buffer == null)
+            return;
+            
+        currentDecoder = sender;
+        currentBuffer = sender.Buffer;
+        currentCursorPosition = sender.CursorPosition;
+
+        InvalidateCursor();
+    }
+
+    /// <inheritdoc/>
+    public void MoveCursorTo(IBufferedDecoder sender, Coord position)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => MoveCursorTo(sender, position));
+            return;
+        }
+
+        if (sender?.Buffer == null)
+            return;
+            
+        currentDecoder = sender;
+        currentBuffer = sender.Buffer;
+        currentCursorPosition = sender.CursorPosition;
+
+        InvalidateCursor();
+    }
+
+    /// <inheritdoc/>
+    public void ClearScreen(IBufferedDecoder sender, ClearDirection direction)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => ClearScreen(sender, direction));
+            return;
+        }
+
+        if (sender?.Buffer == null)
+            return;
+            
+        currentDecoder = sender;
+        currentBuffer = sender.Buffer;
+        needsFullInvalidation = true;
+
+        InvalidateMeasure();
+        InvalidateVisual();
+    }
+
+    /// <inheritdoc/>
+    public void ClearLine(IBufferedDecoder sender, ClearDirection direction)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => ClearLine(sender, direction));
+            return;
+        }
+
+        if (sender?.Buffer == null)
+            return;
+            
+        currentDecoder = sender;
+        currentBuffer = sender.Buffer;
+        currentCursorPosition = sender.CursorPosition;
+
+        // Invalidate the affected line
+        InvalidateRow(currentCursorPosition.Y);
+    }
+
+    /// <inheritdoc/>
+    public void ScrollPageUpwards(IBufferedDecoder sender, int linesToScroll)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => ScrollPageUpwards(sender, linesToScroll));
+            return;
+        }
+
+        if (sender?.Buffer == null)
+            return;
+            
+        currentDecoder = sender;
+        currentBuffer = sender.Buffer;
+        needsFullInvalidation = true;
+
+        InvalidateMeasure();
+        InvalidateVisual();
+    }
+
+    /// <inheritdoc/>
+    public void ScrollPageDownwards(IBufferedDecoder sender, int linesToScroll)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => ScrollPageDownwards(sender, linesToScroll));
+            return;
+        }
+
+        if (sender?.Buffer == null)
+            return;
+            
+        currentDecoder = sender;
+        currentBuffer = sender.Buffer;
+        needsFullInvalidation = true;
+
+        InvalidateMeasure();
+        InvalidateVisual();
+    }
+
+    /// <inheritdoc/>
+    public Coord GetCursorPosition(IBufferedDecoder sender)
+    {
+        if (sender?.Buffer == null)
+            return new Coord(0, 0);
+            
+        return new Coord(sender.CursorPosition.X, sender.CursorPosition.Y);
+    }
+
+    /// <inheritdoc/>
+    public void SetGraphicRendition(IBufferedDecoder sender, GraphicRendition[] commands)
+    {
+        if (sender?.Buffer == null)
+            return;
+            
+        currentDecoder = sender;
+        currentBuffer = sender.Buffer;
+        
+        // Invalidate current row where cursor is
+        int row = sender.CursorPosition.Y;
+        InvalidateRow(row);
+    }
+
+    /// <inheritdoc/>
+    public void ModeChanged(IBufferedDecoder sender, AnsiMode mode)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => ModeChanged(sender, mode));
+            return;
+        }
+
+        if (sender?.Buffer == null)
+            return;
+            
+        currentDecoder = sender;
+        currentBuffer = sender.Buffer;
+
+        // Some modes might require full invalidation
+        switch (mode)
+        {
+            case AnsiMode.HideCursor:
+                {
+                    CursorVisible = false;
+                    InvalidateCursor();
+                    break;
+                }
+
+            case AnsiMode.ShowCursor:
+                {
+                    CursorVisible = true;
+                    InvalidateCursor();
+                    break;
+                }
+        }
+    }
+    
+    /// <summary>
+    /// Sets the decoder and buffer for rendering. Called when session changes.
+    /// </summary>
+    public void SetDecoder(IBufferedDecoder? decoder)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => SetDecoder(decoder));
+            return;
+        }
+
+        currentDecoder = decoder;
+        currentBuffer = decoder?.Buffer;
+
+        if (currentBuffer == null)
+            return;
+        
         lock (_renderLock)
         {
-            bool lastCursorVisible = CursorVisible;
-            try
-            {
-                CursorVisible = false;
-                CorrectVisualsCount(newInfo);
-
-                if (RequiresInvalidation(newInfo, out _, out _))
-                {
-                    lastInfo = newInfo;
-                    lastBuffer = buffer;
-
-                    InvalidateMeasure();
-                    InvalidateScreen();
-                    return;
-                }
-
-                /*
-                if (RequiresRemeasure(newInfo, out _, out _))
-                {
-                    lastInfo = newInfo;
-
-                    InvalidateMeasure();
-                    RenderScreen(newInfo, buffer);
-                }
-                */
-
-                lastInfo = newInfo;
-                InvalidateMeasure();
-                RenderScreen(newInfo, buffer);
-            }
-            finally
-            {
-                CursorVisible = lastCursorVisible;
-            }
+            CorrectVisualsCountForBuffer(currentBuffer);
+            needsFullInvalidation = true;
+            InvalidateMeasure();
+            InvalidateVisual();
         }
     }
-
-    private bool RequiresInvalidation(CONSOLE_SCREEN_BUFFER_INFO newInfo, out bool invalidateRows, out bool invalidateColumns)
+    
+    private void CorrectVisualsCountForBuffer(TerminalScreenBuffer buffer)
     {
-        if (lastInfo == null)
-        {
-            invalidateColumns = true;
-            invalidateRows = true;
-            return true;
-        }
-
-        invalidateColumns = lastInfo.Value.dwSize.X != newInfo.dwSize.X;
-        invalidateRows = lastInfo.Value.dwSize.Y != newInfo.dwSize.Y;
-        return invalidateColumns || invalidateRows;
-    }
-
-    /*
-    private bool RequiresRemeasure(CONSOLE_SCREEN_BUFFER_INFO newInfo, out bool invalidateRows, out bool invalidateColumns)
-    {
-        if (lastInfo == null)
-        {
-            invalidateColumns = true;
-            invalidateRows = true;
-            return true;
-        }
-
-        int oldWidth = lastInfo.Value.srWindow.Left + lastInfo.Value.srWindow.Right;
-        int oldHeight = lastInfo.Value.srWindow.Top + lastInfo.Value.srWindow.Bottom;
-
-        int newWidth = newInfo.srWindow.Left + newInfo.srWindow.Right;
-        int newHeight = newInfo.srWindow.Top + newInfo.srWindow.Bottom;
-
-        invalidateColumns = oldWidth != newWidth;
-        invalidateRows = oldHeight != newHeight;
-        return invalidateColumns || invalidateRows;
-    }
-    */
-
-    private void CorrectVisualsCount(CONSOLE_SCREEN_BUFFER_INFO info)
-    {
-        int difference = info.dwSize.Y;
-        if (lastInfo != null)
-            difference -= lastInfo.Value.dwSize.Y;
+        int targetRows = buffer.RowsCount;
+        int currentRows = _rowVisuals.Count;
+        int difference = targetRows - currentRows;
 
         if (difference == 0)
             return;
@@ -233,91 +473,90 @@ public class VirtualTerminalScreen : FrameworkElement
         }
         else if (difference < 0)
         {
-            for (int i = 0; i < difference; i++)
+            for (int i = 0; i < -difference; i++)
             {
                 _rowVisuals.RemoveAt(_rowVisuals.Count - 1);
                 _children.RemoveAt(_children.Count - 2);
             }
         }
     }
-
-    private void InvalidateScreen()
+    
+    private void InvalidateRowsFromBuffer()
     {
-        if (lastBuffer == null)
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => InvalidateRowsFromBuffer());
             return;
-
-        if (lastInfo == null)
+        }
+        
+        if (currentBuffer == null || currentDecoder == null)
             return;
-
+            
+        currentCursorPosition = currentDecoder.CursorPosition;
+        InvalidateRow(currentCursorPosition.Y);
+    }
+    
+    private void InvalidateRow(int row)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => InvalidateRow(row));
+            return;
+        }
+        
+        if (currentBuffer == null || row < 0 || row >= currentBuffer.RowsCount)
+            return;
+            
         lock (_renderLock)
         {
-            int height = lastInfo.Value.dwSize.Y; //srWindow.Bottom;
-            int width = lastInfo.Value.dwSize.X;
-            Size cellSize = GetCellSize();
-
-            for (int y = 0; y < height; y++)
+            if (row < _rowVisuals.Count)
             {
-                try
-                {
-                    int bufferOffset = y * width;
-                    double verticalOffset = y * cellSize.Height;
-
-                    DrawingVisual visual = _rowVisuals[y];
-                    visual.Offset = new Vector(0, verticalOffset);
-
-                    Span<CHAR_INFO> rowSpan = lastBuffer.AsSpan(bufferOffset, width);
-                    RenderRow(visual, rowSpan, cellSize);
-
-                    if (lastInfo.Value.dwCursorPosition.Y == y)
-                        UpdateCursorPosition(lastInfo.Value.dwCursorPosition, lastInfo.Value.dwSize);
-                }
-                catch
-                {
-                    // fucked up somewhere
-                    _ = 0xBAD + 0xC0DE;
-                }
+                RenderRowFromBuffer(row);
             }
         }
     }
-
-    private void RenderScreen(CONSOLE_SCREEN_BUFFER_INFO info, CHAR_INFO[] buffer)
+    
+    private void InvalidateCursor()
     {
-        lock (_renderLock)
+        if (!Dispatcher.CheckAccess())
         {
-            int height = info.dwSize.Y; //info.srWindow.Bottom;
-            int width = info.dwSize.X;
+            Dispatcher.Invoke(() => InvalidateCursor());
+            return;
+        }
+        
+        if (currentBuffer == null || currentDecoder == null)
+            return;
+            
+        currentCursorPosition = currentDecoder.CursorPosition;
+        UpdateCursorPositionFromBuffer();
+        RenderCursorFromBuffer();
+    }
+    
+    private void RenderRowFromBuffer(int row)
+    {
+        if (currentBuffer == null || row < 0 || row >= currentBuffer.RowsCount || row >= _rowVisuals.Count)
+            return;
+            
+        try
+        {
             Size cellSize = GetCellSize();
-
-            for (int y = 0; y < height; y++)
-            {
-                try
-                {
-                    int bufferOffset = y * width;
-                    double verticalOffset = y * cellSize.Height;
-
-                    DrawingVisual visual = _rowVisuals[y];
-                    visual.Offset = new Vector(0, verticalOffset);
-
-                    Span<CHAR_INFO> rowSpan = lastBuffer.AsSpan(bufferOffset, width);
-                    Span<CHAR_INFO> newRowSpan = buffer.AsSpan(bufferOffset, width);
-
-                    if (!rowSpan.SequenceEqual(newRowSpan))
-                        newRowSpan.CopyTo(rowSpan);
-
-                    RenderRow(visual, rowSpan, cellSize);
-                    if (info.dwCursorPosition.Y == y)
-                        UpdateCursorPosition(info.dwCursorPosition, info.dwSize);
-                }
-                catch
-                {
-                    // fucked up somewhere
-                    _ = 0xBAD + 0xC0DE;
-                }
-            }
+            double verticalOffset = row * cellSize.Height;
+            
+            DrawingVisual visual = _rowVisuals[row];
+            visual.Offset = new Vector(0, verticalOffset);
+            
+            int rowStart = row * currentBuffer.ColumnsCount;
+            Span<TerminalCellInfo> rowSpan = currentBuffer.Cells.AsSpan(rowStart, currentBuffer.ColumnsCount);
+            RenderRowFromTerminalBuffer(visual, rowSpan, cellSize);
+        }
+        catch
+        {
+            // fucked up somewhere
+            _ = 0xBAD + 0xC0DE;
         }
     }
-
-    private void RenderRow(DrawingVisual visual, Span<CHAR_INFO> rowSpan, Size cellSize)
+    
+    private void RenderRowFromTerminalBuffer(DrawingVisual visual, Span<TerminalCellInfo> rowSpan, Size cellSize)
     {
         lock (_renderLock)
         {
@@ -328,23 +567,32 @@ public class VirtualTerminalScreen : FrameworkElement
             {
                 try
                 {
-                    Span<CHAR_INFO> remainingSlice = rowSpan.Slice(x);
+                    Span<TerminalCellInfo> remainingSlice = rowSpan.Slice(x);
                     int runLength = TakeWhileSameAttributes(remainingSlice);
                     x += runLength;
 
-                    Span<CHAR_INFO> runSpan = remainingSlice.Slice(0, runLength);
+                    Span<TerminalCellInfo> runSpan = remainingSlice.Slice(0, runLength);
                     Span<char> textSpan = new char[runLength];
 
                     for (int i = 0; i < runLength; i++)
-                        textSpan[i] = (char)runSpan[i].Char;
+                        textSpan[i] = runSpan[i].Character;
 
-                    ConsoleCharacterAttributes attr = remainingSlice[0].Attributes;
-                    Color fore = ColorHelper.ConvertToColor(attr, false);
-                    Color back = ColorHelper.ConvertToColor(attr, true);
-
-                    FormattedText formatted = Format(new string(textSpan), new SolidColorBrush(fore == defaultForeground ? Foreground : fore));
-                    if (back != defaultBackground)
-                        dc.DrawRectangle(new SolidColorBrush(back), new Pen(), new Rect(horizontalOffset, 0, formatted.WidthIncludingTrailingWhitespace, formatted.Height));
+                    TerminalCellInfo firstCell = runSpan[0];
+                    
+                    // Apply bold if needed
+                    FontWeight weight = firstCell.Bold ? FontWeights.Bold : FontWeights.Normal;
+                    Typeface runTypeface = new Typeface(FontFamily, FontStyles.Normal, weight, FontStretches.Normal);
+                    
+                    FormattedText formatted = new FormattedText(
+                        new string(textSpan), CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+                        runTypeface, FontSize, new SolidColorBrush(firstCell.Foreground == defaultForeground ? Foreground : TerminalCellInfo.TextColorToColor(firstCell.Foreground)),
+                        VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                    
+                    if (firstCell.Background != defaultBackground)
+                        dc.DrawRectangle(new SolidColorBrush(
+                            TerminalCellInfo.TextColorToColor(firstCell.Foreground)),
+                            new Pen(),
+                            new Rect(horizontalOffset, 0, formatted.WidthIncludingTrailingWhitespace, formatted.Height));
 
                     dc.DrawText(formatted, new Point(horizontalOffset, 0));
                     horizontalOffset += formatted.Width;
@@ -357,30 +605,71 @@ public class VirtualTerminalScreen : FrameworkElement
             }
         }
     }
-
-    private static int TakeWhileSameAttributes(ReadOnlySpan<CHAR_INFO> span)
+    
+    private static int TakeWhileSameAttributes(ReadOnlySpan<TerminalCellInfo> span)
     {
         if (span.IsEmpty)
             return 0;
 
-        ConsoleCharacterAttributes attrs = span[0].Attributes;
+        TerminalCellInfo first = span[0];
         int length = span.Length;
 
         for (int i = 1; i < length; i++)
         {
-            if (span[i].Attributes != attrs)
+            TerminalCellInfo current = span[i];
+            if (first != current)
                 return i;
         }
 
         return span.Length;
     }
+    
+    private void UpdateCursorPositionFromBuffer()
+    {
+        if (currentBuffer == null)
+            return;
+            
+        Size cellSize = GetCellSize();
+        Point point = new Point(currentCursorPosition.X * cellSize.Width, currentCursorPosition.Y * cellSize.Height);
+        _cursorVisual.Offset = (Vector)point;
+    }
+    
+    private void RenderCursorFromBuffer()
+    {
+        if (currentBuffer == null || currentDecoder == null)
+            return;
+            
+        lock (_renderLock)
+        {
+            try
+            {
+                UpdateCursorPositionFromBuffer();
+                
+                int linearIndex = currentCursorPosition.Y * currentBuffer.ColumnsCount + currentCursorPosition.X;
+                if (linearIndex >= 0 && linearIndex < currentBuffer.Cells.Length)
+                {
+                    TerminalCellInfo cell = currentBuffer.Cells[linearIndex];
+                    char charToShow = cell.Character;
+                    
+                    using DrawingContext dc = _cursorVisual.RenderOpen();
+                    FormattedText formatted = Format(new string(charToShow, 1), new SolidColorBrush(Foreground));
+
+                    SolidColorBrush background = new SolidColorBrush(cursorState ? Foreground : Colors.Transparent);
+                    dc.DrawRectangle(background, new Pen(), new Rect(0, 0, 1, formatted.Height));
+                    dc.DrawText(formatted, new Point(0, 0));
+                }
+            }
+            catch
+            {
+                // fucked up somewhere
+                _ = 0xBAD + 0xC0DE;
+            }
+        }
+    }
 
     private void DispatcherBlinkHandler(object? sender, EventArgs e)
     {
-        if (!lastInfo.HasValue)
-            return;
-
-        if (lastBuffer == null)
+        if (currentBuffer == null || currentDecoder == null)
             return;
 
         lock (_renderLock)
@@ -388,68 +677,12 @@ public class VirtualTerminalScreen : FrameworkElement
             if (!CursorVisible)
             {
                 cursorState = false;
-                RenderCursor(
-                    lastInfo.Value.dwCursorPosition,
-                    lastInfo.Value.dwSize);
-
+                RenderCursorFromBuffer();
                 return;
             }
 
             cursorState = !cursorState;
-            RenderCursor(
-                lastInfo.Value.dwCursorPosition,
-                lastInfo.Value.dwSize);
-        }
-    }
-
-    private void UpdateCursorPosition(COORD cursorPos, COORD bufferSize)
-    {
-        Size cellSize = GetCellSize();
-        Point point = new Point(cursorPos.X * cellSize.Width, cursorPos.Y * cellSize.Height);
-        _cursorVisual.Offset = (Vector)point;
-    }
-
-    private void RenderCursorState(COORD cursorPos, COORD bufferSize)
-    {
-        cursorPos.X -= 1;
-        int linearIndex = bufferSize.X * cursorPos.Y + cursorPos.X;
-        CHAR_INFO charInfo = lastBuffer.ElementAt(linearIndex + 1);
-
-        // Classic style cursor
-        /*
-        SolidColorBrush foreground = new SolidColorBrush(cursorState ? Background : Foreground);
-        SolidColorBrush background = new SolidColorBrush(cursorState ? Foreground : Background);
-
-        using DrawingContext dc = _cursorVisual.RenderOpen();
-        FormattedText formatted = Format(new string((char)charInfo.Char, 1), foreground);
-
-        dc.DrawRectangle(background, new Pen(), new Rect(0, 0, formatted.WidthIncludingTrailingWhitespace, formatted.Height));
-        dc.DrawText(formatted, new Point(0, 0));
-        */
-
-        // Modern style cursor
-        using DrawingContext dc = _cursorVisual.RenderOpen();
-        FormattedText formatted = Format(new string((char)charInfo.Char, 1), new SolidColorBrush(Foreground));
-
-        SolidColorBrush background = new SolidColorBrush(cursorState ? Foreground : Colors.Transparent);
-        dc.DrawRectangle(background, new Pen(), new Rect(0, 0, 1, formatted.Height));
-        dc.DrawText(formatted, new Point(0, 0));
-    }
-
-    private void RenderCursor(COORD cursorPos, COORD bufferSize)
-    {
-        lock (_renderLock)
-        {
-            try
-            {
-                UpdateCursorPosition(cursorPos, bufferSize);
-                RenderCursorState(cursorPos, bufferSize);
-            }
-            catch
-            {
-                // fucked up somewhere
-                _ = 0xBAD + 0xC0DE;
-            }
+            RenderCursorFromBuffer();
         }
     }
 
@@ -490,7 +723,7 @@ public class VirtualTerminalScreen : FrameworkElement
     /// </summary>
     public static readonly DependencyProperty CursorVisibleProperty = DependencyProperty.Register(
         nameof(CursorVisible), typeof(bool), typeof(VirtualTerminalScreen),
-        new FrameworkPropertyMetadata(true, OnFontFamilyChanged));
+        new FrameworkPropertyMetadata(true, OnCursorVisibleChanged));
 
     /// <summary>
     /// Identifies the <see cref="FontFamily"/> dependency property.

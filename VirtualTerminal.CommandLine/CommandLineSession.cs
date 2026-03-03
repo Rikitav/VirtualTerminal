@@ -3,6 +3,8 @@ using System.IO;
 using System.Text;
 using VirtualTerminal.Interop;
 using VirtualTerminal.Session;
+using VirtualTerminal.Engine;
+using System.Diagnostics;
 
 namespace VirtualTerminal;
 
@@ -54,7 +56,7 @@ public sealed partial class CommandLineSession : TerminalSession
     /// <inheritdoc />
     public override void Resize(int columns, int rows)
     {
-        Buffer.ResizeBuffer(columns, rows);
+        Buffer.Resize(columns, rows);
         PseudoConsole.Resize(columns, rows);
     }
 
@@ -76,18 +78,9 @@ public sealed partial class CommandLineSession : TerminalSession
 
                 ReadOnlySpan<byte> readed = data.AsSpan(0, bytesRead);
                 string dataStr = InputEncoding.GetString(readed);
+                Debug.WriteLine(dataStr);
 
-                // checking for 'clear screen' sequence. Due to strange behaivour of this command, we required to handle it cutsomly
-                COORD cursorPos = IsCmdClearScreen(readed);
-                if (cursorPos != COORD.Invalid)
-                {
-                    Buffer.WriteFromEncoding(InputEncoding, readed);
-                    Buffer.SetCursorPosition(cursorPos);
-                    NotifyBufferUpdated();
-                    continue;
-                }
-
-                Buffer.WriteFromEncoding(InputEncoding, readed);
+                Decoder.WriteFromEncoding(InputEncoding, readed);
                 NotifyBufferUpdated();
             }
             catch

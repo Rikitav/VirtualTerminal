@@ -67,7 +67,7 @@ public static class TerminalSessionExtensions
     /// <returns>A writer that writes to the terminal buffer.</returns>
     public static TextWriter CreateBufferWriter(this ITerminalSession session)
     {
-        return new BufferStreamWriter(session.Buffer);
+        return new BufferStreamWriter(session.Buffer, session.Decoder);
     }
 
     /// <summary>

@@ -1,10 +1,11 @@
 ﻿using System.Text;
-using VirtualTerminal.Interop;
+using VirtualTerminal.Engine;
+using VirtualTerminal.Engine.Components;
 
 namespace VirtualTerminal.Session;
 
 /// <summary>
-/// Represents a terminal backend session that can provide output via a <see cref="VirtualTerminalBuffer"/>
+/// Represents a terminal backend session that can provide output via a <see cref="TerminalScreenBuffer"/>
 /// and accept input as bytes (typically VT/ANSI sequences).
 /// </summary>
 public interface ITerminalSession : IDisposable
@@ -22,7 +23,12 @@ public interface ITerminalSession : IDisposable
     /// <summary>
     /// Gets the underlying screen buffer used for rendering.
     /// </summary>
-    public VirtualTerminalBuffer Buffer { get; }
+    public TerminalScreenBuffer Buffer { get; }
+
+    /// <summary>
+    /// Gets the underlaying VT escape sequnces decoder
+    /// </summary>
+    public IBufferedDecoder Decoder { get; }
 
     /// <summary>
     /// Gets the encoding expected by <see cref="WriteInput(ReadOnlySpan{byte})"/>.

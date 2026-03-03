@@ -24,12 +24,17 @@
                     Text="CMD : "
                     VerticalAlignment="Center"
                     Margin="5,0,0,0"/>
-                
+
+                <Button
+                    DockPanel.Dock="Right"
+                    Content="Invalidate"
+                    Click="Button_Click_Invalidate"/>
+
                 <Button
                     DockPanel.Dock="Right"
                     Content="Start"
-                    Click="Button_Click"/>
-                
+                    Click="Button_Click_Start"/>
+
                 <TextBox
                     x:Name="PART_CommandLineName"
                     VerticalContentAlignment="Center"

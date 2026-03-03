@@ -226,15 +226,16 @@ public class SecureShellSession : TerminalSession
     public override void Resize(int columns, int rows)
     {
         ValidateClient();
-        Buffer.ResizeBuffer(columns, rows);
+        Buffer.Resize(columns, rows);
+        /*
         CONSOLE_SCREEN_BUFFER_INFO info = Buffer.GetBufferInfo();
 
         uint nHeight = (uint)(info.srWindow.Bottom - info.srWindow.Top);
         uint nWidth = (uint)(info.srWindow.Right - info.srWindow.Left);
         uint nRows = (uint)(info.dwSize.Y);
         uint nCols = (uint)(info.dwSize.X);
-
-        _shellStream.ChangeWindowSize(nCols, nRows, nWidth, nHeight);
+        */
+        _shellStream.ChangeWindowSize((uint)Buffer.ColumnsCount, (uint)Buffer.RowsCount, 1200, 800);
     }
 
     /// <inheritdoc />
@@ -327,7 +328,7 @@ public class SecureShellSession : TerminalSession
         if (args.Data == null || args.Data.Length == 0)
             return;
 
-        Buffer.Write(Encoding.Convert(InputEncoding, VirtualTerminalBuffer.Encoding, args.Data));
+        Decoder.Write(Encoding.Convert(InputEncoding, Buffer.Encoding, args.Data));
         NotifyBufferUpdated();
     }
 

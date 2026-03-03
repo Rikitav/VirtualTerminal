@@ -2,11 +2,12 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using VirtualTerminal.Engine;
 
 namespace VirtualTerminal.Interop;
 
 /// <summary>
-/// Helpers for allocating and configuring a Windows console that backs <see cref="VirtualTerminalBuffer"/>.
+/// Helpers for allocating and configuring a Windows console that backs <see cref="TerminalScreenBuffer"/>.
 /// </summary>
 public static partial class ConsoleHelper
 {

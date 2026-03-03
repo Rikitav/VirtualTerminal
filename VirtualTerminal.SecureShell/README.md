@@ -90,7 +90,7 @@ Located in `SecureShellSession.cs` (namespace `VirtualTerminal`).
 
 - Concrete `TerminalSession` implementation backed by SSH:
   - Manages an `ISshClient` (`SshClient` in practice).
-  - Creates a `ShellStream` and forwards its output to `VirtualTerminalBuffer`.
+  - Creates a `ShellStream` and forwards its output to `TerminalScreenBuffer`.
   - Forwards user input from the terminal UI into the SSH shell.
 
 ### Core properties
@@ -161,7 +161,7 @@ If you need to fully reset the client, use the internal helper:
 `SecureShellSession` subscribes to `ShellStream.DataReceived`:
 
 - **`protected virtual void DataReceived(object? sender, ShellDataEventArgs args)`**
-  - Converts received bytes from `InputEncoding` into `VirtualTerminalBuffer.Encoding`.
+  - Converts received bytes from `InputEncoding` into `TerminalScreenBuffer.Encoding`.
   - Writes to `Buffer` and calls `NotifyBufferUpdated()` to trigger UI re-render.
 
 ### Disposal

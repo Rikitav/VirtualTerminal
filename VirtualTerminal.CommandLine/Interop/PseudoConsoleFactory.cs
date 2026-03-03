@@ -1,11 +1,12 @@
 ﻿using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
+using VirtualTerminal.Engine;
 
 namespace VirtualTerminal.Interop;
 
 /// <summary>
-/// Factory for creating ConPTY (<c>CreatePseudoConsole</c>) instances wired to a <see cref="VirtualTerminalBuffer"/>.
+/// Factory for creating ConPTY (<c>CreatePseudoConsole</c>) instances wired to a <see cref="TerminalScreenBuffer"/>.
 /// </summary>
 public static partial class PseudoConsoleFactory
 {
@@ -15,7 +16,7 @@ public static partial class PseudoConsoleFactory
     /// <param name="buffer">Terminal buffer (its dimensions are used as the initial console size).</param>
     /// <param name="processInfo">Child process configuration.</param>
     /// <returns>A <see cref="PseudoConsole"/> wrapper containing handles, pipes and the child process.</returns>
-    public static PseudoConsole Start(VirtualTerminalBuffer buffer, ProcessCreationInfo processInfo)
+    public static PseudoConsole Start(TerminalScreenBuffer buffer, ProcessCreationInfo processInfo)
     {
         Stream writer = Win32PipeFactory.CreateChildStdInPipe(out IntPtr hStdInput);   // Con reads from
         Stream reader = Win32PipeFactory.CreateChildStdOutPipe(out IntPtr hStdOutput); // Con writes to
@@ -23,7 +24,7 @@ public static partial class PseudoConsoleFactory
         try
         {
             IntPtr handle = IntPtr.Zero;
-            int hResult = NativeMethods.CreatePseudoConsole(new COORD(buffer.Cols, buffer.Rows), hStdInput, hStdOutput, 0, out handle);
+            int hResult = NativeMethods.CreatePseudoConsole(new COORD(buffer.ColumnsCount, buffer.RowsCount), hStdInput, hStdOutput, 0, out handle);
 
             if (NativeMethods.IsInvalidHandleValue(handle))
                 throw new Win32Exception(hResult, "Failed to create ConPTY instance");

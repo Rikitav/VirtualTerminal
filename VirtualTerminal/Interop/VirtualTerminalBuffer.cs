@@ -59,7 +59,7 @@ public partial class VirtualTerminalBuffer : IDisposable
     public VirtualTerminalBuffer()
     {
         InitializeConsoleBuffer();
-        ResizeBuffer(120, 400);
+        //ResizeBuffer(120, 400);
     }
 
     /// <summary>
@@ -69,8 +69,8 @@ public partial class VirtualTerminalBuffer : IDisposable
     protected virtual void InitializeConsoleBuffer()
     {
         // Allocated console is required to work with console buffer
-        ConsoleHelper.Allocate();
-        ConsoleHelper.SetEncoding();
+        //ConsoleHelper.Allocate();
+        //ConsoleHelper.SetEncoding();
 
         SECURITY_ATTRIBUTES securityAttributes = new SECURITY_ATTRIBUTES
         {
