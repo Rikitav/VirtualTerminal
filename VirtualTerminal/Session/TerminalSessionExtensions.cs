@@ -20,15 +20,7 @@ public static class TerminalSessionExtensions
     /// <param name="text">Text to send.</param>
     public static void Append(this ITerminalSession session, string text)
     {
-        /*
-        Span<byte> data = stackalloc byte[text.Length * session.InputEncoding.GetCharSize()];
-        int count = session.InputEncoding.GetBytes(text, data);
-
-        if (count == 0)
-            return;
-        */
-
-        Span<byte> data = session.InputEncoding.GetBytes(text);
+        byte[] data = session.InputEncoding.GetBytes(text);
         session.WriteInput(data);
     }
 

@@ -93,7 +93,7 @@ public partial class VirtualTerminalBuffer : IDisposable
         if (!NativeMethods.GetConsoleScreenBufferInfo(_outputHandle, out CONSOLE_SCREEN_BUFFER_INFO info))
             throw new Win32Exception(Marshal.GetLastWin32Error(), "Failed to get console screen buffer info");
 
-        if (!NativeMethods.SetConsoleMode(_outputHandle, (uint)(ConsoleOutputFlags.EnableWrapAtEolOutput | ConsoleOutputFlags.EnableVirtualTerminalProcessing | ConsoleOutputFlags.EnableProcessedOutput)))
+        if (!NativeMethods.SetConsoleMode(_outputHandle, ConsoleOutputFlags.EnableWrapAtEolOutput | ConsoleOutputFlags.EnableVirtualTerminalProcessing | ConsoleOutputFlags.EnableProcessedOutput | ConsoleOutputFlags.DisableNewlineAutoReturn))
             throw new Win32Exception(Marshal.GetLastWin32Error(), "Failed to enable VT processing");
 
         _rows = info.dwSize.Y;
@@ -134,6 +134,7 @@ public partial class VirtualTerminalBuffer : IDisposable
         {
             int windowWidth = info.dwSize.X;
             int windowHeight = info.dwSize.Y;
+            
             /*
             if (windowHeight > 1000)
             {
@@ -141,6 +142,7 @@ public partial class VirtualTerminalBuffer : IDisposable
                 info.srWindow.Top = (short)(info.srWindow.Bottom - windowHeight + 1);
             }
             */
+
             SMALL_RECT readRegion = new SMALL_RECT(0, 0, info.dwSize.X, info.dwSize.Y); //info.srWindow;
             CHAR_INFO[] buffer = new CHAR_INFO[windowWidth * windowHeight];
             COORD bufferSize = new COORD(windowWidth, windowHeight);
@@ -277,7 +279,7 @@ public partial class VirtualTerminalBuffer : IDisposable
 
         [LibraryImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
-        public static partial bool SetConsoleMode(IntPtr hConsoleHandle, uint dwMode);
+        public static partial bool SetConsoleMode(IntPtr hConsoleHandle, ConsoleOutputFlags dwMode);
     }
 
     [Flags]

@@ -490,7 +490,7 @@ public class VirtualTerminalScreen : FrameworkElement
     /// </summary>
     public static readonly DependencyProperty CursorVisibleProperty = DependencyProperty.Register(
         nameof(CursorVisible), typeof(bool), typeof(VirtualTerminalScreen),
-        new FrameworkPropertyMetadata(true, OnFontFamilyChanged));
+        new FrameworkPropertyMetadata(true, OnCursorVisibleChanged));
 
     /// <summary>
     /// Identifies the <see cref="FontFamily"/> dependency property.

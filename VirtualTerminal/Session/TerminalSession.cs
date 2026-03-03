@@ -29,11 +29,7 @@ public abstract class TerminalSession : ITerminalSession
     /// <inheritdoc />
     public virtual string Title
     {
-        get
-        {
-            Process proc = Process.GetCurrentProcess();
-            return proc.ProcessName + "_" + proc.Id;
-        }
+        get => GetType().Name + " (" + _buffer.OutputHandle + ")";
     }
 
     /// <summary>
