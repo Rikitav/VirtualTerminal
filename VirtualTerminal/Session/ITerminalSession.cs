@@ -28,7 +28,7 @@ public interface ITerminalSession : IDisposable
     /// <summary>
     /// Gets the underlaying VT escape sequnces decoder
     /// </summary>
-    public IBufferedDecoder Decoder { get; }
+    public ITerminalDecoder Decoder { get; }
 
     /// <summary>
     /// Gets the encoding expected by <see cref="WriteInput(ReadOnlySpan{byte})"/>.
@@ -45,7 +45,7 @@ public interface ITerminalSession : IDisposable
     /// </summary>
     /// <param name="columns">Number of columns (character cells).</param>
     /// <param name="rows">Number of rows (character cells).</param>
-    public void Resize(int columns, int rows);
+    public void Resize(ushort columns, ushort rows);
 
     /// <summary>
     /// Writes input bytes into the session backend.

@@ -1,10 +1,11 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using VirtualTerminal.Engine.Components;
 
 namespace VirtualTerminal.Engine;
 
-public abstract class EscapeSequenceDecoder : IDecoder
+public abstract class EscapeSequenceDecoder : ITerminalDecoder
 {
     protected enum State
     {
@@ -49,7 +50,7 @@ public abstract class EscapeSequenceDecoder : IDecoder
         set => field = value;
     }
 
-    public EscapeSequenceDecoder()
+    protected EscapeSequenceDecoder()
     {
         state = State.Ground;
         Encoding = Encoding.UTF8; // Use UTF-8 by default for proper Unicode support
@@ -69,9 +70,9 @@ public abstract class EscapeSequenceDecoder : IDecoder
             {
                 ProcessByte(b);
             }
-            catch
+            catch (Exception exc)
             {
-                _ = 0xBAD + 0xC0DE;
+                Debug.WriteLine(exc);
                 Drain();
             }
         }
@@ -168,12 +169,10 @@ public abstract class EscapeSequenceDecoder : IDecoder
         int maxCharCount = Encoding.GetMaxCharCount(characterBuffer.Count);
         char[] charBuffer = new char[maxCharCount];
         
-        int bytesUsed, charsProduced;
-        bool completed;
-        
-        decoder.Convert(characterBuffer.ToArray(), 0, characterBuffer.Count,
-                       charBuffer, 0, maxCharCount, false,
-                       out bytesUsed, out charsProduced, out completed);
+        decoder.Convert(
+            characterBuffer.ToArray(), 0, characterBuffer.Count,
+            charBuffer, 0, maxCharCount, false,
+            out int bytesUsed, out int charsProduced, out bool completed);
         
         if (charsProduced > 0)
         {
@@ -191,9 +190,10 @@ public abstract class EscapeSequenceDecoder : IDecoder
         if (!completed && characterBuffer.Count > 4)
         {
             // Try to decode at least one character
-            decoder.Convert(characterBuffer.ToArray(), 0, characterBuffer.Count,
-                           charBuffer, 0, maxCharCount, true,
-                           out bytesUsed, out charsProduced, out completed);
+            decoder.Convert(
+                characterBuffer.ToArray(), 0, characterBuffer.Count,
+                charBuffer, 0, maxCharCount, true,
+                out bytesUsed, out charsProduced, out completed);
             
             if (charsProduced > 0)
             {
@@ -222,12 +222,10 @@ public abstract class EscapeSequenceDecoder : IDecoder
         int maxCharCount = Encoding.GetMaxCharCount(characterBuffer.Count);
         char[] charBuffer = new char[maxCharCount];
         
-        int bytesUsed, charsProduced;
-        bool completed;
-        
-        decoder.Convert(characterBuffer.ToArray(), 0, characterBuffer.Count,
-                       charBuffer, 0, maxCharCount, true,
-                       out bytesUsed, out charsProduced, out completed);
+        decoder.Convert(
+            characterBuffer.ToArray(), 0, characterBuffer.Count,
+            charBuffer, 0, maxCharCount, true,
+            out int bytesUsed, out int charsProduced, out bool completed);
         
         if (charsProduced > 0)
         {
@@ -399,16 +397,13 @@ public abstract class EscapeSequenceDecoder : IDecoder
 
     private void ProcessOscTermination(byte b)
     {
-        if (b == '\\') // Это был Backslash после ESC?
+        if (b == '\\')
         {
-            DispatchOsc(); // Выполняем!
+            DispatchOsc();
             state = State.Ground;
             return;
         }
 
-        // Это был не терминатор, а просто ESC внутри строки (редкость, но бывает)
-        // Возвращаемся в парсинг строки
-        //oscPayload.Append(EscapeCharacter);
         oscPayload.Add(b);
         state = State.OscString;
     }

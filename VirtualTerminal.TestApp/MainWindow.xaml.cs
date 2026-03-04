@@ -11,12 +11,6 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-
-        SecureShellSession session = new SecureShellSession("shardscript.ru", 2222, "tim", "tim");
-        PART_Terminal_Left.Session = session;
-        PART_Prompt_Left.Session = session;
-
-        _ = session.ConnectAsync();
     }
 
     private void Button_Click_Start(object sender, RoutedEventArgs e)
@@ -29,6 +23,8 @@ public partial class MainWindow : Window
             PART_Terminal_Left.Session?.Dispose();
             
             CommandLineSession session = new CommandLineSession(PART_CommandLineName.Text);
+            session.Resize(512, 10240);
+            
             PART_Terminal_Left.Session = session;
             PART_Prompt_Left.Session = session;
         }

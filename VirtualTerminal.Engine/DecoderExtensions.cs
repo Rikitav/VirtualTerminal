@@ -11,7 +11,7 @@ public static class DecoderExtensions
     /// <param name="decoder"></param>
     /// <param name="encoding"></param>
     /// <param name="data"></param>
-    public static void WriteFromEncoding(this IDecoder decoder, Encoding encoding, ReadOnlySpan<byte> data)
+    public static void WriteFromEncoding(this ITerminalDecoder decoder, Encoding encoding, ReadOnlySpan<byte> data)
     {
         if (decoder.Encoding == encoding)
         {
@@ -35,7 +35,7 @@ public static class DecoderExtensions
     /// </summary>
     /// <param name="decoder"></param>
     /// <param name="data"></param>
-    public static void Write(this IDecoder decoder, ReadOnlySpan<char> data)
+    public static void Write(this ITerminalDecoder decoder, ReadOnlySpan<char> data)
     {
         int bytesCount = decoder.Encoding.GetMaxByteCount(data.Length);
         Span<byte> bytes = stackalloc byte[bytesCount];
@@ -50,11 +50,11 @@ public static class DecoderExtensions
     /// <summary>
     /// Writes character into the console screen buffer via <c>WriteConsoleW</c> in <see cref="TerminalScreenBuffer.Encoding"/>.
     /// </summary>
-    /// <param name="buffer"></param>
+    /// <param name="decoder"></param>
     /// <param name="data"></param>
     /// <param name="offset"></param>
     /// <param name="length"></param>
-    public static void Write(this IDecoder decoder, ReadOnlySpan<char> data, int offset, int length)
+    public static void Write(this ITerminalDecoder decoder, ReadOnlySpan<char> data, int offset, int length)
     {
         decoder.Write(data.Slice(offset, length));
     }
@@ -62,11 +62,11 @@ public static class DecoderExtensions
     /// <summary>
     /// Writes raw bytes into the console screen buffer via <c>WriteConsoleW</c>.
     /// </summary>
-    /// <param name="buffer"></param>
+    /// <param name="decoder"></param>
     /// <param name="data"></param>
     /// <param name="offset"></param>
     /// <param name="length"></param>
-    public static void Write(this IDecoder decoder, ReadOnlySpan<byte> data, int offset, int length)
+    public static void Write(this ITerminalDecoder decoder, ReadOnlySpan<byte> data, int offset, int length)
     {
         decoder.Write(data.Slice(offset, length));
     }
@@ -74,12 +74,12 @@ public static class DecoderExtensions
     /// <summary>
     /// Writes raw bytes into the console screen buffer via <c>WriteConsoleW</c>.
     /// </summary>
-    /// <param name="buffer"></param>
+    /// <param name="decoder"></param>
     /// <param name="encoding"></param>
     /// <param name="data"></param>
     /// <param name="offset"></param>
     /// <param name="length"></param>
-    public static void WriteFromEncoding(this IDecoder decoder, Encoding encoding, ReadOnlySpan<byte> data, int offset, int length)
+    public static void WriteFromEncoding(this ITerminalDecoder decoder, Encoding encoding, ReadOnlySpan<byte> data, int offset, int length)
     {
         decoder.WriteFromEncoding(encoding, data.Slice(offset, length));
     }

@@ -1,7 +1,10 @@
 ﻿using System.Collections;
 using System.Diagnostics;
+using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Media;
+using Color = System.Windows.Media.Color;
 
 namespace VirtualTerminal.Engine;
 
@@ -19,26 +22,6 @@ public enum Underline
     Double,
 }
 
-public enum TextColor
-{
-    Black,
-    Red,
-    Green,
-    Yellow,
-    Blue,
-    Magenta,
-    Cyan,
-    White,
-    BrightBlack,
-    BrightRed,
-    BrightGreen,
-    BrightYellow,
-    BrightBlue,
-    BrightMagenta,
-    BrightCyan,
-    BrightWhite,
-}
-
 [DebuggerDisplay("'{Character}'")]
 public struct TerminalCellInfo() : IEquatable<TerminalCellInfo>
 {
@@ -49,8 +32,8 @@ public struct TerminalCellInfo() : IEquatable<TerminalCellInfo>
     public Underline Underline { get; set; }
     public Blink Blink { get; set; }
     public bool Conceal { get; set; }
-    public TextColor Foreground { get; set; } = TextColor.White;
-    public TextColor Background { get; set; } = TextColor.Black;
+    public Color Foreground { get; set; } = Colors.White;
+    public Color Background { get; set; } = Colors.Black;
 
     public void Reset()
     {
@@ -60,8 +43,8 @@ public struct TerminalCellInfo() : IEquatable<TerminalCellInfo>
         Underline = Underline.None;
         Blink = Blink.None;
         Conceal = false;
-        Foreground = TextColor.White;
-        Background = TextColor.Black;
+        Foreground = Colors.White;
+        Background = Colors.Black;
     }
 
     public readonly bool Equals(TerminalCellInfo other)
@@ -87,49 +70,34 @@ public struct TerminalCellInfo() : IEquatable<TerminalCellInfo>
 
     public override int GetHashCode()
         => Character.GetHashCode();
-
-    public static Color TextColorToColor(TextColor textColor)
-    {
-        return textColor switch
-        {
-            TextColor.Black => Colors.Black,
-            TextColor.Red => Colors.DarkRed,
-            TextColor.Green => Colors.Green,
-            TextColor.Yellow => Colors.Yellow,
-            TextColor.Blue => Colors.Blue,
-            TextColor.Magenta => Colors.DarkMagenta,
-            TextColor.Cyan => Colors.Cyan,
-            TextColor.White => Colors.White,
-            TextColor.BrightBlack => Colors.Gray,
-            TextColor.BrightRed => Colors.Red,
-            TextColor.BrightGreen => Colors.LightGreen,
-            TextColor.BrightYellow => Colors.LightYellow,
-            TextColor.BrightBlue => Colors.LightBlue,
-            TextColor.BrightMagenta => Colors.DarkMagenta,
-            TextColor.BrightCyan => Colors.LightCyan,
-            TextColor.BrightWhite => Colors.Gray,
-            _ => throw new ArgumentOutOfRangeException(nameof(textColor), "Unknown color value."),
-        };
-    }
 }
 
-public class TerminalScreenBuffer(int initCols, int initRows) : IDisposable, IEnumerable<Span<TerminalCellInfo>>
+public class TerminalScreenBuffer(ushort initCols, ushort initRows) : IDisposable, IEnumerable<Span<TerminalCellInfo>>
 {
     private int version = 0;
 
-    public int ColumnsCount { get; set; } = initCols;
-    public int RowsCount { get; set; } = initRows;
-    public TerminalCellInfo[] Cells { get; } = new TerminalCellInfo[initCols * initRows];
+    public Size GridSize { get; private set; } = new Size(initCols, initRows);
+    public TerminalCellInfo[] Cells { get; private set; } = new TerminalCellInfo[initCols * initRows];
 
     public static Encoding Encoding => Encoding.ASCII;
 
-    public TerminalScreenBuffer()
-        : this(30, 120) { }
-
-    public void Resize(int cols, int rows)
+    public void Resize(ushort cols, ushort rows)
     {
+        /*
+        if (GridSize.Width == cols && GridSize.Height == rows)
+            return;
+
+        TerminalCellInfo[] newCells = new TerminalCellInfo[cols * rows];
+        int rowsToCopy = Math.Min(rows, GridSize.Height);
+        int colsToCopy = Math.Min(cols, GridSize.Width);
+
+        for (int y = 0; y < rowsToCopy; y++)
+            Array.Copy(Cells, y * GridSize.Width, newCells, y * cols, colsToCopy);
+
+        Cells = newCells;
+        GridSize = new Size(cols, rows);
         version += 1;
-        throw new NotImplementedException();
+        */
     }
 
     public void Dispose()
@@ -154,7 +122,7 @@ public class TerminalScreenBuffer(int initCols, int initRows) : IDisposable, IEn
                 if (version != buffer.version)
                     throw new InvalidOperationException();
 
-                return buffer.Cells.AsSpan(position, buffer.ColumnsCount);
+                return buffer.Cells.AsSpan(position, buffer.GridSize.Width);
             }
         }
 
@@ -168,7 +136,7 @@ public class TerminalScreenBuffer(int initCols, int initRows) : IDisposable, IEn
             if (version != buffer.version)
                 throw new InvalidOperationException();
 
-            position += position == -1 ? 1 : buffer.ColumnsCount;
+            position += position == -1 ? 1 : buffer.GridSize.Width;
             return position >= buffer.Cells.Length;
         }
 

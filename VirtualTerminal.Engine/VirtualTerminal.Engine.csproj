@@ -5,13 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 	<UseWPF>true</UseWPF>
+	<!--GenerateDocumentationFile>true</GenerateDocumentationFile-->
   </PropertyGroup>
-
-  <ItemGroup>
-    <Compile Remove="Parsing\**" />
-    <EmbeddedResource Remove="Parsing\**" />
-    <None Remove="Parsing\**" />
-    <Page Remove="Parsing\**" />
-  </ItemGroup>
 
 </Project>

@@ -1,23 +1,26 @@
-﻿using System.Windows;
+﻿using System.Drawing;
 
 namespace VirtualTerminal.Engine.Components;
 
 public interface ITerminalScreenView
 {
-    void Characters(IBufferedDecoder sender, ReadOnlySpan<char> chars);
-    void SaveCursor(IBufferedDecoder sernder);
-    void RestoreCursor(IBufferedDecoder sender);
-    Size GetSize(IBufferedDecoder sender);
-    void MoveCursor(IBufferedDecoder sender, Direction _direction, int amount);
-    void MoveCursorToBeginningOfLineBelow(IBufferedDecoder sender, int lineNumberRelativeToCurrentLine);
-    void MoveCursorToBeginningOfLineAbove(IBufferedDecoder sender, int lineNumberRelativeToCurrentLine);
-    void MoveCursorToColumn(IBufferedDecoder sender, int columnNumber);
-    void MoveCursorTo(IBufferedDecoder sender, Coord position);
-    void ClearScreen(IBufferedDecoder sender, ClearDirection direction);
-    void ClearLine(IBufferedDecoder sender, ClearDirection _direction);
-    void ScrollPageUpwards(IBufferedDecoder sender, int linesToScroll);
-    void ScrollPageDownwards(IBufferedDecoder sender, int linesToScroll);
-    Coord GetCursorPosition(IBufferedDecoder sender);
-    void SetGraphicRendition(IBufferedDecoder sender, GraphicRendition[] commands);
-    void ModeChanged(IBufferedDecoder sender, AnsiMode mode);
+    Point CursorPosition { get; }
+
+    void BufferChanged(ITerminalDecoder sender, TerminalScreenBuffer buffer);
+    void Characters(ITerminalDecoder sender, ReadOnlySpan<char> chars);
+    void SaveCursor(ITerminalDecoder sernder);
+    void RestoreCursor(ITerminalDecoder sender);
+    Size GetSize(ITerminalDecoder sender);
+    void MoveCursor(ITerminalDecoder sender, Direction _direction, int amount);
+    void MoveCursorToBeginningOfLineBelow(ITerminalDecoder sender, int lineNumberRelativeToCurrentLine);
+    void MoveCursorToBeginningOfLineAbove(ITerminalDecoder sender, int lineNumberRelativeToCurrentLine);
+    void MoveCursorToColumn(ITerminalDecoder sender, int columnNumber);
+    void MoveCursorTo(ITerminalDecoder sender, Point position);
+    void ClearScreen(ITerminalDecoder sender, ClearDirection direction);
+    void ClearLine(ITerminalDecoder sender, ClearDirection _direction);
+    void ScrollPageUpwards(ITerminalDecoder sender, int linesToScroll);
+    void ScrollPageDownwards(ITerminalDecoder sender, int linesToScroll);
+    Point GetCursorPosition(ITerminalDecoder sender);
+    void SetGraphicRendition(ITerminalDecoder sender, GraphicRendition[] commands);
+    void ModeChanged(ITerminalDecoder sender, AnsiMode mode);
 }

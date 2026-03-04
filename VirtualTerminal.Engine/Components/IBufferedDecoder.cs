@@ -1,8 +1,6 @@
 ﻿namespace VirtualTerminal.Engine.Components;
 
-public interface IBufferedDecoder : IDecoder, ITerminalScreenView
+public interface IBufferedDecoder : ITerminalDecoder
 {
     public TerminalScreenBuffer Buffer { get; }
-    public ITerminalScreenView? OuterView { get; set; }
-    public Coord CursorPosition { get; set; }
 }

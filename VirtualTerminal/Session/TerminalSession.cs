@@ -11,7 +11,7 @@ namespace VirtualTerminal.Session;
 /// </summary>
 public abstract class TerminalSession : ITerminalSession
 {
-    private readonly IBufferedDecoder _decoder;
+    private readonly TerminalDecoder _decoder;
 
     private bool _disposed;
 
@@ -22,10 +22,10 @@ public abstract class TerminalSession : ITerminalSession
     public event EventHandler? Disconnected;
 
     /// <inheritdoc />
-    public TerminalScreenBuffer Buffer => _decoder.Buffer;
+    public ITerminalDecoder Decoder => _decoder;
 
     /// <inheritdoc />
-    public IBufferedDecoder Decoder => _decoder;
+    public TerminalScreenBuffer Buffer => _decoder.Buffer;
 
     /// <inheritdoc />
     public virtual Encoding InputEncoding { get; set; }
@@ -33,19 +33,15 @@ public abstract class TerminalSession : ITerminalSession
     /// <inheritdoc />
     public virtual string Title
     {
-        get
-        {
-            Process proc = Process.GetCurrentProcess();
-            return proc.ProcessName + "_" + proc.Id;
-        }
+        get => GetType().Name;
     }
 
     /// <summary>
     /// Initializes a new session with a fresh <see cref="TerminalScreenBuffer"/> and default input encoding.
     /// </summary>
-    public TerminalSession()
+    protected TerminalSession()
     {
-        _decoder = new BufferedDecoder();
+        _decoder = new TerminalDecoder();
         InputEncoding = Encoding.UTF8;
     }
 
@@ -53,18 +49,16 @@ public abstract class TerminalSession : ITerminalSession
     /// Initializes a new session with a fresh <see cref="TerminalScreenBuffer"/> and the specified input encoding.
     /// </summary>
     /// <param name="encoding">Encoding used for <see cref="WriteInput(ReadOnlySpan{byte})"/>.</param>
-    public TerminalSession(Encoding encoding)
+    protected TerminalSession(Encoding encoding)
     {
-        _decoder = new BufferedDecoder();
+        _decoder = new TerminalDecoder();
         InputEncoding = encoding;
     }
 
     /// <inheritdoc />
-    public virtual void Resize(int columns, int rows)
+    public virtual void Resize(ushort columns, ushort rows)
     {
-        _decoder.Buffer.ColumnsCount = columns;
-        _decoder.Buffer.RowsCount = rows;
-        // TODO: Implement proper resize logic in TerminalScreenBuffer
+        _decoder.Buffer.Resize(columns, rows);
     }
 
     /// <inheritdoc />
@@ -104,7 +98,7 @@ public abstract class TerminalSession : ITerminalSession
         if (_disposed)
             return;
 
-        _decoder.Buffer.Dispose();
+        _decoder.Dispose();
         Dispose(true);
 
         GC.SuppressFinalize(this);

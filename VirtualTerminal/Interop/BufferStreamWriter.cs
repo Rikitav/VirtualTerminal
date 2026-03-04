@@ -15,17 +15,17 @@ namespace VirtualTerminal.Interop;
 public class BufferStreamWriter : TextWriter
 {
     private readonly TerminalScreenBuffer _buffer;
-    private readonly IBufferedDecoder _decoder;
+    private readonly ITerminalDecoder _decoder;
 
     /// <inheritdoc />
-    public override Encoding Encoding => _buffer.Encoding;
+    public override Encoding Encoding => _decoder.Encoding;
 
     /// <summary>
     /// Initializes a new writer for the specified <paramref name="buffer"/>.
     /// </summary>
     /// <param name="buffer">Target terminal buffer.</param>
     /// <param name="decoder"></param>
-    public BufferStreamWriter(TerminalScreenBuffer buffer, IBufferedDecoder decoder)
+    public BufferStreamWriter(TerminalScreenBuffer buffer, ITerminalDecoder decoder)
     {
         _buffer = buffer;
         _decoder = decoder;

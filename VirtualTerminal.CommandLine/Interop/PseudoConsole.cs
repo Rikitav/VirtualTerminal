@@ -45,7 +45,7 @@ public partial class PseudoConsole : IDisposable
     /// </summary>
     /// <param name="cols">Columns.</param>
     /// <param name="rows">Rows.</param>
-    public void Resize(int cols, int rows)
+    public void Resize(ushort cols, ushort rows)
     {
         if (NativeMethods.ResizePseudoConsole(_handle, new COORD(cols, rows)) != 0)
             throw new Win32Exception(Marshal.GetLastWin32Error(), "Faile to resize pseudo consoles' buffer");

@@ -1,44 +1,52 @@
 ﻿using System.Diagnostics;
-using System.Windows;
+using System.Drawing;
+using System.Windows.Media;
 using VirtualTerminal.Engine.Components;
+using Color = System.Windows.Media.Color;
 
 namespace VirtualTerminal.Engine;
 
-public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
+public class TerminalDecoder : EscapeSequenceDecoder, IProxingDecoder
 {
-    private const int defaultCols = 120;
-    private const int defaultRows = 30;
+    private const int defaultCols = 512;
+    private const int defaultRows = 10240;
 
-    private TerminalScreenBuffer buffer = new TerminalScreenBuffer(defaultCols, defaultRows);
-    private Coord savedCursorPosition = new Coord(0, 0);
-
-    // Current text attributes
     private bool currentBold = false;
     private bool currentFaint = false;
     private bool currentItalic = false;
     private Underline currentUnderline = Underline.None;
     private Blink currentBlink = Blink.None;
     private bool currentConceal = false;
-    private TextColor currentForeground = TextColor.White;
-    private TextColor currentBackground = TextColor.Black;
-
+    private Color currentForeground = Colors.White;
+    private Color currentBackground = Colors.Black;
+    private Point savedCursorPosition = new Point(0, 0);
     private bool lineWrapEnabled = false;
 
     public TerminalScreenBuffer Buffer
     {
-        get => buffer;
+        get;
+        private set;
+    }
+
+    public Point CursorPosition
+    {
+        get;
+        private set;
     }
 
     public ITerminalScreenView? OuterView
     {
-        get;
-        set;
+        get => field;
+        set
+        {
+            field = value;
+            field?.BufferChanged(this, Buffer);
+        }
     }
 
-    public Coord CursorPosition
+    public TerminalDecoder()
     {
-        get;
-        set;
+        Buffer = new TerminalScreenBuffer(defaultCols, defaultRows);
     }
 
     protected override void ProcessCsiCommand(byte command, ReadOnlySpan<int> parameters, bool privateMode)
@@ -90,7 +98,7 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
             case 'H':
             case 'f':
                 {
-                    MoveCursorTo(this, new Coord(parameters.At(1, 1) - 1, parameters.At(0, 1) - 1));
+                    MoveCursorTo(this, new Point(parameters.At(1, 1) - 1, parameters.At(0, 1) - 1));
                     break;
                 }
 
@@ -455,7 +463,7 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
 
     protected override void ProcessOscCommand(ReadOnlySpan<int> parameters, string payload)
     {
-        //throw new NotImplementedException();
+        //throw new InvalidOperationException();
     }
 
     protected override void OnCharacters(ReadOnlySpan<char> characters)
@@ -463,7 +471,7 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
         Characters(this, characters);
     }
 
-    public void Characters(IBufferedDecoder sender, ReadOnlySpan<char> chars)
+    public void Characters(ITerminalDecoder sender, ReadOnlySpan<char> chars)
     {
         try
         {
@@ -474,16 +482,16 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
                     case '\r':
                         {
                             // Carriage return - move to beginning of line
-                            CursorPosition = new Coord(0, CursorPosition.Y);
+                            CursorPosition = new Point(0, CursorPosition.Y);
                             break;
                         }
 
                     case '\n':
                         {
                             // Line feed - move to next line
-                            if (CursorPosition.Y < Buffer.RowsCount - 1)
+                            if (CursorPosition.Y < Buffer.GridSize.Height - 1)
                             {
-                                CursorPosition = new Coord(CursorPosition.X, CursorPosition.Y + 1);
+                                CursorPosition = new Point(CursorPosition.X, CursorPosition.Y + 1);
                                 break;
                             }
 
@@ -496,12 +504,12 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
                         {
                             // Tab - move to next tab stop (every 8 columns)
                             int nextTabStop = ((CursorPosition.X / 8) + 1) * 8;
-                            if (nextTabStop >= Buffer.ColumnsCount)
+                            if (nextTabStop >= Buffer.GridSize.Width)
                             {
-                                nextTabStop = Buffer.ColumnsCount - 1;
+                                nextTabStop = Buffer.GridSize.Width - 1;
                             }
 
-                            CursorPosition = new Coord(nextTabStop, CursorPosition.Y);
+                            CursorPosition = new Point(nextTabStop, CursorPosition.Y);
                             break;
                         }
 
@@ -509,7 +517,7 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
                         {
                             // Backspace - move cursor back one position
                             if (CursorPosition.X > 0)
-                                CursorPosition = new Coord(CursorPosition.X - 1, CursorPosition.Y);
+                                CursorPosition = new Point(CursorPosition.X - 1, CursorPosition.Y);
 
                             break;
                         }
@@ -525,9 +533,9 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
                             ApplyCurrentAttributes(ref Buffer.Cells[linearPos]);
 
                             // Move cursor forward
-                            if (CursorPosition.X < Buffer.ColumnsCount - 1)
+                            if (CursorPosition.X < Buffer.GridSize.Width - 1)
                             {
-                                CursorPosition = new Coord(CursorPosition.X + 1, CursorPosition.Y);
+                                CursorPosition = new Point(CursorPosition.X + 1, CursorPosition.Y);
                                 break;
                             }
 
@@ -535,20 +543,20 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
                             if (!lineWrapEnabled)
                             {
                                 // No wrap - stay at end of line
-                                CursorPosition = new Coord(Buffer.ColumnsCount - 1, CursorPosition.Y);
+                                CursorPosition = new Point(Buffer.GridSize.Width - 1, CursorPosition.Y);
                                 break;
                             }
 
                             // Wrap to next line
-                            if (CursorPosition.Y < Buffer.RowsCount - 1)
+                            if (CursorPosition.Y < Buffer.GridSize.Height - 1)
                             {
-                                CursorPosition = new Coord(0, CursorPosition.Y + 1);
+                                CursorPosition = new Point(0, CursorPosition.Y + 1);
                                 break;
                             }
 
                             // At bottom, scroll up and wrap
                             ScrollPageUpwards(this, 1);
-                            CursorPosition = new Coord(0, Buffer.RowsCount - 1);
+                            CursorPosition = new Point(0, Buffer.GridSize.Height - 1);
                             break;
                         }
                 }
@@ -560,7 +568,7 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
         }
     }
 
-    public void SaveCursor(IBufferedDecoder sernder)
+    public void SaveCursor(ITerminalDecoder sender)
     {
         try
         {
@@ -568,16 +576,16 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
         }
         finally
         {
-            OuterView?.SaveCursor(sernder);
+            OuterView?.SaveCursor(sender);
         }
     }
 
-    public void RestoreCursor(IBufferedDecoder sender)
+    public void RestoreCursor(ITerminalDecoder sender)
     {
         try
         {
             CursorPosition = savedCursorPosition;
-            savedCursorPosition = new Coord(0, 0);
+            savedCursorPosition = new Point(0, 0);
         }
         finally
         {
@@ -585,11 +593,11 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
         }
     }
 
-    public Size GetSize(IBufferedDecoder sender)
+    public Size GetSize(ITerminalDecoder sender)
     {
         try
         {
-            return new Size(Buffer.ColumnsCount, Buffer.RowsCount);
+            return new Size(Buffer.GridSize.Width, Buffer.GridSize.Height);
         }
         finally
         {
@@ -597,7 +605,7 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
         }
     }
 
-    public void MoveCursor(IBufferedDecoder sender, Direction direction, int amount)
+    public void MoveCursor(ITerminalDecoder sender, Direction direction, int amount)
     {
         try
         {
@@ -614,11 +622,11 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
                     break;
 
                 case Direction.Down:
-                    newY = Math.Min(Buffer.RowsCount - 1, CursorPosition.Y + amount);
+                    newY = Math.Min(Buffer.GridSize.Height - 1, CursorPosition.Y + amount);
                     break;
 
                 case Direction.Forward:
-                    newX = Math.Min(Buffer.ColumnsCount - 1, CursorPosition.X + amount);
+                    newX = Math.Min(Buffer.GridSize.Width - 1, CursorPosition.X + amount);
                     break;
 
                 case Direction.Backward:
@@ -626,7 +634,7 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
                     break;
             }
 
-            CursorPosition = new Coord(newX, newY);
+            CursorPosition = new Point(newX, newY);
         }
         finally
         {
@@ -634,42 +642,42 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
         }
     }
 
-    public void MoveCursorToBeginningOfLineBelow(IBufferedDecoder sender, int lineNumberRelativeToCurrentLine)
+    public void MoveCursorToBeginningOfLineBelow(ITerminalDecoder sender, int lineNumberRelativeToCurrentLine)
     {
         if (lineNumberRelativeToCurrentLine <= 0)
             lineNumberRelativeToCurrentLine = 1;
 
-        int newY = Math.Min(Buffer.RowsCount - 1, CursorPosition.Y + lineNumberRelativeToCurrentLine);
-        CursorPosition = new Coord(0, newY);
+        int newY = Math.Min(Buffer.GridSize.Height - 1, CursorPosition.Y + lineNumberRelativeToCurrentLine);
+        CursorPosition = new Point(0, newY);
         OuterView?.MoveCursorToBeginningOfLineBelow(sender, lineNumberRelativeToCurrentLine);
     }
 
-    public void MoveCursorToBeginningOfLineAbove(IBufferedDecoder sender, int lineNumberRelativeToCurrentLine)
+    public void MoveCursorToBeginningOfLineAbove(ITerminalDecoder sender, int lineNumberRelativeToCurrentLine)
     {
         if (lineNumberRelativeToCurrentLine <= 0)
             lineNumberRelativeToCurrentLine = 1;
 
         int newY = Math.Max(0, CursorPosition.Y - lineNumberRelativeToCurrentLine);
-        CursorPosition = new Coord(0, newY);
+        CursorPosition = new Point(0, newY);
         OuterView?.MoveCursorToBeginningOfLineAbove(sender, lineNumberRelativeToCurrentLine);
     }
 
-    public void MoveCursorToColumn(IBufferedDecoder sender, int columnNumber)
+    public void MoveCursorToColumn(ITerminalDecoder sender, int columnNumber)
     {
-        int newX = Math.Max(0, Math.Min(Buffer.ColumnsCount - 1, columnNumber));
-        CursorPosition = new Coord(newX, CursorPosition.Y);
+        int newX = Math.Max(0, Math.Min(Buffer.GridSize.Width - 1, columnNumber));
+        CursorPosition = new Point(newX, CursorPosition.Y);
         OuterView?.MoveCursorToColumn(sender, columnNumber);
     }
 
-    public void MoveCursorTo(IBufferedDecoder sender, Coord position)
+    public void MoveCursorTo(ITerminalDecoder sender, Point position)
     {
-        int newX = Math.Max(0, Math.Min(Buffer.ColumnsCount - 1, (int)position.X));
-        int newY = Math.Max(0, Math.Min(Buffer.RowsCount - 1, (int)position.Y));
-        CursorPosition = new Coord(newX, newY);
+        int newX = Math.Max(0, Math.Min(Buffer.GridSize.Width - 1, (int)position.X));
+        int newY = Math.Max(0, Math.Min(Buffer.GridSize.Height - 1, (int)position.Y));
+        CursorPosition = new Point(newX, newY);
         OuterView?.MoveCursorTo(sender, position);
     }
 
-    public void ClearScreen(IBufferedDecoder sender, ClearDirection direction)
+    public void ClearScreen(ITerminalDecoder sender, ClearDirection direction)
     {
         switch (direction)
         {
@@ -688,10 +696,10 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
         OuterView?.ClearScreen(sender, direction);
     }
 
-    public void ClearLine(IBufferedDecoder sender, ClearDirection direction)
+    public void ClearLine(ITerminalDecoder sender, ClearDirection direction)
     {
-        int lineStart = CursorPosition.Y * Buffer.ColumnsCount;
-        int lineEnd = lineStart + Buffer.ColumnsCount - 1;
+        int lineStart = CursorPosition.Y * Buffer.GridSize.Width;
+        int lineEnd = lineStart + Buffer.GridSize.Width - 1;
         int cursorPos = GetLinearCursorPosition();
         
         switch (direction)
@@ -708,21 +716,22 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
                 ClearCells(lineStart, lineEnd);
                 break;
         }
+
         OuterView?.ClearLine(sender, direction);
     }
 
-    public void ScrollPageUpwards(IBufferedDecoder sender, int linesToScroll)
+    public void ScrollPageUpwards(ITerminalDecoder sender, int linesToScroll)
     {
         if (linesToScroll <= 0) linesToScroll = 1;
-        linesToScroll = Math.Min(linesToScroll, Buffer.RowsCount);
+        linesToScroll = Math.Min(linesToScroll, Buffer.GridSize.Height);
         
         // Move lines up
-        for (int i = 0; i < Buffer.RowsCount - linesToScroll; i++)
+        for (int i = 0; i < Buffer.GridSize.Height - linesToScroll; i++)
         {
-            int srcStart = (i + linesToScroll) * Buffer.ColumnsCount;
-            int dstStart = i * Buffer.ColumnsCount;
+            int srcStart = (i + linesToScroll) * Buffer.GridSize.Width;
+            int dstStart = i * Buffer.GridSize.Width;
             
-            for (int j = 0; j < Buffer.ColumnsCount; j++)
+            for (int j = 0; j < Buffer.GridSize.Width; j++)
             {
                 int srcIdx = srcStart + j;
                 int dstIdx = dstStart + j;
@@ -735,24 +744,24 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
         }
         
         // Clear bottom lines
-        int clearStart = (Buffer.RowsCount - linesToScroll) * Buffer.ColumnsCount;
+        int clearStart = (Buffer.GridSize.Height - linesToScroll) * Buffer.GridSize.Width;
         ClearCells(clearStart, Buffer.Cells.Length - 1);
         
         OuterView?.ScrollPageUpwards(sender, linesToScroll);
     }
 
-    public void ScrollPageDownwards(IBufferedDecoder sender, int linesToScroll)
+    public void ScrollPageDownwards(ITerminalDecoder sender, int linesToScroll)
     {
         if (linesToScroll <= 0) linesToScroll = 1;
-        linesToScroll = Math.Min(linesToScroll, Buffer.RowsCount);
+        linesToScroll = Math.Min(linesToScroll, Buffer.GridSize.Height);
         
         // Move lines down
-        for (int i = Buffer.RowsCount - 1; i >= linesToScroll; i--)
+        for (int i = Buffer.GridSize.Height - 1; i >= linesToScroll; i--)
         {
-            int srcStart = (i - linesToScroll) * Buffer.ColumnsCount;
-            int dstStart = i * Buffer.ColumnsCount;
+            int srcStart = (i - linesToScroll) * Buffer.GridSize.Width;
+            int dstStart = i * Buffer.GridSize.Width;
             
-            for (int j = 0; j < Buffer.ColumnsCount; j++)
+            for (int j = 0; j < Buffer.GridSize.Width; j++)
             {
                 int srcIdx = srcStart + j;
                 int dstIdx = dstStart + j;
@@ -765,244 +774,323 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
         }
         
         // Clear top lines
-        int clearEnd = linesToScroll * Buffer.ColumnsCount - 1;
+        int clearEnd = (linesToScroll * Buffer.GridSize.Width) - 1;
         ClearCells(0, clearEnd);
         
         OuterView?.ScrollPageDownwards(sender, linesToScroll);
     }
 
-    public Coord GetCursorPosition(IBufferedDecoder sender)
+    public Point GetCursorPosition(ITerminalDecoder sender)
     {
         OuterView?.GetCursorPosition(sender);
         return CursorPosition;
     }
 
-    public void SetGraphicRendition(IBufferedDecoder sender, GraphicRendition[] commands)
+    private static readonly Color[] SystemColors = new Color[]
     {
-        foreach (var cmd in commands)
+        Color.FromRgb(0, 0, 0),       // 0: Black
+        Color.FromRgb(128, 0, 0),     // 1: Red
+        Color.FromRgb(0, 128, 0),     // 2: Green
+        Color.FromRgb(128, 128, 0),   // 3: Yellow
+        Color.FromRgb(0, 0, 128),     // 4: Blue
+        Color.FromRgb(128, 0, 128),   // 5: Magenta
+        Color.FromRgb(0, 128, 128),   // 6: Cyan
+        Color.FromRgb(192, 192, 192), // 7: White
+        Color.FromRgb(128, 128, 128), // 8: Bright Black (Gray)
+        Color.FromRgb(255, 0, 0),     // 9: Bright Red
+        Color.FromRgb(0, 255, 0),     // 10: Bright Green
+        Color.FromRgb(255, 255, 0),   // 11: Bright Yellow
+        Color.FromRgb(0, 0, 255),     // 12: Bright Blue
+        Color.FromRgb(255, 0, 255),   // 13: Bright Magenta
+        Color.FromRgb(0, 255, 255),   // 14: Bright Cyan
+        Color.FromRgb(255, 255, 255)  // 15: Bright White
+    };
+
+    private static readonly byte[] CubeLevels = { 0, 95, 135, 175, 215, 255 };
+
+    public static Color GetColor(int index)
+    {
+        if (index < 0 || index > 255)
+            throw new ArgumentOutOfRangeException(nameof(index), "Индекс должен быть от 0 до 255.");
+
+        // 1. Системные цвета
+        if (index < 16)
         {
-            switch (cmd)
+            return SystemColors[index];
+        }
+
+        // 2. Цветовой куб 6x6x6 (индексы 16-231)
+        if (index < 232)
+        {
+            int colorIndex = index - 16;
+            byte r = CubeLevels[(colorIndex / 36) % 6];
+            byte g = CubeLevels[(colorIndex / 6) % 6];
+            byte b = CubeLevels[colorIndex % 6];
+            return Color.FromRgb(r, g, b);
+        }
+
+        // 3. Градация серого (индексы 232-255)
+        // Формула: 8 + (index - 232) * 10
+        byte grayValue = (byte)(8 + (index - 232) * 10);
+        return Color.FromRgb(grayValue, grayValue, grayValue);
+    }
+
+    public void SetGraphicRendition(ITerminalDecoder sender, GraphicRendition[] commands)
+    {
+        if (commands.Length == 0)
+        {
+            currentBold = false;
+            currentFaint = false;
+            currentItalic = false;
+            currentUnderline = Underline.None;
+            currentBlink = Blink.None;
+            currentConceal = false;
+            currentForeground = Colors.White;
+            currentBackground = Colors.Black;
+        }
+        else if (commands is [GraphicRendition.AixtermSetBackground, GraphicRendition.AixtermColors, ..])
+        {
+            currentBackground = GetColor((int)commands[2]);
+        }
+        else if (commands is [GraphicRendition.AixtermSetForeground, GraphicRendition.AixtermColors, ..])
+        {
+            currentForeground = GetColor((int)commands[2]);
+        }
+        else if (commands is [GraphicRendition.AixtermSetBackground, GraphicRendition.TrueColors, ..])
+        {
+            currentBackground = Color.FromRgb((byte)commands[2], (byte)commands[3], (byte)commands[4]);
+        }
+        else if (commands is [GraphicRendition.AixtermSetForeground, GraphicRendition.TrueColors, ..])
+        {
+            currentForeground = Color.FromRgb((byte)commands[2], (byte)commands[3], (byte)commands[4]);
+        }
+        else
+        {
+            foreach (GraphicRendition cmd in commands)
             {
-                case GraphicRendition.Reset:
-                    currentBold = false;
-                    currentFaint = false;
-                    currentItalic = false;
-                    currentUnderline = Underline.None;
-                    currentBlink = Blink.None;
-                    currentConceal = false;
-                    currentForeground = TextColor.White;
-                    currentBackground = TextColor.Black;
-                    break;
-                
-                case GraphicRendition.Bold:
-                    currentBold = true;
-                    currentFaint = false;
-                    break;
-                
-                case GraphicRendition.Faint:
-                    currentFaint = true;
-                    currentBold = false;
-                    break;
-                
-                case GraphicRendition.Italic:
-                    currentItalic = true;
-                    break;
-                
-                case GraphicRendition.Underline:
-                    currentUnderline = Underline.Single;
-                    break;
-                
-                case GraphicRendition.BlinkSlow:
-                    currentBlink = Blink.Slow;
-                    break;
-                
-                case GraphicRendition.BlinkRapid:
-                    currentBlink = Blink.Rapid;
-                    break;
+                switch (cmd)
+                {
+                    case GraphicRendition.Reset:
+                        currentBold = false;
+                        currentFaint = false;
+                        currentItalic = false;
+                        currentUnderline = Underline.None;
+                        currentBlink = Blink.None;
+                        currentConceal = false;
+                        currentForeground = Colors.White;
+                        currentBackground = Colors.Black;
+                        break;
 
-                case GraphicRendition.Inverse: // Swap foreground and background
-                    (currentForeground, currentBackground) = (currentBackground, currentForeground);
-                    break;
+                    case GraphicRendition.Bold:
+                        currentBold = true;
+                        currentFaint = false;
+                        break;
 
-                case GraphicRendition.Conceal:
-                    currentConceal = true;
-                    break;
+                    case GraphicRendition.Faint:
+                        currentFaint = true;
+                        currentBold = false;
+                        break;
 
-                case GraphicRendition.UnderlineDouble:
-                    currentUnderline = Underline.Double;
-                    break;
+                    case GraphicRendition.Italic:
+                        currentItalic = true;
+                        break;
 
-                case GraphicRendition.NormalIntensity:
-                    currentBold = false;
-                    currentFaint = false;
-                    break;
+                    case GraphicRendition.Underline:
+                        currentUnderline = Underline.Single;
+                        break;
 
-                case GraphicRendition.NoUnderline:
-                    currentUnderline = Underline.None;
-                    break;
+                    case GraphicRendition.BlinkSlow:
+                        currentBlink = Blink.Slow;
+                        break;
 
-                case GraphicRendition.NoBlink:
-                    currentBlink = Blink.None;
-                    break;
+                    case GraphicRendition.BlinkRapid:
+                        currentBlink = Blink.Rapid;
+                        break;
 
-                case GraphicRendition.Positive: // Undo inverse - swap back
-                    (currentForeground, currentBackground) = (currentBackground, currentForeground);
-                    break;
+                    case GraphicRendition.Inverse: // Swap foreground and background
+                        (currentForeground, currentBackground) = (currentBackground, currentForeground);
+                        break;
 
-                case GraphicRendition.Reveal:
-                    currentConceal = false;
-                    break;
+                    case GraphicRendition.Conceal:
+                        currentConceal = true;
+                        break;
 
-                case GraphicRendition.ForegroundNormalBlack:
-                    currentForeground = TextColor.Black;
-                    break;
+                    case GraphicRendition.UnderlineDouble:
+                        currentUnderline = Underline.Double;
+                        break;
 
-                case GraphicRendition.ForegroundNormalRed:
-                    currentForeground = TextColor.Red;
-                    break;
+                    case GraphicRendition.NormalIntensity:
+                        currentBold = false;
+                        currentFaint = false;
+                        break;
 
-                case GraphicRendition.ForegroundNormalGreen:
-                    currentForeground = TextColor.Green;
-                    break;
+                    case GraphicRendition.NoUnderline:
+                        currentUnderline = Underline.None;
+                        break;
 
-                case GraphicRendition.ForegroundNormalYellow:
-                    currentForeground = TextColor.Yellow;
-                    break;
+                    case GraphicRendition.NoBlink:
+                        currentBlink = Blink.None;
+                        break;
 
-                case GraphicRendition.ForegroundNormalBlue:
-                    currentForeground = TextColor.Blue;
-                    break;
+                    case GraphicRendition.Positive: // Undo inverse - swap back
+                        (currentForeground, currentBackground) = (currentBackground, currentForeground);
+                        break;
 
-                case GraphicRendition.ForegroundNormalMagenta:
-                    currentForeground = TextColor.Magenta;
-                    break;
+                    case GraphicRendition.Reveal:
+                        currentConceal = false;
+                        break;
 
-                case GraphicRendition.ForegroundNormalCyan:
-                    currentForeground = TextColor.Cyan;
-                    break;
+                    case GraphicRendition.ForegroundNormalBlack:
+                        currentForeground = Colors.Black;
+                        break;
 
-                case GraphicRendition.ForegroundNormalWhite:
-                    currentForeground = TextColor.White;
-                    break;
+                    case GraphicRendition.ForegroundNormalRed:
+                        currentForeground = Colors.DarkRed;
+                        break;
 
-                case GraphicRendition.ForegroundNormalReset:
-                    currentForeground = TextColor.White;
-                    break;
+                    case GraphicRendition.ForegroundNormalGreen:
+                        currentForeground = Colors.Green;
+                        break;
 
-                case GraphicRendition.BackgroundNormalBlack:
-                    currentBackground = TextColor.Black;
-                    break;
+                    case GraphicRendition.ForegroundNormalYellow:
+                        currentForeground = Colors.Yellow;
+                        break;
 
-                case GraphicRendition.BackgroundNormalRed:
-                    currentBackground = TextColor.Red;
-                    break;
+                    case GraphicRendition.ForegroundNormalBlue:
+                        currentForeground = Colors.Blue;
+                        break;
 
-                case GraphicRendition.BackgroundNormalGreen:
-                    currentBackground = TextColor.Green;
-                    break;
+                    case GraphicRendition.ForegroundNormalMagenta:
+                        currentForeground = Colors.DarkMagenta;
+                        break;
 
-                case GraphicRendition.BackgroundNormalYellow:
-                    currentBackground = TextColor.Yellow;
-                    break;
+                    case GraphicRendition.ForegroundNormalCyan:
+                        currentForeground = Colors.Cyan;
+                        break;
 
-                case GraphicRendition.BackgroundNormalBlue:
-                    currentBackground = TextColor.Blue;
-                    break;
+                    case GraphicRendition.ForegroundNormalWhite:
+                        currentForeground = Colors.White;
+                        break;
 
-                case GraphicRendition.BackgroundNormalMagenta:
-                    currentBackground = TextColor.Magenta;
-                    break;
+                    case GraphicRendition.ForegroundNormalReset:
+                        currentForeground = Colors.White;
+                        break;
 
-                case GraphicRendition.BackgroundNormalCyan:
-                    currentBackground = TextColor.Cyan;
-                    break;
+                    case GraphicRendition.BackgroundNormalBlack:
+                        currentBackground = Colors.Black;
+                        break;
 
-                case GraphicRendition.BackgroundNormalWhite:
-                    currentBackground = TextColor.White;
-                    break;
+                    case GraphicRendition.BackgroundNormalRed:
+                        currentBackground = Colors.DarkRed;
+                        break;
 
-                case GraphicRendition.BackgroundNormalReset:
-                    currentBackground = TextColor.Black;
-                    break;
+                    case GraphicRendition.BackgroundNormalGreen:
+                        currentBackground = Colors.Green;
+                        break;
 
-                case GraphicRendition.ForegroundBrightBlack:
-                    currentForeground = TextColor.BrightBlack;
-                    break;
+                    case GraphicRendition.BackgroundNormalYellow:
+                        currentBackground = Colors.Yellow;
+                        break;
 
-                case GraphicRendition.ForegroundBrightRed:
-                    currentForeground = TextColor.BrightRed;
-                    break;
+                    case GraphicRendition.BackgroundNormalBlue:
+                        currentBackground = Colors.Blue;
+                        break;
 
-                case GraphicRendition.ForegroundBrightGreen:
-                    currentForeground = TextColor.BrightGreen;
-                    break;
+                    case GraphicRendition.BackgroundNormalMagenta:
+                        currentBackground = Colors.DarkMagenta;
+                        break;
 
-                case GraphicRendition.ForegroundBrightYellow:
-                    currentForeground = TextColor.BrightYellow;
-                    break;
+                    case GraphicRendition.BackgroundNormalCyan:
+                        currentBackground = Colors.Cyan;
+                        break;
 
-                case GraphicRendition.ForegroundBrightBlue:
-                    currentForeground = TextColor.BrightBlue;
-                    break;
+                    case GraphicRendition.BackgroundNormalWhite:
+                        currentBackground = Colors.White;
+                        break;
 
-                case GraphicRendition.ForegroundBrightMagenta:
-                    currentForeground = TextColor.BrightMagenta;
-                    break;
+                    case GraphicRendition.BackgroundNormalReset:
+                        currentBackground = Colors.Black;
+                        break;
 
-                case GraphicRendition.ForegroundBrightCyan:
-                    currentForeground = TextColor.BrightCyan;
-                    break;
+                    case GraphicRendition.ForegroundBrightBlack:
+                        currentForeground = Colors.Gray;
+                        break;
 
-                case GraphicRendition.ForegroundBrightWhite:
-                    currentForeground = TextColor.BrightWhite;
-                    break;
+                    case GraphicRendition.ForegroundBrightRed:
+                        currentForeground = Colors.Red;
+                        break;
 
-                case GraphicRendition.ForegroundBrightReset:
-                    currentForeground = TextColor.White;
-                    break;
+                    case GraphicRendition.ForegroundBrightGreen:
+                        currentForeground = Colors.LightGreen;
+                        break;
 
-                case GraphicRendition.BackgroundBrightBlack:
-                    currentBackground = TextColor.BrightBlack;
-                    break;
+                    case GraphicRendition.ForegroundBrightYellow:
+                        currentForeground = Colors.LightYellow;
+                        break;
 
-                case GraphicRendition.BackgroundBrightRed:
-                    currentBackground = TextColor.BrightRed;
-                    break;
+                    case GraphicRendition.ForegroundBrightBlue:
+                        currentForeground = Colors.LightBlue;
+                        break;
 
-                case GraphicRendition.BackgroundBrightGreen:
-                    currentBackground = TextColor.BrightGreen;
-                    break;
+                    case GraphicRendition.ForegroundBrightMagenta:
+                        currentForeground = Colors.Magenta;
+                        break;
 
-                case GraphicRendition.BackgroundBrightYellow:
-                    currentBackground = TextColor.BrightYellow;
-                    break;
+                    case GraphicRendition.ForegroundBrightCyan:
+                        currentForeground = Colors.LightCyan;
+                        break;
 
-                case GraphicRendition.BackgroundBrightBlue:
-                    currentBackground = TextColor.BrightBlue;
-                    break;
+                    case GraphicRendition.ForegroundBrightWhite:
+                        currentForeground = Colors.Gray;
+                        break;
 
-                case GraphicRendition.BackgroundBrightMagenta:
-                    currentBackground = TextColor.BrightMagenta;
-                    break;
+                    case GraphicRendition.ForegroundBrightReset:
+                        currentForeground = Colors.White;
+                        break;
 
-                case GraphicRendition.BackgroundBrightCyan:
-                    currentBackground = TextColor.BrightCyan;
-                    break;
+                    case GraphicRendition.BackgroundBrightBlack:
+                        currentBackground = Colors.Gray;
+                        break;
 
-                case GraphicRendition.BackgroundBrightWhite:
-                    currentBackground = TextColor.BrightWhite;
-                    break;
+                    case GraphicRendition.BackgroundBrightRed:
+                        currentBackground = Colors.Red;
+                        break;
 
-                case GraphicRendition.BackgroundBrightReset:
-                    currentBackground = TextColor.Black;
-                    break;
+                    case GraphicRendition.BackgroundBrightGreen:
+                        currentBackground = Colors.LightGreen;
+                        break;
+
+                    case GraphicRendition.BackgroundBrightYellow:
+                        currentBackground = Colors.LightYellow;
+                        break;
+
+                    case GraphicRendition.BackgroundBrightBlue:
+                        currentBackground = Colors.LightBlue;
+                        break;
+
+                    case GraphicRendition.BackgroundBrightMagenta:
+                        currentBackground = Colors.DarkMagenta;
+                        break;
+
+                    case GraphicRendition.BackgroundBrightCyan:
+                        currentBackground = Colors.LightCyan;
+                        break;
+
+                    case GraphicRendition.BackgroundBrightWhite:
+                        currentBackground = Colors.Gray;
+                        break;
+
+                    case GraphicRendition.BackgroundBrightReset:
+                        currentBackground = Colors.Black;
+                        break;
+                }
             }
         }
-        
+
         OuterView?.SetGraphicRendition(sender, commands);
     }
 
-    public void ModeChanged(IBufferedDecoder sender, AnsiMode mode)
+    public void ModeChanged(ITerminalDecoder sender, AnsiMode mode)
     {
         switch (mode)
         {
@@ -1022,7 +1110,7 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
 
     private int GetLinearCursorPosition()
     {
-        return CursorPosition.Y * Buffer.ColumnsCount + CursorPosition.X;
+        return CursorPosition.Y * Buffer.GridSize.Width + CursorPosition.X;
     }
 
     [DebuggerStepThrough]
@@ -1042,10 +1130,10 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
     {
         if (startIndex < 0)
             startIndex = 0;
-        
+
         if (endIndex >= Buffer.Cells.Length)
             endIndex = Buffer.Cells.Length - 1;
-        
+
         if (startIndex > endIndex)
             return;
         
@@ -1069,6 +1157,8 @@ public class BufferedDecoder() : EscapeSequenceDecoder(), IBufferedDecoder
         destination.Foreground = source.Foreground;
         destination.Background = source.Background;
     }
+
+    public void BufferChanged(ITerminalDecoder sender, TerminalScreenBuffer buffer) => throw new NotImplementedException();
 }
 
 internal static class ParamsHelpers

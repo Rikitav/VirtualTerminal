@@ -33,6 +33,8 @@ public enum GraphicRendition
     NoBlink = 25,               // Blink: off
     Positive = 27,              // Image: Positive. Not sure what this is supposed to be, the opposite of inverse???
     Reveal = 28,                // Reveal, conceal off
+    AixtermColors = 5,          // Use 256 bits aixterm documented colors modes
+    TrueColors = 2,
 
     // Set foreground color, normal intensity
     ForegroundNormalBlack = 30,
@@ -57,6 +59,7 @@ public enum GraphicRendition
     BackgroundNormalReset = 49,
 
     // Set foreground color, high intensity (aixtem)
+    AixtermSetForeground = 38,
     ForegroundBrightBlack = 90,
     ForegroundBrightRed = 91,
     ForegroundBrightGreen = 92,
@@ -68,6 +71,7 @@ public enum GraphicRendition
     ForegroundBrightReset = 99,
 
     // Set background color, high intensity (aixterm)
+    AixtermSetBackground = 48,
     BackgroundBrightBlack = 100,
     BackgroundBrightRed = 101,
     BackgroundBrightGreen = 102,

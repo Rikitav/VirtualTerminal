@@ -24,7 +24,7 @@ public static partial class PseudoConsoleFactory
         try
         {
             IntPtr handle = IntPtr.Zero;
-            int hResult = NativeMethods.CreatePseudoConsole(new COORD(buffer.ColumnsCount, buffer.RowsCount), hStdInput, hStdOutput, 0, out handle);
+            int hResult = NativeMethods.CreatePseudoConsole(new COORD((ushort)buffer.GridSize.Width, (ushort)buffer.GridSize.Height), hStdInput, hStdOutput, 0, out handle);
 
             if (NativeMethods.IsInvalidHandleValue(handle))
                 throw new Win32Exception(hResult, "Failed to create ConPTY instance");
@@ -53,8 +53,8 @@ public static partial class PseudoConsoleFactory
         public static bool IsInvalidHandleValue(IntPtr handle)
             => handle == IntPtr.Zero || handle == INVALID_HANDLE_VALUE;
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        public static extern int CreatePseudoConsole(COORD size, IntPtr hInput, IntPtr hOutput, uint dwFlags, out IntPtr phPC);
+        [LibraryImport("kernel32.dll", SetLastError = true)]
+        public static partial int CreatePseudoConsole(COORD size, IntPtr hInput, IntPtr hOutput, uint dwFlags, out IntPtr phPC);
 
         [LibraryImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]

@@ -223,7 +223,7 @@ public class SecureShellSession : TerminalSession
     }
 
     /// <inheritdoc />
-    public override void Resize(int columns, int rows)
+    public override void Resize(ushort columns, ushort rows)
     {
         ValidateClient();
         Buffer.Resize(columns, rows);
@@ -235,7 +235,7 @@ public class SecureShellSession : TerminalSession
         uint nRows = (uint)(info.dwSize.Y);
         uint nCols = (uint)(info.dwSize.X);
         */
-        _shellStream.ChangeWindowSize((uint)Buffer.ColumnsCount, (uint)Buffer.RowsCount, 1200, 800);
+        //_shellStream.ChangeWindowSize((uint)Buffer.ColumnsCount, (uint)Buffer.RowsCount, 1200, 800);
     }
 
     /// <inheritdoc />
@@ -292,10 +292,10 @@ public class SecureShellSession : TerminalSession
     /// <summary>
     /// Flushes the shell stream asynchronously.
     /// </summary>
-    public virtual void FlushAsync(CancellationToken cancellationToken = default)
+    public virtual async Task FlushAsync(CancellationToken cancellationToken = default)
     {
         ValidateClient();
-        _shellStream.FlushAsync(cancellationToken);
+        await _shellStream.FlushAsync(cancellationToken);
     }
 
     /// <summary>
@@ -328,7 +328,7 @@ public class SecureShellSession : TerminalSession
         if (args.Data == null || args.Data.Length == 0)
             return;
 
-        Decoder.Write(Encoding.Convert(InputEncoding, Buffer.Encoding, args.Data));
+        Decoder.Write(Encoding.Convert(InputEncoding, Decoder.Encoding, args.Data));
         NotifyBufferUpdated();
     }
 

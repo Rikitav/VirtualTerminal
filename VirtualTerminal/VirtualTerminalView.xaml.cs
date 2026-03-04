@@ -1,5 +1,4 @@
-﻿using System;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -7,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using VirtualTerminal.Engine;
+using VirtualTerminal.Engine.Components;
 using VirtualTerminal.Helpers;
 using VirtualTerminal.Interop;
 using VirtualTerminal.Session;
@@ -20,7 +20,7 @@ namespace VirtualTerminal;
 public partial class VirtualTerminalView : UserControl, IDisposable
 {
     private readonly Lock _renderLock = new Lock();
-    private readonly DispatcherTimer? _renderTimer;
+    //private readonly DispatcherTimer? _renderTimer;
 
     private bool renderPending;
 
@@ -102,7 +102,7 @@ public partial class VirtualTerminalView : UserControl, IDisposable
     /// </summary>
     public Encoding? Encoding
     {
-        get => Session?.Buffer?.Encoding;
+        get => Session?.InputEncoding;
     }
 
     /// <summary>
@@ -120,6 +120,7 @@ public partial class VirtualTerminalView : UserControl, IDisposable
         Unloaded += (o, e) => Dispose();
     }
 
+    /*
     private void DispatcherRenderHandler(object? sender, EventArgs e)
     {
         lock (_renderLock)
@@ -132,14 +133,8 @@ public partial class VirtualTerminalView : UserControl, IDisposable
         }
     }
 
-    private void ScheduleRender()
-    {
-        renderPending = true;
-    }
-
     private void RenderOutput()
     {
-        /*
         lock (_renderLock)
         {
             if (Session?.Buffer == null)
@@ -156,7 +151,12 @@ public partial class VirtualTerminalView : UserControl, IDisposable
                 Debug.WriteLine(ex.Message);
             }
         }
-        */
+    }
+    */
+
+    private void ScheduleRender()
+    {
+        renderPending = true;
     }
 
     private void UpdateScrollDownVisibility()
@@ -289,31 +289,22 @@ public partial class VirtualTerminalView : UserControl, IDisposable
 
         lock (terminal._renderLock)
         {
-            if (e.OldValue is TerminalSession oldSess)
+            if (e.OldValue is ITerminalSession oldSess)
             {
                 oldSess.BufferUpdated -= terminal.OnBufferUpdated;
+                
                 // Disconnect old decoder from screen
-                if (oldSess.Decoder != null)
-                {
-                    oldSess.Decoder.OuterView = null;
-                }
+                if (oldSess.Decoder is IProxingDecoder proxing)
+                    proxing.OuterView = null;
             }
 
-            if (e.NewValue is TerminalSession newSess)
+            if (e.NewValue is ITerminalSession newSess)
             {
                 newSess.BufferUpdated += terminal.OnBufferUpdated;
-                
+
                 // Connect new decoder to screen
-                if (newSess.Decoder != null)
-                {
-                    terminal.PART_Output.SetDecoder(newSess.Decoder);
-                    newSess.Decoder.OuterView = terminal.PART_Output;
-                }
-            }
-            else
-            {
-                // Clear decoder if session is null
-                terminal.PART_Output.SetDecoder(null);
+                if (newSess.Decoder is IProxingDecoder proxing)
+                    proxing.OuterView = terminal.PART_Output;
             }
 
             terminal.ScheduleRender();
@@ -337,7 +328,7 @@ public partial class VirtualTerminalView : UserControl, IDisposable
     public void Dispose()
     {
         // We do not own session, do not dispose it
-        _renderTimer?.Stop();
+        //_renderTimer?.Stop();
         //_blinkTimer?.Stop();
         GC.SuppressFinalize(this);
     }

@@ -2,7 +2,7 @@
 
 namespace VirtualTerminal.Engine.Components;
 
-public interface IDecoder
+public interface ITerminalDecoder : IDisposable
 {
     Encoding Encoding { get; set; }
 
