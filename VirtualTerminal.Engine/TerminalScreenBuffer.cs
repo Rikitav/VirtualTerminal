@@ -1,10 +1,9 @@
-﻿using System.Collections;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Drawing;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Media;
 using Color = System.Windows.Media.Color;
+using Point = System.Drawing.Point;
 
 namespace VirtualTerminal.Engine;
 
@@ -72,18 +71,66 @@ public struct TerminalCellInfo() : IEquatable<TerminalCellInfo>
         => Character.GetHashCode();
 }
 
-public class TerminalScreenBuffer(ushort initCols, ushort initRows) : IDisposable, IEnumerable<Span<TerminalCellInfo>>
+public class TerminalScreenBuffer(ushort initCols, ushort initRows) : IDisposable //, IEnumerable<Span<TerminalCellInfo>>
 {
+    private readonly List<TerminalCellInfo[]> _rows = [];
+    private readonly Size _gridSize = new Size(initCols, initRows);
+
     private int version = 0;
 
-    public Size GridSize { get; private set; } = new Size(initCols, initRows);
-    public TerminalCellInfo[] Cells { get; private set; } = new TerminalCellInfo[initCols * initRows];
+    public List<TerminalCellInfo[]> Rows
+    {
+        get => _rows;
+    }
 
-    public static Encoding Encoding => Encoding.ASCII;
+    public Size GridSize
+    {
+        get => _gridSize;
+    }
 
+    public int ColumnsCount
+    {
+        get => _gridSize.Width;
+    }
+
+    public int RowsCount
+    {
+        get => _gridSize.Height;
+    }
+
+    public int Length
+    {
+        get => Rows.Count * ColumnsCount;
+    }
+
+    public int Capacity
+    {
+        get => ColumnsCount * RowsCount;
+    }
+
+    public ref TerminalCellInfo this[int i]
+    {
+        get => ref _rows[i / Length][i % Length];
+    }
+
+    public ref TerminalCellInfo this[int y, int x]
+    {
+        get => ref _rows[y][x];
+    }
+
+    public ref TerminalCellInfo this[Point cursor]
+    {
+        get => ref _rows[cursor.Y][cursor.X];
+    }
+
+    public static Encoding Encoding
+    {
+        get => Encoding.ASCII;
+    }
+
+    /*
     public void Resize(ushort cols, ushort rows)
     {
-        /*
         if (GridSize.Width == cols && GridSize.Height == rows)
             return;
 
@@ -97,7 +144,12 @@ public class TerminalScreenBuffer(ushort initCols, ushort initRows) : IDisposabl
         Cells = newCells;
         GridSize = new Size(cols, rows);
         version += 1;
-        */
+    }
+    */
+
+    public void AppendRow()
+    {
+        _rows.Add(new TerminalCellInfo[ColumnsCount]);
     }
 
     public void Dispose()
@@ -105,6 +157,7 @@ public class TerminalScreenBuffer(ushort initCols, ushort initRows) : IDisposabl
 
     }
 
+    /*
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     public IEnumerator<Span<TerminalCellInfo>> GetEnumerator() => new TerminalScreenBufferEnumerator(this);
 
@@ -145,4 +198,5 @@ public class TerminalScreenBuffer(ushort initCols, ushort initRows) : IDisposabl
 
         }
     }
+    */
 }

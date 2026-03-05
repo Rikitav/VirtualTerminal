@@ -61,7 +61,8 @@ public sealed class CommandLineSession : TerminalSession
             return;
 
         await Task.Yield();
-        byte[] data = new byte[4096];
+        Span<byte> data = stackalloc byte[1024];
+        Span<byte> cleanupData = stackalloc byte[2];
 
         while (!readLoopToken.IsCancellationRequested)
         {
@@ -71,7 +72,23 @@ public sealed class CommandLineSession : TerminalSession
                 if (bytesRead == 0)
                     break;
 
-                ReadOnlySpan<byte> readed = data.AsSpan(0, bytesRead);
+                ReadOnlySpan<byte> readed = data.Slice(0, bytesRead);
+                if (readed is [27, 91, 63, 50, 53, 108, 27, 91, 50, 74, 27, 91, 109, 27, 91, 72, ..])
+                {
+                    while (!readLoopToken.IsCancellationRequested)
+                    {
+                        bytesRead = PseudoConsole.Reader.Read(cleanupData);
+                        if (bytesRead == 0)
+                            break;
+
+                        if (cleanupData is not [10, 13, ..] && cleanupData is not [13, 10, ..])
+                            break;
+                    }
+
+                    Decoder.WriteFromEncoding(InputEncoding, cleanupData);
+                    NotifyBufferUpdated();
+                    continue;
+                }
 #if DEBUG
                 string dataStr = InputEncoding.GetString(readed);
                 Debug.WriteLine(dataStr);

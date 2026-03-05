@@ -226,7 +226,7 @@ public class SecureShellSession : TerminalSession
     public override void Resize(ushort columns, ushort rows)
     {
         ValidateClient();
-        Buffer.Resize(columns, rows);
+        //Buffer.Resize(columns, rows);
         /*
         CONSOLE_SCREEN_BUFFER_INFO info = Buffer.GetBufferInfo();
 

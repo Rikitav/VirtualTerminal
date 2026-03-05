@@ -9,6 +9,7 @@ using System.Windows;
 using TPoint = System.Drawing.Point;
 using TSize = System.Drawing.Size;
 using TColor = System.Windows.Media.Color;
+using System.Diagnostics;
 
 namespace VirtualTerminal;
 
@@ -311,6 +312,18 @@ public class VirtualTerminalScreen : FrameworkElement, ITerminalScreenView
     }
 
     /// <inheritdoc/>
+    public void EraseCharacters(ITerminalDecoder sender, int count)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => EraseCharacters(sender, count));
+            return;
+        }
+
+        InvalidateRow(CursorPosition.Y);
+    }
+
+    /// <inheritdoc/>
     public void ScrollPageDownwards(ITerminalDecoder sender, int linesToScroll)
     {
         if (!Dispatcher.CheckAccess())
@@ -373,7 +386,7 @@ public class VirtualTerminalScreen : FrameworkElement, ITerminalScreenView
         if (currentBuffer == null)
             return;
 
-        int targetRows = currentBuffer.GridSize.Height;
+        int targetRows = currentBuffer.Rows.Count;
         int currentRows = _rowVisuals.Count;
         int difference = targetRows - currentRows;
 
@@ -424,6 +437,7 @@ public class VirtualTerminalScreen : FrameworkElement, ITerminalScreenView
             
         lock (_renderLock)
         {
+            CorrectVisualsCountForBuffer();
             if (row < _rowVisuals.Count)
             {
                 RenderRowFromBuffer(row);
@@ -457,8 +471,7 @@ public class VirtualTerminalScreen : FrameworkElement, ITerminalScreenView
             DrawingVisual visual = _rowVisuals[row];
             visual.Offset = new Vector(0, verticalOffset);
             
-            int rowStart = row * currentBuffer.GridSize.Width;
-            Span<TerminalCellInfo> rowSpan = currentBuffer.Cells.AsSpan(rowStart, currentBuffer.GridSize.Width);
+            Span<TerminalCellInfo> rowSpan = currentBuffer.Rows[row];
             RenderRowFromTerminalBuffer(visual, rowSpan, cellSize);
         }
         catch
@@ -561,25 +574,14 @@ public class VirtualTerminalScreen : FrameworkElement, ITerminalScreenView
             {
                 UpdateCursorPositionFromBuffer();
 
-                int linearIndex = (CursorPosition.Y * currentBuffer.GridSize.Width) + CursorPosition.X;
-                if (linearIndex >= 0 && linearIndex < currentBuffer.Cells.Length)
-                {
-                    TerminalCellInfo cell = currentBuffer.Cells[linearIndex];
-                    char charToShow = cell.Character;
-
-                    using DrawingContext dc = _cursorVisual.RenderOpen();
-                    FormattedText formatted = Format(new string(charToShow, 1), new SolidColorBrush(Foreground));
-
-                    SolidColorBrush background = new SolidColorBrush(cursorState ? Foreground : Colors.Transparent);
-                    dc.DrawRectangle(background, new Pen(), new Rect(0, 0, 1, formatted.Height));
-                    dc.DrawText(formatted, new Point(0, 0));
-                }
+                using DrawingContext dc = _cursorVisual.RenderOpen();
+                SolidColorBrush background = new SolidColorBrush(cursorState ? Foreground : Colors.Transparent);
+                dc.DrawRectangle(background, new Pen(), new Rect(0, 0, 1, GetCellSize().Height));
             }
         }
-        catch
+        catch (Exception exc)
         {
-            // fucked up somewhere
-            _ = 0xBAD + 0xC0DE;
+            Debug.WriteLine(exc);
         }
     }
 

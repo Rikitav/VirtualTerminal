@@ -58,7 +58,8 @@ public abstract class TerminalSession : ITerminalSession
     /// <inheritdoc />
     public virtual void Resize(ushort columns, ushort rows)
     {
-        _decoder.Buffer.Resize(columns, rows);
+        // TODO: smth
+        //_decoder.Buffer.Resize(columns, rows);
     }
 
     /// <inheritdoc />

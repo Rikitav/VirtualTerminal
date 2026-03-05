@@ -9,7 +9,7 @@ namespace VirtualTerminal.Engine;
 public class TerminalDecoder : EscapeSequenceDecoder, IProxingDecoder
 {
     private const int defaultCols = 512;
-    private const int defaultRows = 10240;
+    private const int defaultRows = 1024;
 
     private bool currentBold = false;
     private bool currentFaint = false;
@@ -133,41 +133,6 @@ public class TerminalDecoder : EscapeSequenceDecoder, IProxingDecoder
                     break;
                 }
 
-                /*
-            case 'n':
-                {
-                    if (parameters is [6])
-                        break;
-
-                    Point cursorPosition = GetCursorPosition(this);
-                    cursorPosition.X++;
-                    cursorPosition.Y++;
-
-                    string row = cursorPosition.Y.ToString();
-                    string column = cursorPosition.X.ToString();
-
-                    byte[] output = new byte[2 + row.Length + 1 + column.Length + 1];
-                    int i = 0;
-                    output[i++] = EscapeCharacter;
-                    output[i++] = LeftBracketCharacter;
-                    
-                    foreach (char c in row)
-                    {
-                        output[i++] = (byte)c;
-                    }
-                    
-                    output[i++] = (byte)';';
-                    foreach (char c in column)
-                    {
-                        output[i++] = (byte)c;
-                    }
-
-                    output[i++] = (byte)'R';
-                    OnOutput(output);
-                    break;
-                }
-                */
-
             case 's':
                 {
                     SaveCursor(this);
@@ -203,6 +168,12 @@ public class TerminalDecoder : EscapeSequenceDecoder, IProxingDecoder
                 {
                     // Set alternate keypad mode (rto: non-numeric, presumably)
                     ModeChanged(this, AnsiMode.AlternateKeypad);
+                    break;
+                }
+
+            case 'X':
+                {
+                    EraseCharacters(this, parameters.At(0, 1));
                     break;
                 }
 
@@ -492,6 +463,12 @@ public class TerminalDecoder : EscapeSequenceDecoder, IProxingDecoder
                             if (CursorPosition.Y < Buffer.GridSize.Height - 1)
                             {
                                 CursorPosition = new Point(CursorPosition.X, CursorPosition.Y + 1);
+                                if (CursorPosition.Y + 1 > Buffer.Rows.Count)
+                                {
+                                    for (int i = Buffer.Rows.Count; i < CursorPosition.Y + 1; i++)
+                                        Buffer.AppendRow();
+                                }
+
                                 break;
                             }
 
@@ -524,13 +501,8 @@ public class TerminalDecoder : EscapeSequenceDecoder, IProxingDecoder
 
                     default:
                         {
-                            // Regular character
-                            int linearPos = GetLinearCursorPosition();
-                            if (!(linearPos >= 0 && linearPos < Buffer.Cells.Length))
-                                break;
-
-                            Buffer.Cells[linearPos].Character = ch;
-                            ApplyCurrentAttributes(ref Buffer.Cells[linearPos]);
+                            Buffer[CursorPosition].Character = ch;
+                            ApplyCurrentAttributes(ref Buffer[CursorPosition]);
 
                             // Move cursor forward
                             if (CursorPosition.X < Buffer.GridSize.Width - 1)
@@ -551,6 +523,12 @@ public class TerminalDecoder : EscapeSequenceDecoder, IProxingDecoder
                             if (CursorPosition.Y < Buffer.GridSize.Height - 1)
                             {
                                 CursorPosition = new Point(0, CursorPosition.Y + 1);
+                                if (CursorPosition.Y + 1 > Buffer.Rows.Count)
+                                {
+                                    for (int i = Buffer.Rows.Count; i < CursorPosition.Y + 1; i++)
+                                        Buffer.AppendRow();
+                                }
+
                                 break;
                             }
 
@@ -635,6 +613,11 @@ public class TerminalDecoder : EscapeSequenceDecoder, IProxingDecoder
             }
 
             CursorPosition = new Point(newX, newY);
+            if (CursorPosition.Y + 1 > Buffer.Rows.Count)
+            {
+                for (int i = Buffer.Rows.Count; i < CursorPosition.Y + 1; i++)
+                    Buffer.AppendRow();
+            }
         }
         finally
         {
@@ -674,6 +657,13 @@ public class TerminalDecoder : EscapeSequenceDecoder, IProxingDecoder
         int newX = Math.Max(0, Math.Min(Buffer.GridSize.Width - 1, (int)position.X));
         int newY = Math.Max(0, Math.Min(Buffer.GridSize.Height - 1, (int)position.Y));
         CursorPosition = new Point(newX, newY);
+
+        if (CursorPosition.Y + 1 > Buffer.Rows.Count)
+        {
+            for (int i = Buffer.Rows.Count; i < CursorPosition.Y + 1; i++)
+                Buffer.AppendRow();
+        }
+
         OuterView?.MoveCursorTo(sender, position);
     }
 
@@ -682,7 +672,7 @@ public class TerminalDecoder : EscapeSequenceDecoder, IProxingDecoder
         switch (direction)
         {
             case ClearDirection.Forward:  // Clear from cursor to end of screen
-                ClearCells(GetLinearCursorPosition(), Buffer.Cells.Length - 1);
+                ClearCells(GetLinearCursorPosition(), Buffer.Length - 1);
                 break;
 
             case ClearDirection.Backward: // Clear from beginning to cursor
@@ -690,9 +680,10 @@ public class TerminalDecoder : EscapeSequenceDecoder, IProxingDecoder
                 break;
 
             case ClearDirection.Both: // Clear entire screen
-                ClearCells(0, Buffer.Cells.Length - 1);
+                ClearCells(0, Buffer.Length - 1);
                 break;
         }
+
         OuterView?.ClearScreen(sender, direction);
     }
 
@@ -720,11 +711,31 @@ public class TerminalDecoder : EscapeSequenceDecoder, IProxingDecoder
         OuterView?.ClearLine(sender, direction);
     }
 
+    public void EraseCharacters(ITerminalDecoder sender, int count)
+    {
+        if (count <= 0)
+            count = 1;
+
+        int limit = Buffer.GridSize.Width - CursorPosition.X;
+        if (count > limit)
+            count = limit;
+
+        for (int i = 0; i < count; i++)
+        {
+            ref TerminalCellInfo cell = ref Buffer[CursorPosition.Y, CursorPosition.X + i];
+            cell.Character = ' ';
+            ApplyCurrentAttributes(ref cell);
+        }
+    }
+
     public void ScrollPageUpwards(ITerminalDecoder sender, int linesToScroll)
     {
-        if (linesToScroll <= 0) linesToScroll = 1;
+        if (linesToScroll <= 0)
+            linesToScroll = 1;
+
         linesToScroll = Math.Min(linesToScroll, Buffer.GridSize.Height);
         
+        /*
         // Move lines up
         for (int i = 0; i < Buffer.GridSize.Height - linesToScroll; i++)
         {
@@ -736,25 +747,29 @@ public class TerminalDecoder : EscapeSequenceDecoder, IProxingDecoder
                 int srcIdx = srcStart + j;
                 int dstIdx = dstStart + j;
                 
-                if (srcIdx < Buffer.Cells.Length && dstIdx < Buffer.Cells.Length)
+                if (srcIdx < Buffer.Length && dstIdx < Buffer.Length)
                 {
-                    CopyCell(ref Buffer.Cells[srcIdx], ref Buffer.Cells[dstIdx]);
+                    CopyCell(ref Buffer[srcIdx], ref Buffer[dstIdx]);
                 }
             }
         }
         
         // Clear bottom lines
         int clearStart = (Buffer.GridSize.Height - linesToScroll) * Buffer.GridSize.Width;
-        ClearCells(clearStart, Buffer.Cells.Length - 1);
+        ClearCells(clearStart, Buffer.Length - 1);
+        */
         
         OuterView?.ScrollPageUpwards(sender, linesToScroll);
     }
 
     public void ScrollPageDownwards(ITerminalDecoder sender, int linesToScroll)
     {
-        if (linesToScroll <= 0) linesToScroll = 1;
+        if (linesToScroll <= 0)
+            linesToScroll = 1;
+        
         linesToScroll = Math.Min(linesToScroll, Buffer.GridSize.Height);
         
+        /*
         // Move lines down
         for (int i = Buffer.GridSize.Height - 1; i >= linesToScroll; i--)
         {
@@ -766,9 +781,9 @@ public class TerminalDecoder : EscapeSequenceDecoder, IProxingDecoder
                 int srcIdx = srcStart + j;
                 int dstIdx = dstStart + j;
                 
-                if (srcIdx < Buffer.Cells.Length && dstIdx < Buffer.Cells.Length)
+                if (srcIdx < Buffer.Length && dstIdx < Buffer.Length)
                 {
-                    CopyCell(ref Buffer.Cells[srcIdx], ref Buffer.Cells[dstIdx]);
+                    CopyCell(ref Buffer[srcIdx], ref Buffer[dstIdx]);
                 }
             }
         }
@@ -776,6 +791,7 @@ public class TerminalDecoder : EscapeSequenceDecoder, IProxingDecoder
         // Clear top lines
         int clearEnd = (linesToScroll * Buffer.GridSize.Width) - 1;
         ClearCells(0, clearEnd);
+        */
         
         OuterView?.ScrollPageDownwards(sender, linesToScroll);
     }
@@ -1131,16 +1147,16 @@ public class TerminalDecoder : EscapeSequenceDecoder, IProxingDecoder
         if (startIndex < 0)
             startIndex = 0;
 
-        if (endIndex >= Buffer.Cells.Length)
-            endIndex = Buffer.Cells.Length - 1;
+        if (endIndex >= Buffer.Length)
+            endIndex = Buffer.Length - 1;
 
         if (startIndex > endIndex)
             return;
         
         for (int i = startIndex; i <= endIndex; i++)
         {
-            Buffer.Cells[i].Character = ' ';
-            Buffer.Cells[i].Reset();
+            Buffer[i].Character = ' ';
+            Buffer[i].Reset();
         }
     }
 
