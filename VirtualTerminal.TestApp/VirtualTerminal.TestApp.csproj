@@ -3,15 +3,24 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
+    <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <Authors>Rikitav</Authors>
+    <Authors>Rikitav Tim4ik</Authors>
+
+    <BaseOutputPath>..\bin</BaseOutputPath>
+    <DocumentationFile>..\docs\reference\$(AssemblyName).xml</DocumentationFile>
+
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <EnableNETAnalyzers>True</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\VirtualTerminal.CommandLine\VirtualTerminal.CommandLine.csproj" />
     <ProjectReference Include="..\VirtualTerminal.SecureShell\VirtualTerminal.SecureShell.csproj" />
+    <ProjectReference Include="..\VirtualTerminal.WPF\VirtualTerminal.WPF.csproj" />
     <ProjectReference Include="..\VirtualTerminal\VirtualTerminal.csproj" />
   </ItemGroup>
 

@@ -1,33 +1,45 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-	<TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-	<RootNamespace>VirtualTerminal</RootNamespace>
     <UseWPF>true</UseWPF>
+    <RootNamespace>VirtualTerminal</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Title>System.Windows.VirtuaTerminal.CommandLine</Title>
-    <Authors>Rikitav</Authors>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!--<IsAotCompatible>True</IsAotCompatible>-->
+
+    <BaseOutputPath>..\bin</BaseOutputPath>
+    <DocumentationFile>..\docs\reference\$(AssemblyName).xml</DocumentationFile>
+
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <EnableNETAnalyzers>True</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
     <IncludeSymbols>True</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <SignAssembly>False</SignAssembly>
-    <GenerateDocumentationFile>True</GenerateDocumentationFile>
-	<RepositoryUrl>https://github.com/Rikitav/VirtualTerminal</RepositoryUrl>
-	<Version>1.1</Version>
+
+    <Title>VirtualTerminal.CommandLine</Title>
+    <Version>1.6</Version>
+    <Authors>Rikitav Tim4ik</Authors>
+    <Company>Rikitav Tim4ik</Company>
+    <RepositoryUrl>https://github.com/Rikitav/VirtualTerminal</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/Rikitav/VirtualTerminal</PackageProjectUrl>
+    <PackageTags>terminal;vt;ansi;virtual;console;xterm;emulator;commandline;cli</PackageTags>
+
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\VirtualTerminal\VirtualTerminal.csproj" />
+    <None Include="README.md" Pack="True" PackagePath="\" />
+    <None Include="..\LICENSE.txt" Pack="True" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="README.md">
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
+    <ProjectReference Include="..\VirtualTerminal\VirtualTerminal.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,38 @@
+<UserControl x:Class="VirtualTerminal.PromptBox"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="root"
+             x:DataType="local:PromptBox"
+             xmlns:local="clr-namespace:VirtualTerminal">
+  <Border Background="#1E1E1E">
+    <Grid ColumnDefinitions="Auto,*,30">
+      <TextBlock
+          x:Name="PART_Prompt"
+          Grid.Column="0"
+          Margin="5,0,5,0"
+          Text="{Binding Prompt, ElementName=root}"
+          Foreground="{Binding Foreground, ElementName=root}"
+          VerticalAlignment="Center"
+          HorizontalAlignment="Stretch"
+          TextAlignment="Right"/>
+
+      <TextBox
+          x:Name="PART_Input"
+          Grid.Column="1"
+          Margin="0,0,5,0"
+          IsEnabled="{Binding IsInputEnabled, ElementName=root}"
+          Text="{Binding InputText, ElementName=root}"
+          BorderThickness="0"
+          Background="Transparent"
+          Foreground="{Binding Foreground, ElementName=root}"
+          CaretBrush="{Binding Foreground, ElementName=root}"
+          TextWrapping="NoWrap"
+          GotFocus="PART_Input_GotFocus"/>
+
+      <Button
+          x:Name="PART_Enter"
+          Grid.Column="2"
+          Click="PART_Enter_Click"/>
+    </Grid>
+  </Border>
+</UserControl>

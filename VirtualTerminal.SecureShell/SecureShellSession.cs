@@ -3,7 +3,6 @@ using Renci.SshNet.Common;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text;
-using VirtualTerminal.Interop;
 using VirtualTerminal.Session;
 
 namespace VirtualTerminal;
@@ -45,7 +44,7 @@ public class SecureShellSession : TerminalSession
     /// </summary>
     public bool IsConnected
     {
-        get => _client is not null && _client.IsConnected; 
+        get => _client is not null && _client.IsConnected;
     }
 
     /// <summary>
@@ -223,22 +222,23 @@ public class SecureShellSession : TerminalSession
     }
 
     /// <inheritdoc />
-    public override void Resize(int columns, int rows)
+    public override void Resize(ushort columns, ushort rows)
     {
         ValidateClient();
-        Buffer.ResizeBuffer(columns, rows);
+        //Buffer.Resize(columns, rows);
+        /*
         CONSOLE_SCREEN_BUFFER_INFO info = Buffer.GetBufferInfo();
 
         uint nHeight = (uint)(info.srWindow.Bottom - info.srWindow.Top);
         uint nWidth = (uint)(info.srWindow.Right - info.srWindow.Left);
         uint nRows = (uint)(info.dwSize.Y);
         uint nCols = (uint)(info.dwSize.X);
-
-        _shellStream.ChangeWindowSize(nCols, nRows, nWidth, nHeight);
+        */
+        //_shellStream.ChangeWindowSize((uint)Buffer.ColumnsCount, (uint)Buffer.RowsCount, 1200, 800);
     }
 
     /// <inheritdoc />
-    public override void WriteInput(ReadOnlySpan<byte> data)
+    public override void Write(ReadOnlySpan<byte> data)
     {
         ValidateClient();
         if (!_shellStream.CanWrite)
@@ -291,10 +291,10 @@ public class SecureShellSession : TerminalSession
     /// <summary>
     /// Flushes the shell stream asynchronously.
     /// </summary>
-    public virtual void FlushAsync(CancellationToken cancellationToken = default)
+    public virtual async Task FlushAsync(CancellationToken cancellationToken = default)
     {
         ValidateClient();
-        _shellStream.FlushAsync(cancellationToken);
+        await _shellStream.FlushAsync(cancellationToken);
     }
 
     /// <summary>
@@ -327,7 +327,7 @@ public class SecureShellSession : TerminalSession
         if (args.Data == null || args.Data.Length == 0)
             return;
 
-        Buffer.Write(Encoding.Convert(InputEncoding, VirtualTerminalBuffer.Encoding, args.Data));
+        Decoder.Write(Encoding.Convert(InputEncoding, Decoder.Encoding, args.Data));
         NotifyBufferUpdated();
     }
 

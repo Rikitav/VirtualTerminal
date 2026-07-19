@@ -1,0 +1,233 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>VirtualTerminal.CommandLine</name>
+    </assembly>
+    <members>
+        <member name="T:VirtualTerminal.CommandLineSession">
+            <summary>
+            A <see cref="T:VirtualTerminal.Session.TerminalSession"/> implementation backed by Windows ConPTY (pseudo console).
+            It starts a child process attached to a pseudoconsole and forwards IO between the process and
+            the session <see cref="P:VirtualTerminal.Session.TerminalSession.Buffer"/>.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.CommandLineSession.Title">
+            <inheritdoc />
+        </member>
+        <member name="P:VirtualTerminal.CommandLineSession.PseudoConsole">
+            <summary>
+            Gets the underlying ConPTY wrapper (process + pipes).
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.CommandLineSession.#ctor(VirtualTerminal.Interop.ProcessCreationInfo)">
+            <summary>
+            Starts a ConPTY session running the provided command line.
+            </summary>
+            <param name="process"></param>
+        </member>
+        <member name="M:VirtualTerminal.CommandLineSession.#ctor(System.String)">
+            <summary>
+            Starts a ConPTY session running the provided command line.
+            </summary>
+            <param name="application">Command line to start (for example, <c>cmd.exe</c> or PowerShell).</param>
+        </member>
+        <member name="M:VirtualTerminal.CommandLineSession.#ctor">
+            <summary>
+            Starts a default ConPTY session using <c>cmd.exe</c>.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.CommandLineSession.Resize(System.UInt16,System.UInt16)">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.CommandLineSession.Write(System.ReadOnlySpan{System.Byte})">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.CommandLineSession.Dispose(System.Boolean)">
+            <inheritdoc />
+        </member>
+        <member name="T:VirtualTerminal.Interop.PseudoConsole">
+            <summary>
+            Wraps a Windows ConPTY pseudo console handle and its associated process and pipes.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Interop.PseudoConsole.Writer">
+            <summary>
+            Writer stream, that transfer data to child process' STD_INPUT
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Interop.PseudoConsole.Reader">
+            <summary>
+            Reader stream, that receives data from child process' STD_OUTPUT
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Interop.PseudoConsole.#ctor(System.IntPtr,VirtualTerminal.Interop.Win32Process,System.IO.Stream,System.IO.Stream)">
+            <summary>
+            Initializes a new <see cref="T:VirtualTerminal.Interop.PseudoConsole"/>.
+            </summary>
+            <param name="pseudoConsoleHandle">ConPTY handle.</param>
+            <param name="associatedProcesss">Process attached to this pseudo console.</param>
+            <param name="writer">Stream used to write input to the child process.</param>
+            <param name="reader">Stream used to read output from the child process.</param>
+        </member>
+        <member name="M:VirtualTerminal.Interop.PseudoConsole.Resize(System.UInt16,System.UInt16)">
+            <summary>
+            Resizes the pseudo console buffer.
+            </summary>
+            <param name="cols">Columns.</param>
+            <param name="rows">Rows.</param>
+        </member>
+        <member name="M:VirtualTerminal.Interop.PseudoConsole.Dispose">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Interop.PseudoConsole.Dispose(System.Boolean)">
+            <inheritdoc cref="M:System.IDisposable.Dispose"/>
+        </member>
+        <member name="T:VirtualTerminal.Interop.PseudoConsoleFactory">
+            <summary>
+            Factory for creating ConPTY (<c>CreatePseudoConsole</c>) instances wired to a <see cref="T:VirtualTerminal.Buffer.TerminalScreenBuffer"/>.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Interop.PseudoConsoleFactory.Start(VirtualTerminal.Buffer.TerminalScreenBuffer,VirtualTerminal.Interop.ProcessCreationInfo)">
+            <summary>
+            Creates a new ConPTY instance for the given buffer size and starts a child process attached to it.
+            </summary>
+            <param name="buffer">Terminal buffer (its dimensions are used as the initial console size).</param>
+            <param name="processInfo">Child process configuration.</param>
+            <returns>A <see cref="T:VirtualTerminal.Interop.PseudoConsole"/> wrapper containing handles, pipes and the child process.</returns>
+        </member>
+        <member name="T:VirtualTerminal.Interop.Win32HandleStream">
+            <summary>
+            A <see cref="T:System.IO.Stream"/> implementation over a raw Win32 handle (typically a pipe).
+            Used by ConPTY plumbing to expose stdin/stdout pipes as .NET streams.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Interop.Win32HandleStream.CanRead">
+            <inheritdoc/>
+        </member>
+        <member name="P:VirtualTerminal.Interop.Win32HandleStream.CanWrite">
+            <inheritdoc/>
+        </member>
+        <member name="P:VirtualTerminal.Interop.Win32HandleStream.CanSeek">
+            <inheritdoc/>
+        </member>
+        <member name="P:VirtualTerminal.Interop.Win32HandleStream.Length">
+            <inheritdoc/>
+        </member>
+        <member name="P:VirtualTerminal.Interop.Win32HandleStream.Position">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Interop.Win32HandleStream.#ctor(System.IntPtr,System.IO.FileAccess,System.Boolean)">
+            <summary>
+            Initializes a new <see cref="T:VirtualTerminal.Interop.Win32HandleStream"/>.
+            </summary>
+            <param name="handle">Win32 handle to wrap.</param>
+            <param name="access">Allowed access for the stream.</param>
+            <param name="ownsHandle">Whether this stream should close the handle on dispose.</param>
+        </member>
+        <member name="M:VirtualTerminal.Interop.Win32HandleStream.Flush">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Interop.Win32HandleStream.Read(System.Byte[],System.Int32,System.Int32)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Interop.Win32HandleStream.Read(System.Span{System.Byte})">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Interop.Win32HandleStream.Write(System.Byte[],System.Int32,System.Int32)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Interop.Win32HandleStream.Write(System.ReadOnlySpan{System.Byte})">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Interop.Win32HandleStream.Seek(System.Int64,System.IO.SeekOrigin)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Interop.Win32HandleStream.SetLength(System.Int64)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Interop.Win32HandleStream.Dispose(System.Boolean)">
+            <inheritdoc/>
+        </member>
+        <member name="T:VirtualTerminal.Interop.Win32PipeFactory">
+            <summary>
+            Creates Win32 pipes used to connect the parent process to a child process (stdin/stdout) for ConPTY scenarios.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Interop.Win32PipeFactory.CreateChildStdInPipe(System.IntPtr@)">
+            <summary>
+            Creates STDIN pipe for child preocess (WE write -> PROCESS reads).
+            </summary>
+            <param name="childReader">Handle for the child process to read from.</param>
+            <returns>Parent-side stream used to write into child's stdin.</returns>
+        </member>
+        <member name="M:VirtualTerminal.Interop.Win32PipeFactory.CreateChildStdOutPipe(System.IntPtr@)">
+            <summary>
+            Creates STDOUT/STDERR pipe for child process (PROCESS writes -> WE read).
+            </summary>
+            <param name="ChildWriter">Handle for the child process to write to.</param>
+            <returns>Parent-side stream used to read child's stdout/stderr.</returns>
+        </member>
+        <member name="T:VirtualTerminal.Interop.Win32Process">
+            <summary>
+            Small wrapper around a Win32 process handle.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Interop.Win32Process.Handle">
+            <summary>
+            Gets the underlying process handle.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Interop.Win32Process.#ctor(System.IntPtr)">
+            <summary>
+            Initializes a new <see cref="T:VirtualTerminal.Interop.Win32Process"/> wrapper for the specified process handle.
+            </summary>
+            <param name="handle">Process handle.</param>
+            <exception cref="T:System.InvalidOperationException">Thrown if the handle is invalid.</exception>
+        </member>
+        <member name="M:VirtualTerminal.Interop.Win32Process.Finalize">
+            <summary>
+            Uninitializes <see cref="T:VirtualTerminal.Interop.Win32Process"/> instance
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Interop.Win32Process.Terminate(System.UInt32)">
+            <summary>
+            Terminates the process.
+            </summary>
+            <param name="exitCode">Exit code to report.</param>
+        </member>
+        <member name="M:VirtualTerminal.Interop.Win32Process.Dispose">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Interop.Win32Process.Dispose(System.Boolean)">
+            <inheritdoc cref="M:System.IDisposable.Dispose"/>
+        </member>
+        <member name="T:VirtualTerminal.Interop.ProcessCreationInfo">
+            <summary>
+            Minimal process creation info used by <see cref="T:VirtualTerminal.Interop.Win32ProcessFactory"/> when starting a process attached to ConPTY.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Interop.ProcessCreationInfo.ApplicationName">
+            <summary>
+            Optional application name passed to <c>CreateProcess</c>.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Interop.ProcessCreationInfo.CommandLine">
+            <summary>
+            Optional command line passed to <c>CreateProcess</c>.
+            </summary>
+        </member>
+        <member name="T:VirtualTerminal.Interop.Win32ProcessFactory">
+            <summary>
+            Starts a Win32 process, optionally attaching it to a ConPTY pseudo console via extended startup info.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Interop.Win32ProcessFactory.Start(VirtualTerminal.Interop.ProcessCreationInfo,System.IntPtr)">
+            <summary>
+            Starts the process described by <paramref name="info"/> and returns a wrapper for its handle.
+            </summary>
+            <param name="info">Application and command line data.</param>
+            <param name="pcHandle">ConPTY pseudo console handle, or -1 when not using a pseudo console.</param>
+            <returns>A <see cref="T:VirtualTerminal.Interop.Win32Process"/> wrapping the process handle.</returns>
+        </member>
+    </members>
+</doc>

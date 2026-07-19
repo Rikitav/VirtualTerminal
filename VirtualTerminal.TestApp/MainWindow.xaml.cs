@@ -12,7 +12,7 @@ public partial class MainWindow : Window
         InitializeComponent();
     }
 
-    private void Button_Click(object sender, RoutedEventArgs e)
+    private void Button_Click_Start(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrEmpty(PART_CommandLineName.Text))
             return;
@@ -20,8 +20,9 @@ public partial class MainWindow : Window
         try
         {
             PART_Terminal_Left.Session?.Dispose();
-            
+
             CommandLineSession session = new CommandLineSession(PART_CommandLineName.Text);
+
             PART_Terminal_Left.Session = session;
             PART_Prompt_Left.Session = session;
         }
@@ -29,5 +30,10 @@ public partial class MainWindow : Window
         {
 
         }
+    }
+
+    private void Button_Click_Invalidate(object sender, RoutedEventArgs e)
+    {
+        PART_Terminal_Left.InvalidateVisual();
     }
 }

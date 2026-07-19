@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>VirtualTerminal.TestApp</name>
+    </assembly>
+    <members>
+        <member name="T:VirtualTerminal.TestApp.App">
+            <summary>
+            Interaction logic for App.xaml
+            </summary>
+            <summary>
+            App
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.TestApp.App.InitializeComponent">
+            <summary>
+            InitializeComponent
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.TestApp.App.Main">
+            <summary>
+            Application Entry Point.
+            </summary>
+        </member>
+        <member name="T:VirtualTerminal.TestApp.MainWindow">
+            <summary>
+            MainWindow
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.TestApp.MainWindow.#ctor">
+            <summary>
+            MainWindow of testing application
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.TestApp.MainWindow.InitializeComponent">
+            <summary>
+            InitializeComponent
+            </summary>
+        </member>
+    </members>
+</doc>

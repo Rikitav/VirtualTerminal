@@ -1,6 +1,7 @@
-﻿using System;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Text;
+using VirtualTerminal.Extensions;
 using VirtualTerminal.Interop;
 using VirtualTerminal.Session;
 
@@ -11,16 +12,13 @@ namespace VirtualTerminal;
 /// It starts a child process attached to a pseudoconsole and forwards IO between the process and
 /// the session <see cref="TerminalSession.Buffer"/>.
 /// </summary>
-public sealed partial class CommandLineSession : TerminalSession
+public sealed class CommandLineSession : TerminalSession
 {
-    private readonly string _application;
-    private readonly string _applicationName;
-
     private CancellationTokenSource readLoopToken;
     private PseudoConsole pseudoConsole;
 
     /// <inheritdoc />
-    public override string Title => _application;
+    public override string Title { get; }
 
     /// <summary>
     /// Gets the underlying ConPTY wrapper (process + pipes).
@@ -30,19 +28,32 @@ public sealed partial class CommandLineSession : TerminalSession
     /// <summary>
     /// Starts a ConPTY session running the provided command line.
     /// </summary>
+    /// <param name="process"></param>
+    public CommandLineSession(ProcessCreationInfo process) : base(Encoding.UTF8)
+    {
+        Title = Path.GetFileNameWithoutExtension(process.CommandLine ?? process.ApplicationName ?? string.Empty).ToLower();
+
+        readLoopToken = new CancellationTokenSource();
+        pseudoConsole = PseudoConsoleFactory.Start(Buffer, process);
+
+        _ = Task.Factory.StartNew(ReadOutputLoop, TaskCreationOptions.LongRunning);
+    }
+    /// <summary>
+    /// Starts a ConPTY session running the provided command line.
+    /// </summary>
     /// <param name="application">Command line to start (for example, <c>cmd.exe</c> or PowerShell).</param>
     public CommandLineSession(string application) : base(Encoding.UTF8)
     {
-        _application = application;
-        _applicationName = Path.GetFileNameWithoutExtension(application).ToLower();
-
-        pseudoConsole = PseudoConsoleFactory.Start(Buffer, new ProcessCreationInfo()
-        {
-            CommandLine = application
-        });
+        Title = Path.GetFileNameWithoutExtension(application).ToLower();
 
         readLoopToken = new CancellationTokenSource();
-        Task.Factory.StartNew(ReadOutputLoop, TaskCreationOptions.LongRunning);
+        pseudoConsole = PseudoConsoleFactory.Start(Buffer, new ProcessCreationInfo()
+        {
+            CommandLine = application,
+            CurrentDirectory = Path.GetDirectoryName(application)
+        });
+
+        _ = Task.Factory.StartNew(ReadOutputLoop, TaskCreationOptions.LongRunning);
     }
 
     /// <summary>
@@ -52,9 +63,12 @@ public sealed partial class CommandLineSession : TerminalSession
         : this(@"C:\Windows\System32\cmd.exe") { }
 
     /// <inheritdoc />
-    public override void Resize(int columns, int rows)
+    public override void Resize(ushort columns, ushort rows)
     {
-        Buffer.ResizeBuffer(columns, rows);
+        // For ConPTY we let the pseudo-console own reflow. Resize only the local buffer
+        // geometry without moving rows into scrollback; ConPTY will repaint/overwrite
+        // the visible area itself, so avoid a full clear that causes blank-frame flicker.
+        base.Resize(columns, rows, pushScrollback: false);
         PseudoConsole.Resize(columns, rows);
     }
 
@@ -64,105 +78,38 @@ public sealed partial class CommandLineSession : TerminalSession
             return;
 
         await Task.Yield();
-        byte[] data = new byte[4096];
+        Span<byte> data = stackalloc byte[8192];
 
-        while (!readLoopToken.IsCancellationRequested)
-        {
-            try
-            {
-                int bytesRead = PseudoConsole.Reader.Read(data);
-                if (bytesRead == 0)
-                    break;
-
-                ReadOnlySpan<byte> readed = data.AsSpan(0, bytesRead);
-                string dataStr = InputEncoding.GetString(readed);
-
-                // checking for 'clear screen' sequence. Due to strange behaivour of this command, we required to handle it cutsomly
-                COORD cursorPos = IsCmdClearScreen(readed);
-                if (cursorPos != COORD.Invalid)
-                {
-                    Buffer.WriteFromEncoding(InputEncoding, readed);
-                    Buffer.SetCursorPosition(cursorPos);
-                    NotifyBufferUpdated();
-                    continue;
-                }
-
-                Buffer.WriteFromEncoding(InputEncoding, readed);
-                NotifyBufferUpdated();
-            }
-            catch
-            {
-                // fucked up somewhere
-                _ = 0xBAD + 0xC0DE;
-            }
-        }
-    }
-
-    private COORD IsCmdClearScreen(ReadOnlySpan<byte> data)
-    {
         try
         {
-            // matching "H\u001[?25h"
-            if (data is not [.., 72, 27, 91, 63, 50, 53, 104])
-                return COORD.Invalid;
-
-            int backing = data.Length - 1 - 7;
-            for (int i = backing; i != backing - 6; i--)
+            while (readLoopToken?.IsCancellationRequested is false)
             {
-                // Trying to locate start of cursor jump escape sequence
-                if (data[i..(i + 2)] is not [27, 91])
-                    continue;
+                try
+                {
+                    int bytesRead = PseudoConsole.Reader.Read(data);
+                    if (bytesRead == 0)
+                        break;
 
-                // Moving position right for 2 bytes of "\u001["
-                backing = i + 2;
-
-                // Checking if jumping to default position
-                if (data[backing] == 72) // H
-                    return new COORD(0, 0);
-
-                // Parsing indexes
-                COORD cursorPos = COORD.Invalid;
-                cursorPos.Y = TryFindIndex(data, ref backing, [72, 59]); // 'H', ';'
-                cursorPos.X = TryFindIndex(data, ref backing, [72, 27]); // 'H', '\u001'
-
-                return cursorPos;
+                    ReadOnlySpan<byte> readed = data.Slice(0, bytesRead);
+                    Decoder.WriteFromEncoding(InputEncoding, readed);
+                    NotifyBufferUpdated();
+                }
+                catch (Exception exc)
+                {
+                    // Log so we can see when the read/decode loop misbehaves instead of silently looping.
+                    Debug.WriteLine($"[{GetType().Name}] ReadOutputLoop inner error: {exc}");
+                }
             }
-
-            // Invalid escape sequense or jump escape sequence not found
-            return COORD.Invalid;
         }
-        catch
+        catch (Exception exc)
         {
-            // fucked up somewhere
-            _ = 0xBAD + 0xC0DE;
-            return COORD.Invalid;
+            Debug.WriteLine(exc);
+            throw;
         }
-    }
-
-    private short TryFindIndex(ReadOnlySpan<byte> data, ref int backing, params byte[] edge)
-    {
-        for (int j = 0; j < 3; j++)
-        {
-            if (!edge.Contains(data[backing + j]))
-                continue;
-
-            string indexStr = InputEncoding.GetString(data.Slice(backing, j));
-            backing += j + 1;
-
-            if (j == 0)
-                return 0;
-
-            if (!short.TryParse(indexStr, out short index))
-                return -1;
-
-            return (short)(index);
-        }
-
-        return -1;
     }
 
     /// <inheritdoc />
-    public override void WriteInput(ReadOnlySpan<byte> data)
+    public override void Write(ReadOnlySpan<byte> data)
     {
         if (PseudoConsole?.Writer == null)
             return;
