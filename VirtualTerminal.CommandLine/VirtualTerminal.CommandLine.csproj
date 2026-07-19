@@ -8,6 +8,7 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>VirtualTerminal</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableWindowsTargeting>True</EnableWindowsTargeting>
     <!--<IsAotCompatible>True</IsAotCompatible>-->
 
     <BaseOutputPath>..\bin</BaseOutputPath>

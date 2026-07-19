@@ -8,6 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <Authors>Rikitav Tim4ik</Authors>
+    <EnableWindowsTargeting>True</EnableWindowsTargeting>
 
     <BaseOutputPath>..\bin</BaseOutputPath>
     <DocumentationFile>..\docs\reference\$(AssemblyName).xml</DocumentationFile>
