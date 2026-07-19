@@ -17,6 +17,10 @@ public struct ProcessCreationInfo
     /// Optional command line passed to <c>CreateProcess</c>.
     /// </summary>
     public string? CommandLine;
+
+    public string? Environment;
+
+    public string? CurrentDirectory;
 }
 
 /// <summary>

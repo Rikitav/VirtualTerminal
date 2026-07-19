@@ -3,7 +3,6 @@ using Renci.SshNet.Common;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text;
-using VirtualTerminal.Interop;
 using VirtualTerminal.Session;
 
 namespace VirtualTerminal;
@@ -45,7 +44,7 @@ public class SecureShellSession : TerminalSession
     /// </summary>
     public bool IsConnected
     {
-        get => _client is not null && _client.IsConnected; 
+        get => _client is not null && _client.IsConnected;
     }
 
     /// <summary>
@@ -239,7 +238,7 @@ public class SecureShellSession : TerminalSession
     }
 
     /// <inheritdoc />
-    public override void WriteInput(ReadOnlySpan<byte> data)
+    public override void Write(ReadOnlySpan<byte> data)
     {
         ValidateClient();
         if (!_shellStream.CanWrite)

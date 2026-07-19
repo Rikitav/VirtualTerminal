@@ -1,7 +1,7 @@
 ## VirtualTerminal.CommandLine
 
 **VirtualTerminal.CommandLine** is an addon for the core `VirtualTerminal` library that provides a `CommandLineSession` implementation based on Windows ConPTY.  
-It lets you host a real local command line (e.g. `cmd.exe`, PowerShell, custom CLI apps) inside the `VirtualTerminalView` WPF control.
+It lets you host a real local command line (e.g. `cmd.exe`, PowerShell, custom CLI apps) inside the WPF or Avalonia `TerminalControl`.
 
 ---
 
@@ -9,34 +9,23 @@ It lets you host a real local command line (e.g. `cmd.exe`, PowerShell, custom C
 
 ### Reference the project
 
-1. Add a project reference from your WPF app to:
+1. Add a project reference from your app to:
    - `VirtualTerminal.CommandLine`
    - `VirtualTerminal` (core – already referenced by the addon).
-2. Ensure your app targets `net10.0-windows` with WPF enabled.
+2. Ensure your app targets `net10.0-windows` (ConPTY is Windows-only).
 
-### Basic usage with `VirtualTerminalView`
-
-In XAML (same as core README):
+### Basic usage
 
 ```xml
-<Window x:Class="MyApp.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vt="clr-namespace:VirtualTerminal;assembly=VirtualTerminal">
-
+<Window ...
+        xmlns:vt="clr-namespace:VirtualTerminal;assembly=VirtualTerminal.WPF">
     <Grid>
-        <vt:VirtualTerminalView x:Name="Terminal"
-                                AllowDirectInput="True"
-                                ScrollDownVisible="True" />
+        <vt:TerminalControl x:Name="Terminal" AllowDirectInput="True" />
     </Grid>
 </Window>
 ```
 
-In code-behind:
-
 ```csharp
-using System;
-using System.Windows;
 using VirtualTerminal;
 
 public partial class MainWindow : Window
@@ -47,8 +36,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        // Start default cmd.exe
-        _session = new CommandLineSession();
+        _session = new CommandLineSession(); // defaults to cmd.exe
         Terminal.Session = _session;
     }
 
@@ -70,25 +58,26 @@ Located in `CommandLineSession.cs` (namespace `VirtualTerminal`).
 
 ### Purpose
 
-- Concrete `TerminalSession` implementation backed by Windows ConPTY:
-  - Connects a `TerminalScreenBuffer` to a pseudoconsole.
-  - Spawns a child process (e.g. `cmd.exe`) attached to that pseudoconsole.
-  - Forwards user input into the process, and process output into the buffer.
+Concrete `TerminalSession` implementation backed by Windows ConPTY:
+
+- Creates a pseudoconsole and spawns a child process attached to it.
+- Reads child output in a background loop and feeds it to the local `TerminalDecoder`.
+- Forwards user input into the child process.
 
 ### Constructors
 
+- **`CommandLineSession()`**
+  - Starts the default Windows shell: `C:\Windows\System32\cmd.exe`.
 - **`CommandLineSession(string application)`**
   - Starts `application` as the child process.
   - Uses `Encoding.UTF8` as `InputEncoding`.
-  - Internally calls `PseudoConsoleFactory.Start(Buffer, new ProcessCreationInfo { CommandLine = application })`.
-- **`CommandLineSession()`**
-  - Convenience overload that starts the default Windows shell:
-    - `C:\Windows\System32\cmd.exe`
+- **`CommandLineSession(ProcessCreationInfo processInfo)`**
+  - Full control over command line, working directory, etc.
 
 ### Properties
 
 - **`override string Title`**
-  - Returns `"ConPTY"`.
+  - Derived from the started executable name.
 - **`PseudoConsole PseudoConsole`**
   - Exposes the underlying `PseudoConsole` instance (process + pipes).
 
@@ -98,16 +87,24 @@ Internally, `CommandLineSession`:
 
 - Starts a long-running background task `ReadOutputLoop()`:
   - Reads from `PseudoConsole.Reader`.
-  - Converts from `InputEncoding` to `TerminalScreenBuffer.Encoding`.
-  - Writes into `Buffer` and calls `NotifyBufferUpdated()` to trigger UI re-rendering.
-- Overrides **`WriteInput(ReadOnlySpan<byte> data)`**:
+  - Converts from `InputEncoding` to the decoder encoding.
+  - Writes into `Decoder` and calls `NotifyBufferUpdated()` to trigger UI re-rendering.
+- Overrides **`Write(ReadOnlySpan<byte> data)`**:
   - Writes input bytes into `PseudoConsole.Writer`.
-  - Calls `NotifyBufferUpdated()` to ensure UI flush if needed.
+
+### Resize behavior
+
+`Resize(ushort columns, ushort rows)`:
+
+1. Resizes the local `TerminalScreenBuffer` geometry.
+2. Tells ConPTY about the new size via `PseudoConsole.Resize(columns, rows)`.
+
+ConPTY owns the actual reflow; the local buffer is resized to match the new dimensions and the control lets ConPTY repaint the visible area.
 
 ### Disposal
 
 - **`protected override void Dispose(bool disposing)`**
-  - Cancels and disposes the read loop token.
+  - Cancels and disposes the read loop.
   - Disposes `PseudoConsole`.
 
 Always dispose `CommandLineSession` when you are done:
@@ -118,53 +115,44 @@ _session?.Dispose();
 
 ---
 
-## PseudoConsole and interop
+## `PseudoConsole` and interop
 
-`VirtualTerminal.CommandLine.Interop` contains the plumbing that connects the Windows pseudoconsole to the `TerminalScreenBuffer`:
+`VirtualTerminal.CommandLine.Interop` contains the plumbing that connects the Windows pseudoconsole to the engine:
 
 ### `PseudoConsoleFactory`
-
-Located in `Interop/PseudoConsoleFactory.cs`.
 
 - **`static PseudoConsole Start(TerminalScreenBuffer buffer, ProcessCreationInfo processInfo)`**
   - Creates anonymous pipes for stdin/stdout.
   - Calls `CreatePseudoConsole` with buffer dimensions.
-  - Starts a child process via `Win32ProcessFactory.Start(processInfo, handle)`.
-  - Returns a `PseudoConsole` that wraps:
-    - ConPTY handle
-    - Child process
-    - `Stream` writer (stdin)
-    - `Stream` reader (stdout)
+  - Starts a child process via `Win32ProcessFactory.Start`.
+  - Returns a `PseudoConsole` wrapping the ConPTY handle, child process, stdin writer and stdout reader.
 
-You usually don’t need to use `PseudoConsoleFactory` directly unless you are building your own custom session around it.
+You usually don’t need to use `PseudoConsoleFactory` directly unless you are building a custom session around it.
 
 ---
 
 ## Example: starting a custom CLI app
 
-You can point `CommandLineSession` at any console application:
-
 ```csharp
-// Run PowerShell
+// PowerShell
 var psSession = new CommandLineSession(@"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe");
 Terminal.Session = psSession;
 
-// Or Python REPL
+// Python REPL
 var replSession = new CommandLineSession(@"C:\python314\python.exe");
 Terminal.Session = replSession;
 
-// Or some custom tool
+// Any console tool
 var toolSession = new CommandLineSession(@"C:\path\to\mytool.exe");
 Terminal.Session = toolSession;
 ```
 
-All VT-compatible output from the tool will be rendered in the `VirtualTerminalView`.
+All VT-compatible output from the tool will be rendered in the `TerminalControl`.
 
 ---
 
 ## Tips & limitations
 
-- **Windows-only**: ConPTY is available on modern Windows 10+; the library targets `net10.0-windows`.
-- **Encoding**: `CommandLineSession` uses UTF‑8 for input and converts output into the Unicode buffer encoding.
-- **Resizing**: When the WPF control resizes and calls `Resize`, the underlying `TerminalScreenBuffer` size is updated. The child process will see the new console dimensions via ConPTY.
-
+- **Windows-only**: ConPTY is available on modern Windows 10/11; the project targets `net10.0-windows`.
+- **Encoding**: `CommandLineSession` uses UTF-8 by default.
+- **Resizing**: the control debounces rapid resize events and suppresses intermediate renders so ConPTY can produce a clean reflow frame. A minimum grid size of 10×3 is enforced to prevent shells from resetting at extremely small window sizes.

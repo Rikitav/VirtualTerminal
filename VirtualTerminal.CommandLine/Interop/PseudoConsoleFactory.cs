@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
-using VirtualTerminal.Engine;
+using VirtualTerminal.Buffer;
 
 namespace VirtualTerminal.Interop;
 

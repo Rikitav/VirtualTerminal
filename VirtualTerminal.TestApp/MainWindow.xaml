@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:VirtualTerminal.TestApp"
-        xmlns:vt="clr-namespace:VirtualTerminal;assembly=VirtualTerminal"
+        xmlns:vt="clr-namespace:VirtualTerminal;assembly=VirtualTerminal.WPF"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
     <Grid>
@@ -44,14 +44,13 @@
             </DockPanel>
         </Border>
         
-        <vt:VirtualTerminalView 
+        <vt:TerminalControl 
             x:Name="PART_Terminal_Left"
             Grid.Row="1" Grid.Column="0"
             AllowDirectInput="True"
             CursorBlinking="True"
-            FontFamily="Cascadia Mono "
-            ScreenBackground="Black"
-            ScreenForeground="White"/>
+            Background="Black"
+            FontFamily="Cascadia Mono"/>
 
         <vt:PromptBox
             x:Name="PART_Prompt_Left"

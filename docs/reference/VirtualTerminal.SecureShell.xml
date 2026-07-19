@@ -1,0 +1,171 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>VirtualTerminal.SecureShell</name>
+    </assembly>
+    <members>
+        <member name="T:VirtualTerminal.SecureShellSession">
+            <summary>
+            A <see cref="T:VirtualTerminal.Session.TerminalSession"/> implementation backed by SSH (via SSH.NET).
+            It creates an interactive <see cref="P:VirtualTerminal.SecureShellSession.ShellStream"/>, forwards incoming data into the session
+            <see cref="P:VirtualTerminal.Session.TerminalSession.Buffer"/>, and forwards terminal input to the remote host.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.SecureShellSession.Client">
+            <summary>
+            Gets the underlying SSH client instance, if initialized.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.SecureShellSession.ShellStream">
+            <summary>
+            Gets the interactive shell stream, if connected.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.SecureShellSession.IsConnected">
+            <summary>
+            Gets whether the underlying SSH client is connected.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.SecureShellSession.AutoFlush">
+            <summary>
+            Gets or sets whether the shell stream is flushed after each write.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.#ctor(Renci.SshNet.ISshClient,System.Text.Encoding)">
+            <summary>
+            Initializes a new SSH session using an externally created client. The session does not own the client.
+            </summary>
+            <param name="client">SSH client instance.</param>
+            <param name="encoding">Input encoding (defaults to UTF-8).</param>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.#ctor(Renci.SshNet.ConnectionInfo,System.Text.Encoding)">
+            <summary>
+            Initializes a new SSH session by creating and owning a new client from the given connection info.
+            </summary>
+            <param name="connectionInfo">SSH connection info.</param>
+            <param name="encoding">Input encoding (defaults to UTF-8).</param>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.#ctor(System.String,System.Int32,System.String,System.String,System.Text.Encoding)">
+            <summary>
+            Initializes a new SSH session using password authentication and an explicit port.
+            The session owns the created client.
+            </summary>
+            <param name="host">Remote host name or IP address.</param>
+            <param name="port">Remote SSH port.</param>
+            <param name="username">SSH username.</param>
+            <param name="password">SSH password.</param>
+            <param name="encoding">Input encoding (defaults to UTF-8).</param>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.#ctor(System.String,System.String,System.String,System.Text.Encoding)">
+            <summary>
+            Initializes a new SSH session using password authentication on the default port (22).
+            The session owns the created client.
+            </summary>
+            <param name="host">Remote host name or IP address.</param>
+            <param name="username">SSH username.</param>
+            <param name="password">SSH password.</param>
+            <param name="encoding">Input encoding (defaults to UTF-8).</param>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.#ctor(System.String,System.Int32,System.String,System.Text.Encoding,Renci.SshNet.IPrivateKeySource[])">
+            <summary>
+            Initializes a new SSH session using key-based authentication and an explicit port.
+            The session owns the created client.
+            </summary>
+            <param name="host">Remote host name or IP address.</param>
+            <param name="port">Remote SSH port.</param>
+            <param name="username">SSH username.</param>
+            <param name="encoding">Input encoding (defaults to UTF-8).</param>
+            <param name="keyFiles">Private key sources used for authentication.</param>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.#ctor(System.String,System.String,System.Text.Encoding,Renci.SshNet.IPrivateKeySource[])">
+            <summary>
+            Initializes a new SSH session using key-based authentication on the default port (22).
+            The session owns the created client.
+            </summary>
+            <param name="host">Remote host name or IP address.</param>
+            <param name="username">SSH username.</param>
+            <param name="encoding">Input encoding (defaults to UTF-8).</param>
+            <param name="keyFiles">Private key sources used for authentication.</param>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.ConnectAsync(System.Threading.CancellationToken)">
+            <summary>
+            Connects the SSH client and creates an interactive <see cref="P:VirtualTerminal.SecureShellSession.ShellStream"/> with terminal type "xterm".
+            </summary>
+            <param name="cancellationToken">Cancellation token.</param>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.TryConnectAsync(System.Threading.CancellationToken)">
+            <summary>
+            Attempts to connect without throwing, returning <c>true</c> on success.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.ReconnectAsync(System.Threading.CancellationToken)">
+            <summary>
+            Attempts to reconnect up to a fixed number of times.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.TryReconnectAsync(System.Threading.CancellationToken)">
+            <summary>
+            Attempts to reconnect without throwing, returning <c>true</c> on success.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.DisconnectAsync(System.Threading.CancellationToken)">
+            <summary>
+            Disconnects the SSH client and disposes the <see cref="P:VirtualTerminal.SecureShellSession.ShellStream"/>.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.Resize(System.UInt16,System.UInt16)">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.Write(System.ReadOnlySpan{System.Byte})">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.WriteInputAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+            <summary>
+            Writes input asynchronously into the SSH shell stream.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.WriteInputAsync(System.Byte[],System.Threading.CancellationToken)">
+            <summary>
+            Writes input asynchronously into the SSH shell stream.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.Flush">
+            <summary>
+            Flushes the shell stream.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.FlushAsync(System.Threading.CancellationToken)">
+            <summary>
+            Flushes the shell stream asynchronously.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.ClosePreviousClient">
+            <summary>
+            Closes current client (if session owns it), and sets it to null
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.ValidateClient">
+            <summary>
+            Validates that the client is connected and the shell stream exists; otherwise throws.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.DataReceived(System.Object,Renci.SshNet.Common.ShellDataEventArgs)">
+            <summary>
+            Handles data received from the SSH shell stream by writing into the terminal buffer.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.Dispose(System.Boolean)">
+            <inheritdoc />
+        </member>
+        <member name="T:VirtualTerminal.ClientUninitializedException">
+            <summary>
+            Thrown when an SSH client or shell stream is not initialized/connected when required.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.ClientUninitializedException.#ctor(System.String)">
+            <summary>
+            Thrown when an SSH client or shell stream is not initialized/connected when required.
+            </summary>
+        </member>
+    </members>
+</doc>

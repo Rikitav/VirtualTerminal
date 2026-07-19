@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using System.IO;
 using System.Text;
-using VirtualTerminal.Engine;
+using VirtualTerminal.Extensions;
 using VirtualTerminal.Interop;
 using VirtualTerminal.Session;
 
@@ -28,6 +28,19 @@ public sealed class CommandLineSession : TerminalSession
     /// <summary>
     /// Starts a ConPTY session running the provided command line.
     /// </summary>
+    /// <param name="process"></param>
+    public CommandLineSession(ProcessCreationInfo process) : base(Encoding.UTF8)
+    {
+        Title = Path.GetFileNameWithoutExtension(process.CommandLine ?? process.ApplicationName ?? string.Empty).ToLower();
+
+        readLoopToken = new CancellationTokenSource();
+        pseudoConsole = PseudoConsoleFactory.Start(Buffer, process);
+
+        _ = Task.Factory.StartNew(ReadOutputLoop, TaskCreationOptions.LongRunning);
+    }
+    /// <summary>
+    /// Starts a ConPTY session running the provided command line.
+    /// </summary>
     /// <param name="application">Command line to start (for example, <c>cmd.exe</c> or PowerShell).</param>
     public CommandLineSession(string application) : base(Encoding.UTF8)
     {
@@ -36,7 +49,8 @@ public sealed class CommandLineSession : TerminalSession
         readLoopToken = new CancellationTokenSource();
         pseudoConsole = PseudoConsoleFactory.Start(Buffer, new ProcessCreationInfo()
         {
-            CommandLine = application
+            CommandLine = application,
+            CurrentDirectory = Path.GetDirectoryName(application)
         });
 
         _ = Task.Factory.StartNew(ReadOutputLoop, TaskCreationOptions.LongRunning);
@@ -51,8 +65,11 @@ public sealed class CommandLineSession : TerminalSession
     /// <inheritdoc />
     public override void Resize(ushort columns, ushort rows)
     {
+        // For ConPTY we let the pseudo-console own reflow. Resize only the local buffer
+        // geometry without moving rows into scrollback; ConPTY will repaint/overwrite
+        // the visible area itself, so avoid a full clear that causes blank-frame flicker.
+        base.Resize(columns, rows, pushScrollback: false);
         PseudoConsole.Resize(columns, rows);
-        base.Resize(columns, rows);
     }
 
     private async Task ReadOutputLoop()
@@ -61,51 +78,38 @@ public sealed class CommandLineSession : TerminalSession
             return;
 
         await Task.Yield();
-        Span<byte> data = stackalloc byte[1024];
-        Span<byte> cleanupData = stackalloc byte[2];
+        Span<byte> data = stackalloc byte[8192];
 
-        while (!readLoopToken.IsCancellationRequested)
+        try
         {
-            try
+            while (readLoopToken?.IsCancellationRequested is false)
             {
-                int bytesRead = PseudoConsole.Reader.Read(data);
-                if (bytesRead == 0)
-                    break;
-
-                ReadOnlySpan<byte> readed = data.Slice(0, bytesRead);
-                if (readed is [27, 91, 63, 50, 53, 108, 27, 91, 50, 74, 27, 91, 109, 27, 91, 72, ..])
+                try
                 {
-                    while (!readLoopToken.IsCancellationRequested)
-                    {
-                        bytesRead = PseudoConsole.Reader.Read(cleanupData);
-                        if (bytesRead == 0)
-                            break;
+                    int bytesRead = PseudoConsole.Reader.Read(data);
+                    if (bytesRead == 0)
+                        break;
 
-                        if (cleanupData is not [10, 13, ..] && cleanupData is not [13, 10, ..])
-                            break;
-                    }
-
-                    Decoder.WriteFromEncoding(InputEncoding, cleanupData);
+                    ReadOnlySpan<byte> readed = data.Slice(0, bytesRead);
+                    Decoder.WriteFromEncoding(InputEncoding, readed);
                     NotifyBufferUpdated();
-                    continue;
                 }
-#if DEBUG
-                string dataStr = InputEncoding.GetString(readed);
-                Debug.WriteLine(dataStr);
-#endif
-                Decoder.WriteFromEncoding(InputEncoding, readed);
-                NotifyBufferUpdated();
+                catch (Exception exc)
+                {
+                    // Log so we can see when the read/decode loop misbehaves instead of silently looping.
+                    Debug.WriteLine($"[{GetType().Name}] ReadOutputLoop inner error: {exc}");
+                }
             }
-            catch
-            {
-                // fucked up somewhere
-                _ = 0xBAD + 0xC0DE;
-            }
+        }
+        catch (Exception exc)
+        {
+            Debug.WriteLine(exc);
+            throw;
         }
     }
 
     /// <inheritdoc />
-    public override void WriteInput(ReadOnlySpan<byte> data)
+    public override void Write(ReadOnlySpan<byte> data)
     {
         if (PseudoConsole?.Writer == null)
             return;

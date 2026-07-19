@@ -1,32 +1,46 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
-    <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Title>System.Windows.VirtuaTerminal</Title>
-    <Authors>Rikitav</Authors>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <!--<IsAotCompatible>True</IsAotCompatible>-->
+
+    <BaseOutputPath>..\bin</BaseOutputPath>
+    <DocumentationFile>..\docs\reference\$(AssemblyName).xml</DocumentationFile>
+
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <EnableNETAnalyzers>True</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
     <IncludeSymbols>True</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <SignAssembly>False</SignAssembly>
-    <GenerateDocumentationFile>True</GenerateDocumentationFile>
-	<RepositoryUrl>https://github.com/Rikitav/VirtualTerminal</RepositoryUrl>
-	<Version>1.1</Version>
+
+    <Title>VirtualTerminal</Title>
+    <Version>1.6</Version>
+    <Authors>Rikitav Tim4ik</Authors>
+    <Company>Rikitav Tim4ik</Company>
+    <RepositoryUrl>https://github.com/Rikitav/VirtualTerminal</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/Rikitav/VirtualTerminal</PackageProjectUrl>
+    <PackageTags>terminal;vt;ansi;virtual;console;xterm;emulator</PackageTags>
+
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="..\README.md">
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
+    <None Include="..\README.md" Pack="True" PackagePath="\" />
+    <None Include="..\LICENSE.txt" Pack="True" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\VirtualTerminal.Engine\VirtualTerminal.Engine.csproj" />
+    <PackageReference Include="PolySharp" Version="1.16.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
 </Project>
