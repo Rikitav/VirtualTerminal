@@ -8,7 +8,7 @@ This repository contains:
 - **VirtualTerminal** – the core engine: `TerminalDecoder`, `TerminalScreenBuffer`, `TerminalState`, options and session abstractions.
 - **VirtualTerminal.WPF** – `TerminalControl` for WPF (`System.Windows.Controls.Control`).
 - **VirtualTerminal.Avalonia** – `TerminalControl` for Avalonia (`Avalonia.Controls.TemplatedControl`).
-- **VirtualTerminal.CommandLine** – `CommandLineSession`, a ConPTY-backed local shell.
+- **VirtualTerminal.CommandLine** – `CommandLineSession`, a ConPTY-backed local shell. (Windows only)
 - **VirtualTerminal.SecureShell** – `SecureShellSession`, an SSH.NET-backed remote shell.
 - **VirtualTerminal.TestApp** – a small WPF demo application
 
@@ -34,13 +34,14 @@ This repository contains:
         xmlns:vt="clr-namespace:VirtualTerminal;assembly=VirtualTerminal.WPF">
 
     <Grid>
-        <vt:TerminalControl x:Name="Terminal"
-                            AllowDirectInput="True"
-                            CursorBlinking="True"
-                            ScrollDownVisible="True"
-                            Background="Black"
-                            FontFamily="Cascadia Mono"
-                            FontSize="14" />
+        <vt:TerminalControl
+            x:Name="Terminal"
+            AllowDirectInput="True"
+            CursorBlinking="True"
+            ScrollDownVisible="True"
+            Background="Black"
+            FontFamily="Cascadia Mono"
+            FontSize="14" />
     </Grid>
 </Window>
 ```
@@ -53,12 +54,13 @@ This repository contains:
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vt="clr-namespace:VirtualTerminal;assembly=VirtualTerminal.Avalonia">
 
-    <vt:TerminalControl CurrentSession="{Binding Session}"
-                        AllowDirectInput="True"
-                        CursorBlinking="True"
-                        Background="Black"
-                        FontFamily="Cascadia Mono"
-                        TerminalFontSize="14" />
+    <vt:TerminalControl 
+        CurrentSession="{Binding Session}"
+        AllowDirectInput="True"
+        CursorBlinking="True"
+        Background="Black"
+        FontFamily="Cascadia Mono"
+        TerminalFontSize="14" />
 </Window>
 ```
 
