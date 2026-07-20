@@ -100,9 +100,17 @@ public sealed class GlyphCache : IDisposable
 
         _cellWidth = adv * _scale;
 
-        int lineSpacing = m.LineSpacing > 0 ? m.LineSpacing : (m.Ascent - m.Descent);
-        _cellHeight = Math.Ceiling(lineSpacing * _scale * Math.Max(0.5, lineHeight));
-        _ascent = Math.Clamp(m.Ascent * _scale, 0, int.MaxValue);
+        // Avalonia/Skia reports signed font metrics in a y-down coordinate system:
+        // Ascent is negative (above baseline), Descent is positive (below baseline),
+        // LineSpacing is the full recommended line height (positive).
+        double ascentMagnitude = m.Ascent > 0 ? m.Ascent : -m.Ascent;
+        double descentMagnitude = m.Descent > 0 ? m.Descent : -m.Descent;
+        int minHeightDesign = (int)(ascentMagnitude + descentMagnitude);
+        int lineSpacingDesign = m.LineSpacing > 0 ? m.LineSpacing : minHeightDesign;
+        double minHeight = minHeightDesign * _scale;
+        double lineHeightMult = Math.Max(0.5, lineHeight);
+        _cellHeight = Math.Ceiling(Math.Max(minHeight, lineSpacingDesign * _scale * lineHeightMult));
+        _ascent = ascentMagnitude * _scale;
         _underlinePos = m.UnderlinePosition * _scale;
         _underlineThickness = Math.Max(1, m.UnderlineThickness * _scale);
         _strikePos = m.StrikethroughPosition * _scale;

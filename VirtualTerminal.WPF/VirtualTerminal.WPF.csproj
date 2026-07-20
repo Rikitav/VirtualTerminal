@@ -9,7 +9,7 @@
     <RootNamespace>VirtualTerminal</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <EnableWindowsTargeting>True</EnableWindowsTargeting>
-    <!--IsAotCompatible>True</IsAotCompatible-->
+    <IsAotCompatible>True</IsAotCompatible>
 
     <BaseOutputPath>..\bin</BaseOutputPath>
     <DocumentationFile>..\docs\reference\$(AssemblyName).xml</DocumentationFile>
@@ -23,7 +23,7 @@
     <SignAssembly>False</SignAssembly>
 
     <Title>VirtualTerminal.WPF</Title>
-    <Version>1.7</Version>
+    <Version>1.8</Version>
     <Authors>Rikitav Tim4ik</Authors>
     <Company>Rikitav Tim4ik</Company>
     <RepositoryUrl>https://github.com/Rikitav/VirtualTerminal</RepositoryUrl>

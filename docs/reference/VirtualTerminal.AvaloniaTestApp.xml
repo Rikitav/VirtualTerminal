@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>VirtualTerminal.AvaloniaTestApp</name>
+    </assembly>
+    <members>
+        <member name="T:VirtualTerminal.AvaloniaTestApp.App">
+            <summary>
+            Avalonia application entry point for the test application.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.AvaloniaTestApp.App.Initialize">
+            <summary>
+            Initializes the Avalonia application by loading XAML resources.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.AvaloniaTestApp.App.OnFrameworkInitializationCompleted">
+            <summary>
+            Called when the framework initialization is complete. Configures debug tracing and creates the main window.
+            </summary>
+        </member>
+        <member name="T:VirtualTerminal.AvaloniaTestApp.MainWindow">
+            <summary>
+            Main window of the Avalonia test application hosting a terminal control and prompt box.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.AvaloniaTestApp.MainWindow.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:VirtualTerminal.AvaloniaTestApp.MainWindow"/> class.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.AvaloniaTestApp.MainWindow.InitializeComponent(System.Boolean)">
+            <summary>
+            Wires up the controls and optionally loads XAML markup and attaches dev tools (if Avalonia.Diagnostics package is referenced).
+            </summary>
+            <param name="loadXaml">Should the XAML be loaded into the component.</param>
+        </member>
+        <member name="T:VirtualTerminal.AvaloniaTestApp.SimpleTuiDemoSession">
+            <summary>
+            Minimal demo TUI application running inside a terminal session.
+            Shows a navigable list inside a box; the selected item can be activated with Enter.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.AvaloniaTestApp.SimpleTuiDemoSession.Render">
+            <summary>
+            Renders the demo TUI, including the bordered menu, selection highlight, and status bar.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.AvaloniaTestApp.SimpleTuiDemoSession.OnKey(System.ConsoleKey)">
+            <summary>
+            Handles keyboard input to navigate the menu or activate the selected item.
+            </summary>
+            <param name="key">The key that was pressed.</param>
+        </member>
+    </members>
+</doc>

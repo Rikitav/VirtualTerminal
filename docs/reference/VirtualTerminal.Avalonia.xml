@@ -344,13 +344,6 @@
         <member name="M:VirtualTerminal.TerminalControl.Render(Avalonia.Media.DrawingContext)">
             <inheritdoc/>
         </member>
-        <member name="M:VirtualTerminal.TerminalControl.RenderViewportRow(System.Int32,System.Collections.Generic.IReadOnlyList{VirtualTerminal.Buffer.TerminalRow})">
-            <summary>
-            Renders one viewport row. When <paramref name="scrollback"/> is non-null (viewing history),
-            the row's source is computed from the (scrollback + active) stream; otherwise it is the
-            active buffer row at the same index.
-            </summary>
-        </member>
         <member name="M:VirtualTerminal.TerminalControl.OnGotFocus(Avalonia.Input.FocusChangedEventArgs)">
             <inheritdoc/>
         </member>

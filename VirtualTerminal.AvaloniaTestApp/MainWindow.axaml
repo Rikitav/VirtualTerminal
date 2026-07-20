@@ -1,0 +1,49 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vt="clr-namespace:VirtualTerminal;assembly=VirtualTerminal.Avalonia"
+        mc:Ignorable="d"
+        x:Class="VirtualTerminal.AvaloniaTestApp.MainWindow"
+        Title="VirtualTerminal Avalonia Test"
+        Width="800"
+        Height="450">
+  <Grid RowDefinitions="40,*,30">
+    <Border Grid.Row="0"
+            BorderBrush="Gray"
+            BorderThickness="1"
+            CornerRadius="5"
+            Margin="5">
+      <DockPanel>
+        <TextBlock Text="CMD : "
+                   VerticalAlignment="Center"
+                   Margin="5,0,0,0" />
+
+        <Button DockPanel.Dock="Right"
+                Content="Invalidate"
+                Click="Button_Click_Invalidate" />
+
+        <Button DockPanel.Dock="Right"
+                Content="Start"
+                Click="Button_Click_Start" />
+
+        <TextBox x:Name="PART_CommandLineName"
+                 VerticalContentAlignment="Center"
+                 HorizontalAlignment="Stretch"
+                 VerticalAlignment="Stretch"
+                 Text="powershell.exe" />
+      </DockPanel>
+    </Border>
+
+    <vt:TerminalControl x:Name="PART_Terminal_Left"
+                        Grid.Row="1"
+                        AllowDirectInput="True"
+                        CursorVisible="True"
+                        Background="Black"
+                        TerminalFontFamily="Cascadia Mono" />
+
+    <vt:PromptBox x:Name="PART_Prompt_Left"
+                  Grid.Row="2"
+                  Prompt=">" />
+  </Grid>
+</Window>

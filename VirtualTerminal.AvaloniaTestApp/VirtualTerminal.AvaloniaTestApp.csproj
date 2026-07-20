@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <BaseOutputPath>..\bin</BaseOutputPath>
+    <DocumentationFile>..\docs\reference\$(AssemblyName).xml</DocumentationFile>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.0.5" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.0.5" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.5" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.5" />
+
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VirtualTerminal.Avalonia\VirtualTerminal.Avalonia.csproj" />
+    <ProjectReference Include="..\VirtualTerminal.CommandLine\VirtualTerminal.CommandLine.csproj" />
+    <ProjectReference Include="..\VirtualTerminal.SecureShell\VirtualTerminal.SecureShell.csproj" />
+  </ItemGroup>
+</Project>

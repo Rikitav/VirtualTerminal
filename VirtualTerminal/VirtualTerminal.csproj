@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-    <!--<IsAotCompatible>True</IsAotCompatible>-->
+    <IsAotCompatible>True</IsAotCompatible>
 
     <BaseOutputPath>..\bin</BaseOutputPath>
     <DocumentationFile>..\docs\reference\$(AssemblyName).xml</DocumentationFile>
@@ -20,7 +20,7 @@
     <SignAssembly>False</SignAssembly>
 
     <Title>VirtualTerminal</Title>
-    <Version>1.7</Version>
+    <Version>1.8</Version>
     <Authors>Rikitav Tim4ik</Authors>
     <Company>Rikitav Tim4ik</Company>
     <RepositoryUrl>https://github.com/Rikitav/VirtualTerminal</RepositoryUrl>

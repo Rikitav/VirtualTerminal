@@ -152,28 +152,27 @@ public sealed class TerminalRenderer : IDisposable
                 col++;
 
             int runEnd = col; // exclusive
-            double x = runStart * cellW;
-            //bool anySelected = selection.HasValue && AnyInRange(selection.Value, rowIndex, runStart, runEnd);
-            bool anySelected = false;
 
-            (Color fg, Color bg) = ResolveColors(style, anySelected);
-            if (!style.BackgroundIsDefault || style.Inverse || anySelected)
-                drawingContext.DrawRectangle(Brush(bg), null, new Rect(x, 0, (runEnd - runStart) * cellW, cellH));
+            // Split the style run at selection boundaries so only selected cells are highlighted.
+            int segStart = runStart;
+            while (segStart < runEnd)
+            {
+                bool selected = selection.HasValue && selection.Value.Contains(rowIndex, segStart);
+                int segEnd = segStart + 1;
+                while (segEnd < runEnd && (selection.HasValue && selection.Value.Contains(rowIndex, segEnd)) == selected)
+                    segEnd++;
 
-            if (!style.Continuation)
-                DrawGlyphRun(drawingContext, row, runStart, runEnd, x, baselineY, Brush(fg), style);
+                double x = segStart * cellW;
+                (Color fg, Color bg) = ResolveColors(style, selected);
+                if (!style.BackgroundIsDefault || style.Inverse || selected)
+                    drawingContext.DrawRectangle(Brush(bg), null, new Rect(x, 0, (segEnd - segStart) * cellW, cellH));
+
+                if (!style.Continuation)
+                    DrawGlyphRun(drawingContext, row, segStart, segEnd, x, baselineY, Brush(fg), style);
+
+                segStart = segEnd;
+            }
         }
-    }
-
-    private static bool AnyInRange(TerminalSelection sel, int row, int start, int end)
-    {
-        for (int x = start; x < end; x++)
-        {
-            if (sel.Contains(row, x))
-                return true;
-        }
-
-        return false;
     }
 
     private void DrawGlyphRun(DrawingContext drawingContext, Span<TerminalCellInfo> row, int start, int end,

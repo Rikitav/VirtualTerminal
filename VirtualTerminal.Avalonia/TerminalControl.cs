@@ -30,18 +30,12 @@ public class TerminalControl : TemplatedControl, IDisposable
     private readonly TerminalRenderer _renderer = new TerminalRenderer();
     private readonly TerminalOptions _options = new TerminalOptions();
 
-    private readonly DrawingGroup _rootDrawingGroup = new DrawingGroup();
-    private readonly DrawingGroup _cursorVisual = new DrawingGroup();
-    private readonly DrawingGroup _contentGroup = new DrawingGroup();
-    private readonly List<DrawingGroup> _lineDrawings = [];
-
     private readonly DispatcherTimer _renderTimer;
     private readonly DispatcherTimer _blinkTimer;
     private readonly DispatcherTimer _resizeTimer;
 
     private TerminalDecoder? _decoder;
     private bool _cursorBlinkState = true;
-    private bool _needsFullInvalidation = true;
     private bool _rendererConfigured;
 
     // Text selection (mouse drag).
@@ -65,9 +59,6 @@ public class TerminalControl : TemplatedControl, IDisposable
 
     // Scroll-to-bottom indicator hit-test region.
     private Rect _scrollIndicatorRect;
-
-    // Serializes changes to render state that is not the screen buffer itself.
-    private readonly Lock _renderStateLock = new Lock();
 
     /// <summary>Raised when the connected program changes the title (OSC 0/1/2).</summary>
     public event EventHandler<string>? TitleChanged;
@@ -191,8 +182,7 @@ public class TerminalControl : TemplatedControl, IDisposable
         _blinkTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(530), DispatcherPriority.Background, Dispatcher.CurrentDispatcher, DispatcherBlinkHandler);
         _resizeTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(150), DispatcherPriority.Background, Dispatcher.CurrentDispatcher, (s, e) => { _resizeTimer!.Stop(); ResizeSessionToBounds(); });
 
-        _rootDrawingGroup.Children.Add(_contentGroup);
-        _rootDrawingGroup.Children.Add(_cursorVisual);
+        Focusable = true;
     }
 
     /// <summary>Sends a clear-screen + home escape sequence to the active session.</summary>
@@ -213,7 +203,7 @@ public class TerminalControl : TemplatedControl, IDisposable
         InvalidateVisual();
     }
 
-    private void InvalidateCommandState()
+    private static void InvalidateCommandState()
     {
         CopyCommand.InvalidateCanExecute();
         PasteCommand.InvalidateCanExecute();
@@ -245,7 +235,6 @@ public class TerminalControl : TemplatedControl, IDisposable
 
             SyncOptionsToDecoder();
             ResizeSessionToBounds();
-            _needsFullInvalidation = true;
             InvalidateVisual();
         }
 
@@ -262,7 +251,6 @@ public class TerminalControl : TemplatedControl, IDisposable
 
         if (change.Property == PaddingProperty)
         {
-            ApplyPadding();
             InvalidateVisual();
         }
     }
@@ -312,12 +300,9 @@ public class TerminalControl : TemplatedControl, IDisposable
             SyncOptionsToDecoder();
             _renderer.Configure(TerminalFontFamily, TerminalFontSize, _options);
 
-            ApplyPadding();
             _rendererConfigured = true;
 
             ResizeSessionToBounds();
-            _needsFullInvalidation = true;
-
             InvalidateVisual();
         }
         catch
@@ -325,11 +310,6 @@ public class TerminalControl : TemplatedControl, IDisposable
             // Font not yet available; will retry on the next layout pass.
             _rendererConfigured = false;
         }
-    }
-
-    private void ApplyPadding()
-    {
-        _contentGroup.Transform = new TranslateTransform(Padding.Left, Padding.Top);
     }
 
     /// <inheritdoc/>
@@ -373,13 +353,8 @@ public class TerminalControl : TemplatedControl, IDisposable
                 _scrollOffset = Math.Clamp(_scrollOffset + lost, 0, _decoder.Buffer.ScrollbackCount);
             }
 
-            lock (_renderStateLock)
-                _needsFullInvalidation = true;
-
             _suppressRenderUntil = DateTime.UtcNow + ResizeRenderSuppression;
-
-            if (DateTime.UtcNow >= _suppressRenderUntil)
-                InvalidateVisual();
+            InvalidateVisual();
         }
     }
 
@@ -387,7 +362,8 @@ public class TerminalControl : TemplatedControl, IDisposable
     /// <inheritdoc/>
     public override void Render(DrawingContext context)
     {
-        base.Render(context);
+        // Do not call base.Render: TemplatedControl may apply a default template/background
+        // transform that would shift our custom content by one row. WPF skips base.OnRender too.
 
         if (_decoder is null || !_rendererConfigured)
         {
@@ -397,19 +373,37 @@ public class TerminalControl : TemplatedControl, IDisposable
             return;
         }
 
-        lock (_decoder.Buffer.SyncRoot)
-        {
-            if (_needsFullInvalidation)
-            {
-                RenderFullBuffer();
-                _needsFullInvalidation = false;
-            }
-        }
+        TerminalScreenBuffer buf = _decoder.Buffer;
+        IReadOnlyList<TerminalRow>? scrollback = _scrollOffset > 0 ? buf.GetScrollback() : null;
+        TerminalSelection? sel = _scrollOffset > 0 ? null : _selection;
 
         if (Background is not null)
-            context.DrawRectangle(Background, null, new Rect(Bounds.Size));
+        {
+            double bgW = Math.Max(0, Bounds.Width - Padding.Left - Padding.Right);
+            double bgH = Math.Max(0, Bounds.Height - Padding.Top - Padding.Bottom);
+            context.DrawRectangle(Background, null, new Rect(Padding.Left, Padding.Top, bgW, bgH));
+        }
 
-        _rootDrawingGroup.Draw(context);
+        Size cell = _renderer.CellSize;
+        lock (buf.SyncRoot)
+        {
+            int rows = buf.Rows;
+            for (int y = 0; y < rows; y++)
+            {
+                double yPos = Padding.Top + y * cell.Height;
+                using (context.PushTransform(Matrix.CreateTranslation(Padding.Left, yPos)))
+                {
+                    Span<TerminalCellInfo> cells = GetRowCells(buf, scrollback, y);
+                    _renderer.RenderRow(context, cells, sel, y);
+                }
+            }
+
+            RenderCursor(context);
+
+            for (int i = 0; i < buf.Rows; i++)
+                buf.MarkRowClean(i);
+        }
+
         RenderScrollToBottomIndicator(context);
     }
 
@@ -439,26 +433,6 @@ public class TerminalControl : TemplatedControl, IDisposable
         context.DrawGeometry(new SolidColorBrush(Colors.White), null, arrow);
     }
 
-    private void RenderFullBuffer()
-    {
-        if (_decoder is null)
-            return;
-
-        lock (_decoder.Buffer.SyncRoot)
-        {
-            CorrectVisualsCountForBuffer();
-            TerminalScreenBuffer buf = _decoder.Buffer;
-
-            IReadOnlyList<TerminalRow>? scrollback = _scrollOffset > 0 ? buf.GetScrollback() : null;
-            int rows = Math.Min(buf.Rows, _lineDrawings.Count);
-
-            for (int y = 0; y < rows; y++)
-                RenderViewportRow(y, scrollback);
-
-            RenderCursorFromBuffer();
-        }
-    }
-
     private void DispatcherRenderHandler(object? sender, EventArgs e)
     {
         if (DateTime.UtcNow < _suppressRenderUntil)
@@ -469,47 +443,11 @@ public class TerminalControl : TemplatedControl, IDisposable
             return;
 
         TerminalScreenBuffer buf = dec.Buffer;
-        bool shouldInvalidate = false;
-
+        bool dirty;
         lock (buf.SyncRoot)
-        {
-            // While viewing history, the visible content is static; repaint fully on any change so
-            // eviction/scroll shifts are reflected (and mark active rows clean so we don't loop).
-            if (_scrollOffset > 0)
-            {
-                if (buf.HasDirtyRows)
-                {
-                    CorrectVisualsCountForBuffer();
-                    IReadOnlyList<TerminalRow> scrollback = buf.GetScrollback();
-                    int rows = Math.Min(buf.Rows, _lineDrawings.Count);
+            dirty = buf.HasDirtyRows;
 
-                    for (int y = 0; y < rows; y++)
-                        RenderViewportRow(y, scrollback);
-
-                    for (int i = 0; i < buf.Rows; i++)
-                        buf.MarkRowClean(i);
-
-                    shouldInvalidate = true;
-                }
-            }
-            else if (buf.HasDirtyRows || _selection is not null)
-            {
-                CorrectVisualsCountForBuffer();
-                int rows = Math.Min(buf.Rows, _lineDrawings.Count);
-
-                for (int i = 0; i < rows; i++)
-                {
-                    if (!buf.IsRowDirty(i) && _selection is null)
-                        continue;
-
-                    RenderViewportRow(i, null);
-                    buf.MarkRowClean(i);
-                    shouldInvalidate = true;
-                }
-            }
-        }
-
-        if (shouldInvalidate)
+        if (dirty || _selection is not null)
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }
 
@@ -524,111 +462,41 @@ public class TerminalControl : TemplatedControl, IDisposable
             return;
 
         _cursorBlinkState = !_cursorBlinkState;
-        lock (dec.Buffer.SyncRoot)
-            RenderCursorFromBuffer();
-
         Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }
 
-    private void CorrectVisualsCountForBuffer()
-    {
-        if (_decoder is null)
-            return;
-
-        int target = _decoder.Buffer.Rows;
-        int current = _lineDrawings.Count;
-        if (target == current)
-            return;
-
-        if (target > current)
-        {
-            for (int i = 0; i < target - current; i++)
-                _lineDrawings.Add(new DrawingGroup());
-        }
-        else if (target < current)
-        {
-            _lineDrawings.RemoveRange(target, current - target);
-        }
-
-        // Rebuild the visual tree so row order always matches _lineDrawings exactly.
-        // This avoids stale/misaligned visuals after the buffer row count changes.
-        _contentGroup.Children.Clear();
-        foreach (DrawingGroup group in _lineDrawings)
-            _contentGroup.Children.Add(group);
-    }
-
-    /// <summary>
-    /// Renders one viewport row. When <paramref name="scrollback"/> is non-null (viewing history),
-    /// the row's source is computed from the (scrollback + active) stream; otherwise it is the
-    /// active buffer row at the same index.
-    /// </summary>
-    private void RenderViewportRow(int viewportRow, IReadOnlyList<TerminalRow>? scrollback)
-    {
-        if (_decoder is null || viewportRow < 0 || viewportRow >= _lineDrawings.Count)
-            return;
-
-        try
-        {
-            Size cell = _renderer.CellSize;
-            DrawingGroup group = _lineDrawings[viewportRow];
-            group.Children.Clear();
-            group.Transform = new TranslateTransform(0, viewportRow * cell.Height);
-
-            TerminalScreenBuffer buf = _decoder.Buffer;
-            TerminalSelection? sel = _scrollOffset > 0 ? null : _selection;
-            Span<TerminalCellInfo> cells;
-
-            if (scrollback is null || scrollback.Count == 0)
-            {
-                if (viewportRow >= buf.Rows)
-                    return;
-                cells = buf.GetRow(viewportRow);
-            }
-            else
-            {
-                int streamLen = scrollback.Count + buf.Rows;
-                int top = scrollback.Count - _scrollOffset; // stream index of the top visible row
-                int idx = top + viewportRow;
-
-                if (idx < 0 || idx >= streamLen)
-                    return;
-
-                cells = idx < scrollback.Count ? scrollback[idx].AsSpan() : buf.GetRow(idx - scrollback.Count);
-            }
-
-            using DrawingContext drawingContext = group.Open();
-            _renderer.RenderRow(drawingContext, cells, sel, viewportRow);
-        }
-        catch
-        {
-            // transient (e.g. concurrent resize) — skip this pass
-        }
-    }
-
-    private void RenderCursorFromBuffer()
+    private void RenderCursor(DrawingContext context)
     {
         if (_decoder is null)
             return;
 
         try
         {
-            Size cell = _renderer.CellSize;
             TerminalState state = _decoder.State;
-            _cursorVisual.Transform = new TranslateTransform(0, state.CursorY * cell.Height);
+            if (!ShouldRenderCursor(state))
+                return;
 
-            using DrawingContext drawingContext = _cursorVisual.Open();
-            bool shouldBlink = state.Modes.CursorBlinking || _options.CursorBlink;
-            bool visible = IsFocused && _scrollOffset == 0
-                && state.Modes.CursorVisible && CursorVisible
-                && (!shouldBlink || _cursorBlinkState);
+            Size cell = _renderer.CellSize;
+            double x = Padding.Left + state.CursorX * cell.Width;
+            double y = Padding.Top + state.CursorY * cell.Height;
 
-            if (visible)
-                _renderer.RenderCursor(drawingContext, state.CursorX, state.Modes.CursorShape);
+            using (context.PushTransform(Matrix.CreateTranslation(x, y)))
+            {
+                _renderer.RenderCursor(context, 0, state.Modes.CursorShape);
+            }
         }
         catch
         {
             // ignore transient cursor render failures
         }
+    }
+
+    private bool ShouldRenderCursor(TerminalState state)
+    {
+        bool shouldBlink = state.Modes.CursorBlinking || _options.CursorBlink;
+        return IsFocused && _scrollOffset == 0
+            && state.Modes.CursorVisible && CursorVisible
+            && (!shouldBlink || _cursorBlinkState);
     }
 
     // ---- Focus ----
@@ -637,12 +505,6 @@ public class TerminalControl : TemplatedControl, IDisposable
     {
         base.OnGotFocus(e);
         _cursorBlinkState = true;
-        if (_decoder is not null)
-        {
-            lock (_decoder.Buffer.SyncRoot)
-                RenderCursorFromBuffer();
-        }
-
         InvalidateVisual();
     }
 
@@ -650,12 +512,6 @@ public class TerminalControl : TemplatedControl, IDisposable
     protected override void OnLostFocus(FocusChangedEventArgs e)
     {
         base.OnLostFocus(e);
-        if (_decoder is not null)
-        {
-            lock (_decoder.Buffer.SyncRoot)
-                RenderCursorFromBuffer();
-        }
-
         InvalidateVisual();
     }
 
@@ -782,6 +638,9 @@ public class TerminalControl : TemplatedControl, IDisposable
     {
         base.OnPointerPressed(e);
 
+        // Ensure the terminal surface has focus so keyboard input is routed here.
+        Focus();
+
         if (ScrollDownVisible && _scrollOffset > 0 && _scrollIndicatorRect.Contains(e.GetPosition(this)))
         {
             ScrollToBottom();
@@ -898,9 +757,6 @@ public class TerminalControl : TemplatedControl, IDisposable
             return;
 
         _scrollOffset = next;
-        lock (_renderStateLock)
-            _needsFullInvalidation = true;
-
         InvalidateVisual();
     }
 
@@ -911,9 +767,6 @@ public class TerminalControl : TemplatedControl, IDisposable
             return;
 
         _scrollOffset = 0;
-        lock (_renderStateLock)
-            _needsFullInvalidation = true;
-
         InvalidateVisual();
     }
 
