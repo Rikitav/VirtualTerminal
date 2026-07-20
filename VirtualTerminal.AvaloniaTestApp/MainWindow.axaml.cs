@@ -25,8 +25,8 @@ public partial class MainWindow : Window
         {
             PART_Terminal_Left.CurrentSession?.Dispose();
 
-            //SimpleTuiDemoSession session = new();
-            CommandLineSession session = new CommandLineSession(PART_CommandLineName.Text);
+            SimpleTuiDemoSession session = new();
+            //CommandLineSession session = new CommandLineSession(PART_CommandLineName.Text);
 
             PART_Terminal_Left.CurrentSession = session;
             PART_Prompt_Left.Session = session;
