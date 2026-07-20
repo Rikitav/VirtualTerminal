@@ -59,7 +59,8 @@ public interface ITerminalSession : IDisposable
     /// </summary>
     /// <param name="columns">Number of columns (character cells).</param>
     /// <param name="rows">Number of rows (character cells).</param>
-    public void Resize(ushort columns, ushort rows);
+    /// <param name="pushScrollback"></param>
+    public void Resize(ushort columns, ushort rows, bool pushScrollback = true);
 
     /// <summary>
     /// Writes input bytes into the session backend.

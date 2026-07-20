@@ -1,4 +1,4 @@
-﻿using Renci.SshNet;
+using Renci.SshNet;
 using Renci.SshNet.Common;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -61,7 +61,7 @@ public class SecureShellSession : TerminalSession
     /// </summary>
     /// <param name="client">SSH client instance.</param>
     /// <param name="encoding">Input encoding (defaults to UTF-8).</param>
-    public SecureShellSession(ISshClient client, Encoding? encoding = null) : base(encoding ?? Encoding.UTF8)
+    public SecureShellSession(ISshClient client) : base()
     {
         _client = client;
         _ownsClient = false;
@@ -72,7 +72,7 @@ public class SecureShellSession : TerminalSession
     /// </summary>
     /// <param name="connectionInfo">SSH connection info.</param>
     /// <param name="encoding">Input encoding (defaults to UTF-8).</param>
-    public SecureShellSession(ConnectionInfo connectionInfo, Encoding? encoding = null) : base(encoding ?? Encoding.UTF8)
+    public SecureShellSession(ConnectionInfo connectionInfo) : base()
     {
         _client = new SshClient(connectionInfo);
         _ownsClient = true;
@@ -87,7 +87,7 @@ public class SecureShellSession : TerminalSession
     /// <param name="username">SSH username.</param>
     /// <param name="password">SSH password.</param>
     /// <param name="encoding">Input encoding (defaults to UTF-8).</param>
-    public SecureShellSession(string host, int port, string username, string password, Encoding? encoding = null) : base(encoding ?? Encoding.UTF8)
+    public SecureShellSession(string host, int port, string username, string password) : base()
     {
         _client = new SshClient(host, port, username, password);
         _ownsClient = true;
@@ -101,7 +101,7 @@ public class SecureShellSession : TerminalSession
     /// <param name="username">SSH username.</param>
     /// <param name="password">SSH password.</param>
     /// <param name="encoding">Input encoding (defaults to UTF-8).</param>
-    public SecureShellSession(string host, string username, string password, Encoding? encoding = null) : base(encoding ?? Encoding.UTF8)
+    public SecureShellSession(string host, string username, string password) : base()
     {
         _client = new SshClient(host, username, password);
         _ownsClient = true;
@@ -116,7 +116,7 @@ public class SecureShellSession : TerminalSession
     /// <param name="username">SSH username.</param>
     /// <param name="encoding">Input encoding (defaults to UTF-8).</param>
     /// <param name="keyFiles">Private key sources used for authentication.</param>
-    public SecureShellSession(string host, int port, string username, Encoding? encoding = null, params IPrivateKeySource[] keyFiles) : base(encoding ?? Encoding.UTF8)
+    public SecureShellSession(string host, int port, string username, params IPrivateKeySource[] keyFiles) : base()
     {
         _client = new SshClient(host, port, username, keyFiles);
         _ownsClient = true;
@@ -130,7 +130,7 @@ public class SecureShellSession : TerminalSession
     /// <param name="username">SSH username.</param>
     /// <param name="encoding">Input encoding (defaults to UTF-8).</param>
     /// <param name="keyFiles">Private key sources used for authentication.</param>
-    public SecureShellSession(string host, string username, Encoding? encoding = null, params IPrivateKeySource[] keyFiles) : base(encoding ?? Encoding.UTF8)
+    public SecureShellSession(string host, string username, params IPrivateKeySource[] keyFiles) : base()
     {
         _client = new SshClient(host, username, keyFiles);
         _ownsClient = true;
@@ -148,7 +148,7 @@ public class SecureShellSession : TerminalSession
         _client.KeepAliveInterval = TimeSpan.FromSeconds(30);
         await _client.ConnectAsync(cancellationToken);
 
-        // Intercativity doesnt work without this 'xterm' stream name for some reason
+        // Interactivity doesnt work without this 'xterm' stream name for some reason
         _shellStream = _client.CreateShellStream("xterm", 80, 24, 800, 600, 1024);
         _shellStream.DataReceived += DataReceived;
     }
@@ -211,30 +211,21 @@ public class SecureShellSession : TerminalSession
     /// </summary>
     public virtual async Task DisconnectAsync(CancellationToken cancellationToken = default)
     {
+        await Task.Yield();
         if (_client is null || !_client.IsConnected)
             return;
 
         _client.Disconnect();
         _shellStream?.Dispose();
-
-        await Task.Yield();
         _shellStream = null;
     }
 
     /// <inheritdoc />
-    public override void Resize(ushort columns, ushort rows)
+    public override void Resize(ushort columns, ushort rows, bool pushScrollback = true)
     {
         ValidateClient();
-        //Buffer.Resize(columns, rows);
-        /*
-        CONSOLE_SCREEN_BUFFER_INFO info = Buffer.GetBufferInfo();
-
-        uint nHeight = (uint)(info.srWindow.Bottom - info.srWindow.Top);
-        uint nWidth = (uint)(info.srWindow.Right - info.srWindow.Left);
-        uint nRows = (uint)(info.dwSize.Y);
-        uint nCols = (uint)(info.dwSize.X);
-        */
-        //_shellStream.ChangeWindowSize((uint)Buffer.ColumnsCount, (uint)Buffer.RowsCount, 1200, 800);
+        base.Resize(columns, rows, pushScrollback);
+        // TODO: forward the new size to the SSH shell stream when a public API is available.
     }
 
     /// <inheritdoc />

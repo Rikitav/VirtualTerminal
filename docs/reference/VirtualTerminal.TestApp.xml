@@ -37,5 +37,11 @@
             InitializeComponent
             </summary>
         </member>
+        <member name="T:VirtualTerminal.TestApp.SimpleTuiDemoSession">
+            <summary>
+            Minimal demo TUI application running inside a terminal session.
+            Shows a navigable list inside a box; the selected item can be activated with Enter.
+            </summary>
+        </member>
     </members>
 </doc>

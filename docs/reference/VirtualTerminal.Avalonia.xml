@@ -207,8 +207,23 @@
         <member name="P:VirtualTerminal.TerminalControl.CursorPosition">
             <summary>Gets the current cursor position in buffer coordinates.</summary>
         </member>
+        <member name="F:VirtualTerminal.TerminalControl.CopyCommand">
+            <summary>Copies the current selection to the clipboard.</summary>
+        </member>
+        <member name="F:VirtualTerminal.TerminalControl.PasteCommand">
+            <summary>Pastes the clipboard content into the session.</summary>
+        </member>
+        <member name="F:VirtualTerminal.TerminalControl.SelectAllCommand">
+            <summary>Selects the whole visible screen.</summary>
+        </member>
+        <member name="F:VirtualTerminal.TerminalControl.ClearCommand">
+            <summary>Clears the terminal screen and scrollback.</summary>
+        </member>
         <member name="M:VirtualTerminal.TerminalControl.Clear">
             <summary>Sends a clear-screen + home escape sequence to the active session.</summary>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.SelectAll">
+            <summary>Selects the entire visible screen.</summary>
         </member>
         <member name="M:VirtualTerminal.TerminalControl.RenderViewportRow(System.Int32,System.Collections.Generic.IReadOnlyList{VirtualTerminal.Buffer.TerminalRow})">
             <summary>
@@ -232,6 +247,30 @@
         </member>
         <member name="M:VirtualTerminal.TerminalControl.Dispose">
             <summary>Stops timers, detaches from the decoder and releases rendering resources.</summary>
+        </member>
+        <member name="T:VirtualTerminal.TerminalControl.TerminalCommand">
+            <summary>Reusable ICommand implementation that forwards Execute/CanExecute to a <see cref="T:VirtualTerminal.TerminalControl"/>.</summary>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.TerminalCommand.#ctor(System.String,System.Action{VirtualTerminal.TerminalControl},System.Func{VirtualTerminal.TerminalControl,System.Boolean})">
+            <summary>Initializes a new command.</summary>
+            <param name="name">Display name of the command.</param>
+            <param name="execute">Action invoked when the command executes.</param>
+            <param name="canExecute">Predicate that determines whether the command can execute.</param>
+        </member>
+        <member name="P:VirtualTerminal.TerminalControl.TerminalCommand.Name">
+            <summary>Gets the display name of the command.</summary>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.TerminalCommand.CanExecute(System.Object)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.TerminalCommand.Execute(System.Object)">
+            <inheritdoc/>
+        </member>
+        <member name="E:VirtualTerminal.TerminalControl.TerminalCommand.CanExecuteChanged">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.TerminalCommand.InvalidateCanExecute">
+            <summary>Raises <see cref="E:VirtualTerminal.TerminalControl.TerminalCommand.CanExecuteChanged"/>.</summary>
         </member>
         <member name="F:VirtualTerminal.TerminalControl.CurrentSessionProperty">
             <summary>Defines the <see cref="P:VirtualTerminal.TerminalControl.CurrentSession"/> styled property.</summary>

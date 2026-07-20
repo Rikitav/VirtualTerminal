@@ -479,12 +479,13 @@
             Gets the number of bytes available to be read.
             </summary>
         </member>
-        <member name="M:VirtualTerminal.Interfaces.ITerminalSession.Resize(System.UInt16,System.UInt16)">
+        <member name="M:VirtualTerminal.Interfaces.ITerminalSession.Resize(System.UInt16,System.UInt16,System.Boolean)">
             <summary>
             Resizes the session to the specified terminal dimensions.
             </summary>
             <param name="columns">Number of columns (character cells).</param>
             <param name="rows">Number of rows (character cells).</param>
+            <param name="pushScrollback"></param>
         </member>
         <member name="M:VirtualTerminal.Interfaces.ITerminalSession.Write(System.ReadOnlySpan{System.Byte})">
             <summary>
@@ -641,6 +642,28 @@
         <member name="P:VirtualTerminal.Options.TerminalOptions.AllowClipboard">
             <summary>Allow OSC 52 clipboard access.</summary>
         </member>
+        <member name="T:VirtualTerminal.Session.CanonicalTerminalSession">
+            <summary>
+            A canonical, in-memory terminal session with a real line editor: positional cursor editing
+            (left/right/home/end), insert and delete at the cursor, kill shortcuts, and command history
+            (Up/Down). It parses the xterm key sequences the control emits (CSI table, SS3, arrows)
+            rather than treating input as raw characters.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Session.CanonicalTerminalSession.ReadLineAsync">
+            <summary>Completes when the user submits a line while a caller is awaiting input.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Session.CanonicalTerminalSession.RedrawLine">
+            <summary>Reprints the active prompt + current input, clears the trailing tail, and positions the caret.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Session.CanonicalTerminalSession.ExecuteCommandAsync(System.String)">
+            <summary>
+            Called when the user submits a line and no <see cref="M:VirtualTerminal.Session.CanonicalTerminalSession.ReadLineAsync"/> is pending.
+            Override this in derived classes to implement built-in commands; the base implementation
+            simply prints a fresh prompt.
+            </summary>
+            <param name="rawCommand">The submitted line.</param>
+        </member>
         <member name="T:VirtualTerminal.Session.DummyTerminalSession">
             <summary>
             Minimal <see cref="T:VirtualTerminal.Session.TerminalSession"/> implementation useful for testing UI and rendering without
@@ -648,61 +671,10 @@
             </summary>
         </member>
         <member name="P:VirtualTerminal.Session.DummyTerminalSession.Title">
-            <inheritdoc />
+            <summary>Gets the session title.</summary>
         </member>
         <member name="M:VirtualTerminal.Session.DummyTerminalSession.Dispose(System.Boolean)">
             <inheritdoc />
-        </member>
-        <member name="T:VirtualTerminal.Session.InMemoryTerminalEngineSession">
-            <summary>
-            An in-memory session that bridges a script/CLI to the <see cref="!:Views.Controls.TerminalControl"/>
-            with a real line editor: positional cursor editing (left/right/home/end), insert and delete at the
-            cursor, kill shortcuts, and command history (Up/Down). It parses the xterm key sequences the
-            control emits (CSI <c>~</c> table, SS3, arrows) rather than treating input as raw chars.
-            </summary>
-        </member>
-        <member name="M:VirtualTerminal.Session.InMemoryTerminalEngineSession.ReadLineAsync">
-            <summary>Completes when the user submits a line while a command is awaiting input.</summary>
-        </member>
-        <member name="M:VirtualTerminal.Session.InMemoryTerminalEngineSession.RedrawLine">
-            <summary>Reprints the active prompt + current input, clears the trailing tail, and positions the caret.</summary>
-        </member>
-        <member name="T:VirtualTerminal.Session.InMemoryTerminalSession">
-            <summary>
-            A completely in-memory implementation of <see cref="T:VirtualTerminal.Interfaces.ITerminalSession"/>.
-            Useful for testing, embedding local sub-shells, or mocking terminal behavior.
-            </summary>
-        </member>
-        <member name="M:VirtualTerminal.Session.InMemoryTerminalSession.#ctor">
-            <summary>
-            Initializes a new instance of <see cref="T:VirtualTerminal.Session.InMemoryTerminalSession"/>.
-            </summary>
-            <param name="initialCols">Initial columns count.</param>
-            <param name="initialRows">Initial rows count.</param>
-            <param name="decoderFactory">A factory to construct the VT/ANSI decoder linked to this buffer.</param>
-        </member>
-        <member name="M:VirtualTerminal.Session.InMemoryTerminalSession.Write(System.ReadOnlySpan{System.Byte})">
-            <summary>
-            Writes user input (e.g. keyboard events) into the session.
-            In this in-memory implementation, writing input directly feeds the decoder
-            to update the screen buffer, simulating immediate local echo/processing.
-            </summary>
-        </member>
-        <member name="M:VirtualTerminal.Session.InMemoryTerminalSession.FeedOutput(System.ReadOnlySpan{System.Byte})">
-            <summary>
-            Simulates program/backend output generation.
-            Call this method to feed data that the terminal application *prints* to the console.
-            </summary>
-        </member>
-        <member name="M:VirtualTerminal.Session.InMemoryTerminalSession.FeedOutput(System.String)">
-            <summary>
-            Simulates program/backend output generation using a string.
-            </summary>
-        </member>
-        <member name="M:VirtualTerminal.Session.InMemoryTerminalSession.Disconnect">
-            <summary>
-            Forces a disconnect state from the backend side.
-            </summary>
         </member>
         <member name="T:VirtualTerminal.Session.TerminalSession">
             <summary>
@@ -722,14 +694,11 @@
         <member name="P:VirtualTerminal.Session.TerminalSession.Decoder">
             <inheritdoc />
         </member>
-        <member name="P:VirtualTerminal.Session.TerminalSession.InternalDecoder">
+        <member name="P:VirtualTerminal.Session.TerminalSession.Buffer">
             <summary>
             Gets the underlying <see cref="T:VirtualTerminal.TerminalDecoder"/> for derived sessions that need
             to apply local-only VT sequences (e.g. clearing the screen during ConPTY resize).
             </summary>
-        </member>
-        <member name="P:VirtualTerminal.Session.TerminalSession.Buffer">
-            <inheritdoc />
         </member>
         <member name="P:VirtualTerminal.Session.TerminalSession.InputEncoding">
             <inheritdoc />
@@ -748,20 +717,7 @@
             Initializes a new session with a fresh <see cref="T:VirtualTerminal.Buffer.TerminalScreenBuffer"/> and default input encoding.
             </summary>
         </member>
-        <member name="M:VirtualTerminal.Session.TerminalSession.#ctor(System.Text.Encoding)">
-            <summary>
-            Initializes a new session with a fresh <see cref="T:VirtualTerminal.Buffer.TerminalScreenBuffer"/> and the specified input encoding.
-            </summary>
-            <param name="encoding">Encoding used for <see cref="M:VirtualTerminal.Session.TerminalSession.Write(System.ReadOnlySpan{System.Byte})"/>.</param>
-        </member>
-        <member name="M:VirtualTerminal.Session.TerminalSession.#ctor(System.Text.Encoding,System.Text.Encoding)">
-            <summary>
-            Initializes a new session with the specified input and output encodings.
-            </summary>
-            <param name="inputEncoding">Encoding used for <see cref="M:VirtualTerminal.Session.TerminalSession.Write(System.ReadOnlySpan{System.Byte})"/>.</param>
-            <param name="outputEncoding">Encoding used for <see cref="M:VirtualTerminal.Session.TerminalSession.Read(System.Span{System.Byte})"/>.</param>
-        </member>
-        <member name="M:VirtualTerminal.Session.TerminalSession.Resize(System.UInt16,System.UInt16)">
+        <member name="M:VirtualTerminal.Session.TerminalSession.Resize(System.UInt16,System.UInt16,System.Boolean)">
             <inheritdoc />
         </member>
         <member name="M:VirtualTerminal.Session.TerminalSession.Write(System.ReadOnlySpan{System.Byte})">
@@ -804,6 +760,64 @@
             <summary>
             Disposes the session and its underlying <see cref="T:VirtualTerminal.Buffer.TerminalScreenBuffer"/>.
             </summary>
+        </member>
+        <member name="T:VirtualTerminal.Session.TerminalUserInterfaceSession">
+            <summary>
+            Base class for hosting a TUI application directly inside an <see cref="T:VirtualTerminal.Interfaces.ITerminalSession"/>.
+            The application renders using VT/ANSI escape sequences (alternate screen buffer, colors,
+            box-drawing characters) and receives keyboard input through <see cref="M:VirtualTerminal.Session.TerminalUserInterfaceSession.Write(System.ReadOnlySpan{System.Byte})"/>.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Session.TerminalUserInterfaceSession.Width">
+            <summary>Current terminal width in columns.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Session.TerminalUserInterfaceSession.Height">
+            <summary>Current terminal height in rows.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Session.TerminalUserInterfaceSession.FeedOutput(System.ReadOnlySpan{System.Byte})">
+            <summary>Feeds raw output bytes into the terminal decoder and notifies the UI.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Session.TerminalUserInterfaceSession.FeedOutput(System.String)">
+            <summary>Feeds a text string into the terminal decoder and notifies the UI.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Session.TerminalUserInterfaceSession.Run">
+            <summary>Enters the alternate screen buffer and triggers the first render.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Session.TerminalUserInterfaceSession.Resize(System.UInt16,System.UInt16,System.Boolean)">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Session.TerminalUserInterfaceSession.Write(System.ReadOnlySpan{System.Byte})">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Session.TerminalUserInterfaceSession.Render">
+            <summary>Called to redraw the whole TUI surface.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Session.TerminalUserInterfaceSession.OnKey(System.ConsoleKey)">
+            <summary>Called when a TUI key is pressed.</summary>
+            <param name="key">The pressed key.</param>
+        </member>
+        <member name="M:VirtualTerminal.Session.TerminalUserInterfaceSession.ClearScreen">
+            <summary>Clears the screen and moves the cursor to the top-left corner.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Session.TerminalUserInterfaceSession.SetCursor(System.Int32,System.Int32)">
+            <summary>Moves the cursor to the specified cell.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Session.TerminalUserInterfaceSession.DrawText(System.Int32,System.Int32,System.String)">
+            <summary>Draws text at the specified cell, clamped to the visible area.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Session.TerminalUserInterfaceSession.SetColor(System.Byte,System.Byte)">
+            <summary>Sets foreground and background colors using the 256-color palette.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Session.TerminalUserInterfaceSession.ResetColor">
+            <summary>Resets all attributes to defaults.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Session.TerminalUserInterfaceSession.DrawBox(System.Int32,System.Int32,System.Int32,System.Int32,System.String)">
+            <summary>
+            Draws a box using box-drawing characters. The border is drawn inside the given rectangle.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Session.TerminalUserInterfaceSession.Dispose(System.Boolean)">
+            <summary>Leaves the alternate screen buffer and shows the cursor again.</summary>
         </member>
         <member name="T:VirtualTerminal.TerminalDecoder">
             <summary>

@@ -197,6 +197,55 @@ Each addon has its own README with setup and usage:
 - **Auto-scrolling**: when at the bottom, new output keeps the view pinned.
 - **Resize debounce**: both controls debounce rapid window resize events and suppress intermediate renders so backends like ConPTY have time to produce a clean reflow frame.
 
+### Context menu and built-in commands
+
+Both controls expose static commands for common terminal operations. If no `ContextMenu` is assigned, the right mouse button behaves in terminal style: **copy** when text is selected, **paste** otherwise. If you assign a `ContextMenu`, the control lets the framework open it and the commands can be used from XAML.
+
+**WPF**
+
+```xml
+<vt:TerminalControl x:Name="Terminal" ...>
+    <vt:TerminalControl.ContextMenu>
+        <ContextMenu>
+            <MenuItem Command="{x:Static vt:TerminalControl.CopyCommand}"
+                      CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+            <MenuItem Command="{x:Static vt:TerminalControl.PasteCommand}"
+                      CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+            <Separator />
+            <MenuItem Command="{x:Static vt:TerminalControl.SelectAllCommand}"
+                      CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+            <MenuItem Command="{x:Static vt:TerminalControl.ClearCommand}"
+                      CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+        </ContextMenu>
+    </vt:TerminalControl.ContextMenu>
+</vt:TerminalControl>
+```
+
+**Avalonia**
+
+```xml
+<vt:TerminalControl x:Name="Terminal" ...>
+    <vt:TerminalControl.ContextMenu>
+        <ContextMenu>
+            <MenuItem Command="{x:Static vt:TerminalControl.CopyCommand}" CommandParameter="{Binding #Terminal}" />
+            <MenuItem Command="{x:Static vt:TerminalControl.PasteCommand}" CommandParameter="{Binding #Terminal}" />
+            <Separator />
+            <MenuItem Command="{x:Static vt:TerminalControl.SelectAllCommand}" CommandParameter="{Binding #Terminal}" />
+            <MenuItem Command="{x:Static vt:TerminalControl.ClearCommand}" CommandParameter="{Binding #Terminal}" />
+        </ContextMenu>
+    </vt:TerminalControl.ContextMenu>
+</vt:TerminalControl>
+```
+
+| Command | Action |
+| --- | --- |
+| `CopyCommand` | Copies the current selection to the clipboard. |
+| `PasteCommand` | Pastes the clipboard content into the session. |
+| `SelectAllCommand` | Selects the entire visible screen. |
+| `ClearCommand` | Sends `ESC[2J ESC[H` to clear the screen. |
+
+`Ctrl+C`/`Ctrl+V` and `Ctrl+Shift+C` keep working as before.
+
 ---
 
 ## Notes & limitations

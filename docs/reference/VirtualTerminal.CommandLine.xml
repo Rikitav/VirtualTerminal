@@ -36,7 +36,7 @@
             Starts a default ConPTY session using <c>cmd.exe</c>.
             </summary>
         </member>
-        <member name="M:VirtualTerminal.CommandLineSession.Resize(System.UInt16,System.UInt16)">
+        <member name="M:VirtualTerminal.CommandLineSession.Resize(System.UInt16,System.UInt16,System.Boolean)">
             <inheritdoc />
         </member>
         <member name="M:VirtualTerminal.CommandLineSession.Write(System.ReadOnlySpan{System.Byte})">

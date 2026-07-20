@@ -57,6 +57,18 @@ public partial class TerminalControl : Control, IDisposable
     private DateTime _suppressRenderUntil = DateTime.MinValue;
     private static readonly TimeSpan ResizeRenderSuppression = TimeSpan.FromMilliseconds(100);
 
+    /// <summary>Copies the current selection to the clipboard.</summary>
+    public static readonly RoutedUICommand CopyCommand = new RoutedUICommand("Copy", "Copy", typeof(TerminalControl));
+
+    /// <summary>Pastes the clipboard content into the session.</summary>
+    public static readonly RoutedUICommand PasteCommand = new RoutedUICommand("Paste", "Paste", typeof(TerminalControl));
+
+    /// <summary>Selects the whole visible screen.</summary>
+    public static readonly RoutedUICommand SelectAllCommand = new RoutedUICommand("Select All", "SelectAll", typeof(TerminalControl));
+
+    /// <summary>Clears the terminal screen and scrollback.</summary>
+    public static readonly RoutedUICommand ClearCommand = new RoutedUICommand("Clear", "Clear", typeof(TerminalControl));
+
     private SolidColorBrush _foregroundBrush = new SolidColorBrush(Colors.White);
     private SolidColorBrush _backgroundBrush = new SolidColorBrush(Colors.Black);
 
@@ -199,6 +211,19 @@ public partial class TerminalControl : Control, IDisposable
         Loaded += (o, e) => Debug.WriteLine($"[{GetType().Name}] Loaded: Actual={ActualWidth}x{ActualHeight}, RenderSize={RenderSize}");
         Unloaded += (o, e) => Dispose();
 
+        CommandBindings.Add(new CommandBinding(CopyCommand,
+            (s, e) => { _ = CopySelectionToClipboardAsync(); e.Handled = true; },
+            (s, e) => { e.CanExecute = _selection is not null; e.Handled = true; }));
+        CommandBindings.Add(new CommandBinding(PasteCommand,
+            (s, e) => { _ = PasteFromClipboardAsync(); e.Handled = true; },
+            (s, e) => { e.CanExecute = Session is not null; e.Handled = true; }));
+        CommandBindings.Add(new CommandBinding(SelectAllCommand,
+            (s, e) => { SelectAll(); e.Handled = true; },
+            (s, e) => { e.CanExecute = _decoder is not null; e.Handled = true; }));
+        CommandBindings.Add(new CommandBinding(ClearCommand,
+            (s, e) => { Clear(); e.Handled = true; },
+            (s, e) => { e.CanExecute = _decoder is not null; e.Handled = true; }));
+
         _renderTimer.Start();
         _blinkTimer.Start();
     }
@@ -263,6 +288,27 @@ public partial class TerminalControl : Control, IDisposable
 
         _options.DefaultBackground = ScreenBackground.ToDrawingColor();
         _options.DefaultForeground = ScreenForeground.ToDrawingColor();
+    }
+
+    private void InvalidateCommandState()
+        => CommandManager.InvalidateRequerySuggested();
+
+    /// <summary>Selects the entire visible screen.</summary>
+    public void SelectAll()
+    {
+        if (_decoder is null)
+            return;
+
+        _selection = new TerminalSelection(0, 0, _decoder.Buffer.Columns - 1, _decoder.Buffer.Rows - 1);
+        InvalidateCommandState();
+        InvalidateVisual();
+    }
+
+    /// <summary>Clears the terminal screen and moves the cursor to the home position.</summary>
+    public void Clear()
+    {
+        // Standard "clear screen + home" via escape sequences (decoded, not a direct buffer wipe).
+        _decoder?.Write("\x1b[2J\x1b[H"u8);
     }
 
     private void SyncOptionsToDecoder()
@@ -534,6 +580,7 @@ public partial class TerminalControl : Control, IDisposable
         Key key = e.Key;
         ModifierKeys mods = Keyboard.Modifiers;
 
+        // Ctrl+Shift+C always copies the current selection.
         if (key == Key.C && (mods & ModifierKeys.Control) != 0 && (mods & ModifierKeys.Shift) != 0)
         {
             _ = CopySelectionToClipboardAsync();
@@ -541,12 +588,24 @@ public partial class TerminalControl : Control, IDisposable
             return;
         }
 
+        // Ctrl+V pastes clipboard content into the session.
         if (key == Key.V && (mods & ModifierKeys.Control) != 0)
         {
             _ = PasteFromClipboardAsync();
             e.Handled = true;
             return;
         }
+
+        // Any other input clears the selection.
+        if (_selection is not null)
+        {
+            _selection = null;
+            InvalidateCommandState();
+            InvalidateVisual();
+        }
+
+        if (_scrollOffset > 0)
+            ScrollToBottom();
 
         TerminalKey terminalKey = ToTerminalKey(key);
         TerminalModifier terminalMods = ToTerminalModifier(mods);
@@ -564,6 +623,13 @@ public partial class TerminalControl : Control, IDisposable
         base.OnPreviewTextInput(e);
         if (string.IsNullOrEmpty(e.Text) || _decoder is null || !AllowDirectInput)
             return;
+
+        if (_selection is not null)
+        {
+            _selection = null;
+            InvalidateCommandState();
+            InvalidateVisual();
+        }
 
         if (_scrollOffset > 0)
             ScrollToBottom();
@@ -629,16 +695,41 @@ public partial class TerminalControl : Control, IDisposable
             return;
 
         Focus();
-        /*
-        Point p = GetCellPosition(e);
-        if (p.X < 0)
-            return;
 
-        _isSelecting = true;
-        _selectStart = p;
-        // Don't create a selection on a plain click; selection is started by dragging.
-        CaptureMouse();
-        */
+        if (e.ChangedButton == MouseButton.Left)
+        {
+            Point p = GetCellPosition(e);
+            if (p.X < 0)
+                return;
+
+            _isSelecting = true;
+            _selectStart = p;
+            _selection = new TerminalSelection((int)p.X, (int)p.Y, (int)p.X, (int)p.Y);
+            CaptureMouse();
+            InvalidateCommandState();
+            InvalidateVisual();
+        }
+        else if (e.ChangedButton == MouseButton.Right)
+        {
+            // If a context menu is explicitly assigned, let the framework open it.
+            if (ContextMenu is not null)
+                return;
+
+            e.Handled = true;
+
+            // Terminal-style right click: copy if something is selected, otherwise paste.
+            if (_selection is not null)
+            {
+                _ = CopySelectionToClipboardAsync();
+                _selection = null;
+                InvalidateCommandState();
+                InvalidateVisual();
+            }
+            else
+            {
+                _ = PasteFromClipboardAsync();
+            }
+        }
     }
 
     protected override void OnMouseMove(MouseEventArgs e)
@@ -647,13 +738,12 @@ public partial class TerminalControl : Control, IDisposable
         if (!_isSelecting || _decoder is null)
             return;
 
-        /*
         Point p = GetCellPosition(e);
         if (p.X < 0)
             return;
 
         _selection = new TerminalSelection((int)_selectStart.X, (int)_selectStart.Y, (int)p.X, (int)p.Y);
-        */
+        InvalidateCommandState();
         InvalidateVisual();
     }
 
@@ -669,11 +759,13 @@ public partial class TerminalControl : Control, IDisposable
         if (_selection is { } sel && (sel.StartY != sel.EndY || sel.StartX != sel.EndX))
         {
             _ = CopySelectionToClipboardAsync();
+            InvalidateCommandState();
         }
         else
         {
             // Plain click without drag: clear the empty/single-cell selection.
             _selection = null;
+            InvalidateCommandState();
             InvalidateVisual();
         }
     }
@@ -766,6 +858,7 @@ public partial class TerminalControl : Control, IDisposable
 
         StringBuilder builder = new();
         TerminalScreenBuffer buffer = _decoder.Buffer;
+        IReadOnlyList<TerminalRow>? scrollback = _scrollOffset > 0 ? buffer.GetScrollback() : null;
 
         for (int y = sel.StartY; y <= sel.EndY; y++)
         {
@@ -774,7 +867,7 @@ public partial class TerminalControl : Control, IDisposable
 
             int x0 = y == sel.StartY ? sel.StartX : 0;
             int x1 = y == sel.EndY ? sel.EndX : buffer.Columns - 1;
-            Span<TerminalCellInfo> row = buffer.GetRow(y);
+            Span<TerminalCellInfo> row = GetRowCells(buffer, scrollback, y);
 
             for (int x = x0; x <= x1 && x < row.Length; x++)
             {
@@ -788,7 +881,7 @@ public partial class TerminalControl : Control, IDisposable
         }
 
         return builder.Length > 0
-            ? builder.ToString() : null;
+            ? builder.ToString().TrimEnd('\n') : null;
     }
 
     private async Task CopySelectionToClipboardAsync()
@@ -797,7 +890,7 @@ public partial class TerminalControl : Control, IDisposable
         if (string.IsNullOrEmpty(text))
             return;
 
-        // Clipboard integration is intentionally left for the consumer / future phase.
+        Clipboard.SetText(text);
         await Task.CompletedTask;
     }
 
@@ -806,7 +899,13 @@ public partial class TerminalControl : Control, IDisposable
         if (Session is null)
             return;
 
-        // Clipboard integration is intentionally left for the consumer / future phase.
+        string? text = Clipboard.GetText();
+        if (string.IsNullOrEmpty(text))
+            return;
+
+        // Normalize line endings to CR so the terminal interprets them as Enter keys.
+        text = text.ReplaceLineEndings("\r");
+        Session.Append(text);
         await Task.CompletedTask;
     }
 

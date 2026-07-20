@@ -241,6 +241,18 @@
             buffer, not by scrolling a huge child element.
             </summary>
         </member>
+        <member name="F:VirtualTerminal.TerminalControl.CopyCommand">
+            <summary>Copies the current selection to the clipboard.</summary>
+        </member>
+        <member name="F:VirtualTerminal.TerminalControl.PasteCommand">
+            <summary>Pastes the clipboard content into the session.</summary>
+        </member>
+        <member name="F:VirtualTerminal.TerminalControl.SelectAllCommand">
+            <summary>Selects the whole visible screen.</summary>
+        </member>
+        <member name="F:VirtualTerminal.TerminalControl.ClearCommand">
+            <summary>Clears the terminal screen and scrollback.</summary>
+        </member>
         <member name="P:VirtualTerminal.TerminalControl.Session">
             <summary>
             Gets or sets the active <see cref="T:VirtualTerminal.Interfaces.ITerminalSession"/> displayed by this control.
@@ -315,6 +327,12 @@
             <summary>
             Initializes a new instance of the <see cref="T:VirtualTerminal.TerminalControl"/> control.
             </summary>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.SelectAll">
+            <summary>Selects the entire visible screen.</summary>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.Clear">
+            <summary>Clears the terminal screen and moves the cursor to the home position.</summary>
         </member>
         <member name="M:VirtualTerminal.TerminalControl.ScrollBy(System.Int32)">
             <summary>Scrolls the viewport by <paramref name="lines"/> (positive = up into history).</summary>

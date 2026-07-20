@@ -1,6 +1,6 @@
 ﻿using System.Text;
 
-namespace VirtualTerminal.Helpers;
+namespace VirtualTerminal.Extensions;
 
 public static class EncodingHelpers
 {

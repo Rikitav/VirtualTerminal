@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Collections.Concurrent;
+using System.Text;
 using VirtualTerminal.Buffer;
 using VirtualTerminal.Interfaces;
 
@@ -11,7 +12,10 @@ namespace VirtualTerminal.Session;
 public abstract class TerminalSession : ITerminalSession
 {
     private readonly TerminalDecoder _decoder;
-    private readonly Queue<byte> _inputQueue;
+    private readonly TerminalScreenBuffer _buffer;
+    private readonly ConcurrentQueue<byte> _inputQueue = [];
+
+    private string _title;
     private bool _disposed;
 
     /// <inheritdoc />
@@ -24,31 +28,51 @@ public abstract class TerminalSession : ITerminalSession
     public event EventHandler? InputAvailable;
 
     /// <inheritdoc />
-    public ITerminalDecoder Decoder => _decoder;
+    public ITerminalDecoder Decoder
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return _decoder;
+        }
+    }
 
     /// <summary>
     /// Gets the underlying <see cref="TerminalDecoder"/> for derived sessions that need
     /// to apply local-only VT sequences (e.g. clearing the screen during ConPTY resize).
     /// </summary>
-    protected TerminalDecoder InternalDecoder => _decoder;
+    public TerminalScreenBuffer Buffer
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return _buffer;
+        }
+    }
 
     /// <inheritdoc />
-    public TerminalScreenBuffer Buffer => _decoder.Buffer;
+    public Encoding InputEncoding
+    {
+        get => Encoding.UTF8;
+    }
 
     /// <inheritdoc />
-    public virtual Encoding InputEncoding { get; set; }
-
-    /// <inheritdoc />
-    public virtual Encoding OutputEncoding { get; set; }
+    public Encoding OutputEncoding
+    {
+        get => Encoding.UTF8;
+    }
 
     /// <inheritdoc />
     public virtual string Title
     {
-        get => GetType().Name;
+        get => _title;
+        set => _title = value ?? throw new ArgumentNullException(nameof(value));
     }
 
     /// <inheritdoc />
     public int AvailableDataLength => _inputQueue.Count;
+
+    protected TerminalDecoder InternalDecoder => _decoder;
 
     /// <summary>
     /// Initializes a new session with a fresh <see cref="TerminalScreenBuffer"/> and default input encoding.
@@ -56,47 +80,15 @@ public abstract class TerminalSession : ITerminalSession
     protected TerminalSession()
     {
         _decoder = new TerminalDecoder();
-        _inputQueue = new Queue<byte>();
+        _buffer = new TerminalScreenBuffer(128, 20);
 
+        _title = GetType().Name;
+        _decoder.TitleChanged += (_, title) => _title = title;
         _decoder.SendOutput = AddToInputQueue;  // report responses (DSR/DA/…) reach Read()
-        InputEncoding = Encoding.UTF8;
-        OutputEncoding = Encoding.UTF8;
-    }
-
-    /// <summary>
-    /// Initializes a new session with a fresh <see cref="TerminalScreenBuffer"/> and the specified input encoding.
-    /// </summary>
-    /// <param name="encoding">Encoding used for <see cref="Write(ReadOnlySpan{byte})"/>.</param>
-    protected TerminalSession(Encoding encoding)
-    {
-        _decoder = new TerminalDecoder();
-        _inputQueue = new Queue<byte>();
-
-        _decoder.SendOutput = AddToInputQueue;  // report responses (DSR/DA/…) reach Read()
-        InputEncoding = encoding;
-        OutputEncoding = encoding;
-    }
-
-    /// <summary>
-    /// Initializes a new session with the specified input and output encodings.
-    /// </summary>
-    /// <param name="inputEncoding">Encoding used for <see cref="Write(ReadOnlySpan{byte})"/>.</param>
-    /// <param name="outputEncoding">Encoding used for <see cref="Read(Span{byte})"/>.</param>
-    protected TerminalSession(Encoding inputEncoding, Encoding outputEncoding)
-    {
-        _decoder = new TerminalDecoder();
-        _inputQueue = new Queue<byte>();
-
-        _decoder.SendOutput = AddToInputQueue;  // report responses (DSR/DA/…) reach Read()
-        InputEncoding = inputEncoding;
-        OutputEncoding = outputEncoding;
     }
 
     /// <inheritdoc />
-    public virtual void Resize(ushort columns, ushort rows)
-        => Resize(columns, rows, pushScrollback: true);
-
-    public virtual void Resize(ushort columns, ushort rows, bool pushScrollback)
+    public virtual void Resize(ushort columns, ushort rows, bool pushScrollback = true)
     {
         _decoder.Resize(columns, rows, pushScrollback);
     }
@@ -111,15 +103,19 @@ public abstract class TerminalSession : ITerminalSession
     /// <inheritdoc />
     public virtual int Read(Span<byte> buffer)
     {
+        ThrowIfDisposed();
         if (buffer.IsEmpty)
             return 0;
 
         int bytesRead = 0;
         lock (_inputQueue)
         {
-            while (_inputQueue.Count > 0 && bytesRead < buffer.Length)
+            while (!_inputQueue.IsEmpty && bytesRead < buffer.Length)
             {
-                buffer[bytesRead] = _inputQueue.Dequeue();
+                if (!_inputQueue.TryDequeue(out byte resultByte))
+                    continue;
+
+                buffer[bytesRead] = resultByte;
                 bytesRead++;
             }
         }
@@ -130,9 +126,10 @@ public abstract class TerminalSession : ITerminalSession
     /// <inheritdoc />
     public virtual byte[] ReadAll()
     {
+        ThrowIfDisposed();
         lock (_inputQueue)
         {
-            if (_inputQueue.Count == 0)
+            if (_inputQueue.IsEmpty)
                 return [];
 
             byte[] data = _inputQueue.ToArray();
@@ -196,6 +193,12 @@ public abstract class TerminalSession : ITerminalSession
     /// <param name="disposing"><c>true</c> when called from <see cref="Dispose()"/>; otherwise <c>false</c>.</param>
     protected abstract void Dispose(bool disposing);
 
+    protected void ThrowIfDisposed()
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(GetType().Name);
+    }
+
     /// <summary>
     /// Disposes the session and its underlying <see cref="TerminalScreenBuffer"/>.
     /// </summary>
@@ -204,6 +207,7 @@ public abstract class TerminalSession : ITerminalSession
         if (_disposed)
             return;
 
+        _buffer.Dispose();
         _decoder.Dispose();
         Dispose(true);
 

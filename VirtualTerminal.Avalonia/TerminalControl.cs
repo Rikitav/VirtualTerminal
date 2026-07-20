@@ -2,9 +2,11 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Media;
 using Avalonia.Threading;
 using System.Text;
+using System.Windows.Input;
 using VirtualTerminal.Buffer;
 using VirtualTerminal.Extensions;
 using VirtualTerminal.Helpers;
@@ -158,6 +160,30 @@ public class TerminalControl : TemplatedControl, IDisposable
     /// <summary>Gets the current cursor position in buffer coordinates.</summary>
     public Point CursorPosition => _decoder is null ? default : new Point(_decoder.State.CursorX, _decoder.State.CursorY);
 
+    /// <summary>Copies the current selection to the clipboard.</summary>
+    public static readonly TerminalCommand CopyCommand = new(
+        "Copy",
+        static c => _ = c.CopySelectionToClipboardAsync(),
+        static c => c._selection is not null);
+
+    /// <summary>Pastes the clipboard content into the session.</summary>
+    public static readonly TerminalCommand PasteCommand = new(
+        "Paste",
+        static c => _ = c.PasteFromClipboardAsync(),
+        static c => c.CurrentSession is not null);
+
+    /// <summary>Selects the whole visible screen.</summary>
+    public static readonly TerminalCommand SelectAllCommand = new(
+        "Select All",
+        static c => c.SelectAll(),
+        static c => c._decoder is not null);
+
+    /// <summary>Clears the terminal screen and scrollback.</summary>
+    public static readonly TerminalCommand ClearCommand = new(
+        "Clear",
+        static c => c.Clear(),
+        static c => c._decoder is not null);
+
     public TerminalControl()
     {
         _renderTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Background, Dispatcher.CurrentDispatcher, DispatcherRenderHandler);
@@ -173,6 +199,25 @@ public class TerminalControl : TemplatedControl, IDisposable
     {
         // Standard "clear screen + home" via escape sequences (decoded, not a direct buffer wipe).
         _decoder?.Write("\x1b[2J\x1b[H"u8);
+    }
+
+    /// <summary>Selects the entire visible screen.</summary>
+    public void SelectAll()
+    {
+        if (_decoder is null)
+            return;
+
+        _selection = new TerminalSelection(0, 0, _decoder.Buffer.Columns - 1, _decoder.Buffer.Rows - 1);
+        InvalidateCommandState();
+        InvalidateVisual();
+    }
+
+    private void InvalidateCommandState()
+    {
+        CopyCommand.InvalidateCanExecute();
+        PasteCommand.InvalidateCanExecute();
+        SelectAllCommand.InvalidateCanExecute();
+        ClearCommand.InvalidateCanExecute();
     }
 
     // ---- Property change handling ----
@@ -633,6 +678,14 @@ public class TerminalControl : TemplatedControl, IDisposable
         if (!AllowDirectInput)
             return;
 
+        // Any other input clears the selection.
+        if (_selection is not null)
+        {
+            _selection = null;
+            InvalidateCommandState();
+            InvalidateVisual();
+        }
+
         // Typing snaps the viewport back to the live bottom.
         if (_scrollOffset > 0)
             ScrollToBottom();
@@ -700,6 +753,13 @@ public class TerminalControl : TemplatedControl, IDisposable
         if (string.IsNullOrEmpty(e.Text) || _decoder is null || !AllowDirectInput)
             return;
 
+        if (_selection is not null)
+        {
+            _selection = null;
+            InvalidateCommandState();
+            InvalidateVisual();
+        }
+
         if (_scrollOffset > 0)
             ScrollToBottom();
 
@@ -722,16 +782,43 @@ public class TerminalControl : TemplatedControl, IDisposable
         if (_decoder is null)
             return;
 
-        Point p = GetCellPosition(e);
-        if (p.X < 0)
-            return;
+        var update = e.GetCurrentPoint(this).Properties.PointerUpdateKind;
 
-        _isSelecting = true;
-        _selectStart = p;
-        _selection = new TerminalSelection((int)p.X, (int)p.Y, (int)p.X, (int)p.Y);
+        if (update == PointerUpdateKind.LeftButtonPressed)
+        {
+            Point p = GetCellPosition(e);
+            if (p.X < 0)
+                return;
 
-        InvalidateVisual();
-        e.Pointer.Capture(this);
+            _isSelecting = true;
+            _selectStart = p;
+            _selection = new TerminalSelection((int)p.X, (int)p.Y, (int)p.X, (int)p.Y);
+
+            InvalidateCommandState();
+            InvalidateVisual();
+            e.Pointer.Capture(this);
+        }
+        else if (update == PointerUpdateKind.RightButtonPressed)
+        {
+            // If a context menu is explicitly assigned, let the framework open it.
+            if (ContextMenu is not null)
+                return;
+
+            e.Handled = true;
+
+            // Terminal-style right click: copy if something is selected, otherwise paste.
+            if (_selection is not null)
+            {
+                _ = CopySelectionToClipboardAsync();
+                _selection = null;
+                InvalidateCommandState();
+                InvalidateVisual();
+            }
+            else
+            {
+                _ = PasteFromClipboardAsync();
+            }
+        }
     }
 
     protected override void OnPointerMoved(PointerEventArgs e)
@@ -745,6 +832,7 @@ public class TerminalControl : TemplatedControl, IDisposable
             return;
 
         _selection = new TerminalSelection((int)_selectStart.X, (int)_selectStart.Y, (int)p.X, (int)p.Y);
+        InvalidateCommandState();
         InvalidateVisual();
     }
 
@@ -758,7 +846,10 @@ public class TerminalControl : TemplatedControl, IDisposable
         e.Pointer.Capture(null);
 
         if (_selection is { } sel && (sel.StartY != sel.EndY || sel.StartX != sel.EndX))
+        {
             _ = CopySelectionToClipboardAsync();
+            InvalidateCommandState();
+        }
     }
 
     // ---- Scrollback navigation ----
@@ -835,6 +926,21 @@ public class TerminalControl : TemplatedControl, IDisposable
         return new Point(col, row);
     }
 
+    private Span<TerminalCellInfo> GetRowCells(TerminalScreenBuffer buf, IReadOnlyList<TerminalRow>? scrollback, int viewportRow)
+    {
+        if (scrollback is null || scrollback.Count == 0)
+            return buf.GetRow(viewportRow);
+
+        int streamLen = scrollback.Count + buf.Rows;
+        int top = scrollback.Count - _scrollOffset;
+        int idx = top + viewportRow;
+
+        if (idx < 0 || idx >= streamLen)
+            return [];
+
+        return idx < scrollback.Count ? scrollback[idx].AsSpan() : buf.GetRow(idx - scrollback.Count);
+    }
+
     private string? BuildSelectedText()
     {
         if (_decoder is null || _selection is not { } sel)
@@ -842,6 +948,8 @@ public class TerminalControl : TemplatedControl, IDisposable
 
         StringBuilder sb = new StringBuilder();
         TerminalScreenBuffer buf = _decoder.Buffer;
+        IReadOnlyList<TerminalRow>? scrollback = _scrollOffset > 0 ? buf.GetScrollback() : null;
+
         for (int y = sel.StartY; y <= sel.EndY; y++)
         {
             if (y < 0 || y >= buf.Rows)
@@ -849,7 +957,7 @@ public class TerminalControl : TemplatedControl, IDisposable
 
             int x0 = y == sel.StartY ? sel.StartX : 0;
             int x1 = y == sel.EndY ? sel.EndX : buf.Columns - 1;
-            Span<TerminalCellInfo> row = buf.GetRow(y);
+            Span<TerminalCellInfo> row = GetRowCells(buf, scrollback, y);
 
             for (int x = x0; x <= x1 && x < row.Length; x++)
             {
@@ -862,7 +970,7 @@ public class TerminalControl : TemplatedControl, IDisposable
             sb.Append('\n');
         }
 
-        return sb.Length > 0 ? sb.ToString() : null;
+        return sb.Length > 0 ? sb.ToString().TrimEnd('\n') : null;
     }
 
     private async Task CopySelectionToClipboardAsync()
@@ -871,7 +979,9 @@ public class TerminalControl : TemplatedControl, IDisposable
         if (string.IsNullOrEmpty(text))
             return;
 
-        //await SetClipboardTextAsync(text.TrimEnd('\n'));
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard is not null)
+            await clipboard.SetTextAsync(text);
     }
 
     private async Task PasteFromClipboardAsync()
@@ -879,14 +989,19 @@ public class TerminalControl : TemplatedControl, IDisposable
         if (CurrentSession is null)
             return;
 
-        /*
-        string? text = await GetClipboardTextAsync();
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard is null)
+            return;
+
+        string? text = await clipboard.TryGetTextAsync();
         if (string.IsNullOrEmpty(text))
             return;
 
+        // Normalize line endings and wrap with bracketed-paste envelope if the
+        // terminal requested it (?2004h).
+        text = text.ReplaceLineEndings("\r");
         bool bracketed = _decoder?.State.Modes.BracketedPaste == true;
         CurrentSession.Append(KeyboardEncoder.WrapBracketedPaste(text, bracketed));
-        */
     }
 
     // ---- Dispose ----
@@ -905,6 +1020,45 @@ public class TerminalControl : TemplatedControl, IDisposable
 
         _renderer.Dispose();
         GC.SuppressFinalize(this);
+    }
+
+    /// <summary>Reusable ICommand implementation that forwards Execute/CanExecute to a <see cref="TerminalControl"/>.</summary>
+    public sealed class TerminalCommand : ICommand
+    {
+        private readonly Action<TerminalControl> _execute;
+        private readonly Func<TerminalControl, bool> _canExecute;
+
+        /// <summary>Initializes a new command.</summary>
+        /// <param name="name">Display name of the command.</param>
+        /// <param name="execute">Action invoked when the command executes.</param>
+        /// <param name="canExecute">Predicate that determines whether the command can execute.</param>
+        public TerminalCommand(string name, Action<TerminalControl> execute, Func<TerminalControl, bool> canExecute)
+        {
+            Name = name;
+            _execute = execute;
+            _canExecute = canExecute;
+        }
+
+        /// <summary>Gets the display name of the command.</summary>
+        public string Name { get; }
+
+        /// <inheritdoc/>
+        public bool CanExecute(object? parameter)
+            => parameter is TerminalControl control && _canExecute(control);
+
+        /// <inheritdoc/>
+        public void Execute(object? parameter)
+        {
+            if (parameter is TerminalControl control)
+                _execute(control);
+        }
+
+        /// <inheritdoc/>
+        public event EventHandler? CanExecuteChanged;
+
+        /// <summary>Raises <see cref="CanExecuteChanged"/>.</summary>
+        public void InvalidateCanExecute()
+            => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
     }
 
     // ---- StyledProperty registrations ----

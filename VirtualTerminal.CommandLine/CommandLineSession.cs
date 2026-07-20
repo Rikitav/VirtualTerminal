@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using VirtualTerminal.Extensions;
@@ -18,7 +18,11 @@ public sealed class CommandLineSession : TerminalSession
     private PseudoConsole pseudoConsole;
 
     /// <inheritdoc />
-    public override string Title { get; }
+    public override string Title
+    {
+        get => base.Title;
+        set => base.Title = value;
+    }
 
     /// <summary>
     /// Gets the underlying ConPTY wrapper (process + pipes).
@@ -29,7 +33,7 @@ public sealed class CommandLineSession : TerminalSession
     /// Starts a ConPTY session running the provided command line.
     /// </summary>
     /// <param name="process"></param>
-    public CommandLineSession(ProcessCreationInfo process) : base(Encoding.UTF8)
+    public CommandLineSession(ProcessCreationInfo process) : base()
     {
         Title = Path.GetFileNameWithoutExtension(process.CommandLine ?? process.ApplicationName ?? string.Empty).ToLower();
 
@@ -42,7 +46,7 @@ public sealed class CommandLineSession : TerminalSession
     /// Starts a ConPTY session running the provided command line.
     /// </summary>
     /// <param name="application">Command line to start (for example, <c>cmd.exe</c> or PowerShell).</param>
-    public CommandLineSession(string application) : base(Encoding.UTF8)
+    public CommandLineSession(string application) : base()
     {
         Title = Path.GetFileNameWithoutExtension(application).ToLower();
 
@@ -63,7 +67,7 @@ public sealed class CommandLineSession : TerminalSession
         : this(@"C:\Windows\System32\cmd.exe") { }
 
     /// <inheritdoc />
-    public override void Resize(ushort columns, ushort rows)
+    public override void Resize(ushort columns, ushort rows, bool pushScrollback = false)
     {
         // For ConPTY we let the pseudo-console own reflow. Resize only the local buffer
         // geometry without moving rows into scrollback; ConPTY will repaint/overwrite
