@@ -1,4 +1,4 @@
-﻿using Color = System.Drawing.Color;
+using Color = System.Drawing.Color;
 using WindowsColor = System.Windows.Media.Color;
 
 namespace VirtualTerminal.Helpers;
@@ -8,9 +8,14 @@ namespace VirtualTerminal.Helpers;
 /// </summary>
 public static class ColorHelper
 {
+    /// <summary>Converts a <see cref="Color"/> to a WPF <see cref="WindowsColor"/>.</summary>
     public static WindowsColor ToWindowsMediaColor(this Color color)
         => WindowsColor.FromArgb(color.A, color.R, color.G, color.B);
+ /// <summary>
+ /// ToDrawingColors the to drawing color.
+ /// </summary>
 
+    /// <summary>Converts a WPF <see cref="WindowsColor"/> to a <see cref="Color"/>.</summary>
     public static Color ToDrawingColor(this WindowsColor color)
         => Color.FromArgb(color.A, color.R, color.G, color.B);
 

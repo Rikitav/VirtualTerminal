@@ -39,12 +39,19 @@ public readonly struct CsiParams
     /// <summary>Enumerates (index, value, isSubParam).</summary>
     public Enumerator GetEnumerator() => new(this);
 
+    /// <summary>Supports iterating over the parameters of a <see cref="CsiParams"/> value.</summary>
     public ref struct Enumerator
     {
         private readonly CsiParams _p;
         private int _i;
+
         internal Enumerator(CsiParams p) { _p = p; _i = -1; }
+
+        /// <summary>Advances the enumerator to the next parameter.</summary>
+        /// <returns>true if another parameter is available; otherwise false.</returns>
         public bool MoveNext() { _i++; return _i < _p._count; }
+
+        /// <summary>Gets the current parameter index, value, and sub-parameter flag.</summary>
         public readonly (int Index, int Value, bool IsSubParam) Current => (_i, _p._values[_i], _p._sub[_i]);
     }
 }

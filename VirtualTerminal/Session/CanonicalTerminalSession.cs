@@ -21,10 +21,18 @@ public class CanonicalTerminalSession : TerminalSession
     private int _historyCursor;                     // == _history.Count means "the new line being typed"
     private int _cursor;
 
-    public string ShellPrompt { get; set; }
+    /// <summary>Gets or sets the prompt displayed before user input.</summary>
+    public string ShellPrompt { get; set; } = "> ";
+
+    /// <summary>Gets a <see cref="TextWriter"/> that feeds output into this session.</summary>
     public TextWriter Writer { get; }
+
+    /// <summary>Gets a <see cref="TextReader"/> that reads from this session.</summary>
     public TextReader Reader { get; }
 
+    /// <summary>
+    /// Initializes a new canonical terminal session with default I/O wrappers and prompt.
+    /// </summary>
     public CanonicalTerminalSession() : base()
     {
         Writer = new TerminalTextWriter(this);
@@ -49,6 +57,10 @@ public class CanonicalTerminalSession : TerminalSession
         return _readLineTcs.Task;
     }
 
+    /// <summary>
+    /// Feeds raw output bytes to the terminal decoder and queues them for <see cref="Read(Span{byte})"/>.
+    /// </summary>
+    /// <param name="data">Output bytes to process.</param>
     public virtual void FeedOutput(ReadOnlySpan<byte> data)
     {
         ThrowIfDisposed();
@@ -65,6 +77,10 @@ public class CanonicalTerminalSession : TerminalSession
         NotifyInputAvailable();
     }
 
+    /// <summary>
+    /// Encodes <paramref name="text"/> and feeds the resulting bytes to <see cref="FeedOutput(ReadOnlySpan{byte})"/>.
+    /// </summary>
+    /// <param name="text">Text to output.</param>
     public virtual void FeedOutput(string text)
     {
         if (string.IsNullOrEmpty(text))
@@ -85,6 +101,11 @@ public class CanonicalTerminalSession : TerminalSession
     }
 
     // ---- Input parsing ----
+
+    /// <summary>
+    /// Processes input bytes as xterm key sequences or raw characters.
+    /// </summary>
+    /// <param name="data">Input bytes to process.</param>
     public override void Write(ReadOnlySpan<byte> data)
     {
         ThrowIfDisposed();
@@ -172,6 +193,7 @@ public class CanonicalTerminalSession : TerminalSession
         FeedOutput(sb.ToString());
     }
 
+    /// <summary>Resets the input line and prints a fresh prompt.</summary>
     public void PrintPrompt()
     {
         ResetInput();
@@ -193,6 +215,11 @@ public class CanonicalTerminalSession : TerminalSession
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Copies up to <paramref name="buffer"/>.Length bytes from the output queue into <paramref name="buffer"/>.
+    /// </summary>
+    /// <param name="buffer">Destination span.</param>
+    /// <returns>The number of bytes read.</returns>
     public override int Read(Span<byte> buffer)
     {
         ThrowIfDisposed();
@@ -209,6 +236,10 @@ public class CanonicalTerminalSession : TerminalSession
         return bytesRead;
     }
 
+    /// <summary>
+    /// Reads all queued output bytes into a newly allocated array.
+    /// </summary>
+    /// <returns>A byte array containing all queued output, or an empty array if none is available.</returns>
     public override byte[] ReadAll()
     {
         ThrowIfDisposed();
@@ -225,6 +256,10 @@ public class CanonicalTerminalSession : TerminalSession
         return result;
     }
 
+    /// <summary>
+    /// Releases resources held by this session.
+    /// </summary>
+    /// <param name="disposing"><c>true</c> when called from <see cref="IDisposable.Dispose"/>; otherwise <c>false</c>.</param>
     protected override void Dispose(bool disposing)
     {
         _outputQueue.Clear();

@@ -33,17 +33,34 @@ public sealed class TerminalScreenBuffer : IDisposable
 
     private bool _disposed;
 
+    /// <summary>Gets the number of columns in the active screen.</summary>
     public int Columns => _columns;
+
+    /// <summary>Gets the number of rows in the active screen.</summary>
     public int Rows => _rows;
+
+    /// <summary>Gets the top row of the current scroll region (inclusive).</summary>
     public int ScrollTop => _scrollTop;
+
+    /// <summary>Gets the bottom row of the current scroll region (inclusive).</summary>
     public int ScrollBottom => _scrollBottom;
+
+    /// <summary>Gets a value indicating whether the alternate screen is active.</summary>
     public bool IsAlternate => _isAlt;
+
+    /// <summary>Gets the number of rows currently stored in scrollback.</summary>
     public int ScrollbackCount => _scrollback.Count;
+
+    /// <summary>Gets the maximum number of rows to retain in scrollback.</summary>
     public int ScrollbackMax => _scrollbackMax;
 
     /// <summary>Convenience size (columns, rows) for consumers expecting the legacy shape.</summary>
     public Size GridSize => new Size(_columns, _rows);
 
+    /// <summary>Initializes a new screen buffer.</summary>
+    /// <param name="columns">Number of columns.</param>
+    /// <param name="rows">Number of rows.</param>
+    /// <param name="scrollbackMax">Maximum scrollback rows to retain.</param>
     public TerminalScreenBuffer(int columns, int rows, int scrollbackMax = DefaultScrollbackMax)
     {
         _columns = Math.Max(1, columns);
@@ -61,6 +78,8 @@ public sealed class TerminalScreenBuffer : IDisposable
         InitDefaultTabStops();
     }
 
+    /// <summary>Sets the maximum scrollback size and trims excess rows.</summary>
+    /// <param name="max">The new maximum number of scrollback rows.</param>
     public void SetScrollbackMax(int max)
     {
         _scrollbackMax = Math.Max(0, max);
@@ -69,16 +88,27 @@ public sealed class TerminalScreenBuffer : IDisposable
     }
 
     // ---- Row / cell access ----
+    /// <summary>Returns the cells of row <paramref name="y"/> as a span.</summary>
+    /// <param name="y">The zero-based row index.</param>
+    /// <returns>A span over the row's cells.</returns>
     public Span<TerminalCellInfo> GetRow(int y)
         => _active[y].AsSpan();
 
+    /// <summary>Returns the <see cref="TerminalRow"/> object at row <paramref name="y"/>.</summary>
+    /// <param name="y">The zero-based row index.</param>
+    /// <returns>The row object.</returns>
     public TerminalRow GetRowObject(int y)
         => _active[y];
 
+    /// <summary>Returns a reference to the cell at (<paramref name="y"/>, <paramref name="x"/>).</summary>
+    /// <param name="y">The zero-based row index.</param>
+    /// <param name="x">The zero-based column index.</param>
+    /// <returns>A reference to the requested cell.</returns>
     public ref TerminalCellInfo GetCell(int y, int x)
         => ref _active[y].Cells[x];
 
     // ---- Dirty tracking ----
+    /// <summary>Gets a value indicating whether any row on the active screen is dirty.</summary>
     public bool HasDirtyRows
     {
         get
@@ -93,15 +123,23 @@ public sealed class TerminalScreenBuffer : IDisposable
         }
     }
 
+    /// <summary>Determines whether row <paramref name="y"/> is dirty.</summary>
+    /// <param name="y">The zero-based row index.</param>
+    /// <returns><see langword="true"/> if the row is dirty; otherwise, <see langword="false"/>.</returns>
     public bool IsRowDirty(int y)
         => y >= 0 && y < _rows && _active[y].Dirty;
 
+    /// <summary>Marks row <paramref name="y"/> dirty if it is within bounds.</summary>
+    /// <param name="y">The zero-based row index.</param>
     public void MarkRowDirty(int y)
     {
         if (y >= 0 && y < _rows)
             _active[y].Dirty = true;
     }
 
+    /// <summary>Marks a range of rows dirty.</summary>
+    /// <param name="from">The starting row index.</param>
+    /// <param name="count">The number of rows to mark.</param>
     public void MarkRowsDirty(int from, int count)
     {
         int end = Math.Min(from + count, _rows);
@@ -109,12 +147,15 @@ public sealed class TerminalScreenBuffer : IDisposable
             _active[i].Dirty = true;
     }
 
+    /// <summary>Marks row <paramref name="y"/> clean if it is within bounds.</summary>
+    /// <param name="y">The zero-based row index.</param>
     public void MarkRowClean(int y)
     {
         if (y >= 0 && y < _rows)
             _active[y].Dirty = false;
     }
 
+    /// <summary>Marks every row on the active screen dirty.</summary>
     public void MarkAllDirty()
     {
         for (int i = 0; i < _rows; i++)
@@ -122,6 +163,7 @@ public sealed class TerminalScreenBuffer : IDisposable
     }
 
     // ---- Clearing ----
+    /// <summary>Clears every cell on the active screen and marks all rows dirty.</summary>
     public void ClearAll()
     {
         for (int i = 0; i < _rows; i++)
@@ -141,21 +183,29 @@ public sealed class TerminalScreenBuffer : IDisposable
         => _active[y].ClearRange(x, count);
 
     // ---- Tab stops ----
+    /// <summary>Determines whether a tab stop is set at column <paramref name="x"/>.</summary>
+    /// <param name="x">The zero-based column index.</param>
+    /// <returns><see langword="true"/> if a tab stop exists at the column; otherwise, <see langword="false"/>.</returns>
     public bool IsTabStop(int x)
         => x >= 0 && x < _tabStops.Length && _tabStops[x];
 
+    /// <summary>Sets a tab stop at column <paramref name="x"/>.</summary>
+    /// <param name="x">The zero-based column index.</param>
     public void SetTabStop(int x)
     {
         if (x >= 0 && x < _tabStops.Length)
             _tabStops[x] = true;
     }
 
+    /// <summary>Clears the tab stop at column <paramref name="x"/>.</summary>
+    /// <param name="x">The zero-based column index.</param>
     public void ClearTabStop(int x)
     {
         if (x >= 0 && x < _tabStops.Length)
             _tabStops[x] = false;
     }
 
+    /// <summary>Clears all tab stops.</summary>
     public void ClearAllTabStops()
         => Array.Fill(_tabStops, false);
 
@@ -191,6 +241,9 @@ public sealed class TerminalScreenBuffer : IDisposable
     }
 
     // ---- Scroll region ----
+    /// <summary>Sets the scroll region to the specified inclusive row range.</summary>
+    /// <param name="top">The top row of the region.</param>
+    /// <param name="bottom">The bottom row of the region.</param>
     public void SetScrollRegion(int top, int bottom)
     {
         if (top < 0)
@@ -206,6 +259,7 @@ public sealed class TerminalScreenBuffer : IDisposable
         _scrollBottom = bottom;
     }
 
+    /// <summary>Resets the scroll region to cover the entire screen.</summary>
     public void ResetScrollRegion()
     {
         _scrollTop = 0;
@@ -217,6 +271,10 @@ public sealed class TerminalScreenBuffer : IDisposable
     public void ScrollUp(int n)
         => ScrollUp(_scrollTop, _scrollBottom, n);
 
+    /// <summary>Scrolls rows in [<paramref name="top"/>, <paramref name="bottom"/>] up by <paramref name="n"/> lines.</summary>
+    /// <param name="top">The top row of the region.</param>
+    /// <param name="bottom">The bottom row of the region.</param>
+    /// <param name="n">The number of lines to scroll.</param>
     public void ScrollUp(int top, int bottom, int n)
     {
         if (n <= 0 || top > bottom)
@@ -261,6 +319,10 @@ public sealed class TerminalScreenBuffer : IDisposable
     public void ScrollDown(int n)
         => ScrollDown(_scrollTop, _scrollBottom, n);
 
+    /// <summary>Scrolls rows in [<paramref name="top"/>, <paramref name="bottom"/>] down by <paramref name="n"/> lines.</summary>
+    /// <param name="top">The top row of the region.</param>
+    /// <param name="bottom">The bottom row of the region.</param>
+    /// <param name="n">The number of lines to scroll.</param>
     public void ScrollDown(int top, int bottom, int n)
     {
         if (n <= 0 || top > bottom)
@@ -296,6 +358,10 @@ public sealed class TerminalScreenBuffer : IDisposable
         => ScrollUp(y, bottom, n);
 
     // ---- Per-row character insert/delete ----
+    /// <summary>Inserts <paramref name="n"/> blank cells at (<paramref name="y"/>, <paramref name="x"/>), shifting existing cells right.</summary>
+    /// <param name="y">The zero-based row index.</param>
+    /// <param name="x">The zero-based column index.</param>
+    /// <param name="n">The number of blank cells to insert.</param>
     public void InsertChars(int y, int x, int n)
     {
         if (n <= 0 || y < 0 || y >= _rows)
@@ -318,6 +384,10 @@ public sealed class TerminalScreenBuffer : IDisposable
         _active[y].Dirty = true;
     }
 
+    /// <summary>Deletes <paramref name="n"/> cells at (<paramref name="y"/>, <paramref name="x"/>), shifting remaining cells left and blanking the right edge.</summary>
+    /// <param name="y">The zero-based row index.</param>
+    /// <param name="x">The zero-based column index.</param>
+    /// <param name="n">The number of cells to delete.</param>
     public void DeleteChars(int y, int x, int n)
     {
         if (n <= 0 || y < 0 || y >= _rows)
@@ -344,6 +414,7 @@ public sealed class TerminalScreenBuffer : IDisposable
     public void EraseChars(int y, int x, int n) => _active[y].ClearRange(x, n);
 
     // ---- Alternate screen ----
+    /// <summary>Switches to the alternate screen, clearing it and resetting the scroll region.</summary>
     public void EnterAlternateScreen()
     {
         if (_isAlt)
@@ -367,6 +438,7 @@ public sealed class TerminalScreenBuffer : IDisposable
         ResetScrollRegion();
     }
 
+    /// <summary>Returns to the primary screen and marks all rows dirty.</summary>
     public void LeaveAlternateScreen()
     {
         if (!_isAlt)
@@ -378,6 +450,7 @@ public sealed class TerminalScreenBuffer : IDisposable
         MarkAllDirty();
     }
 
+    /// <summary>Clears every cell on the alternate screen if it is active.</summary>
     public void ClearAlternateScreen()
     {
         if (!_isAlt)
@@ -388,12 +461,24 @@ public sealed class TerminalScreenBuffer : IDisposable
     }
 
     // ---- Resize ----
+    /// <summary>Resizes the active grid to the specified dimensions, pushing dropped rows to scrollback.</summary>
+    /// <param name="columns">The new number of columns.</param>
+    /// <param name="rows">The new number of rows.</param>
     public void Resize(int columns, int rows)
         => Resize(columns, rows, state: null, pushScrollback: true);
 
+    /// <summary>Resizes the active grid and adjusts the cursor state.</summary>
+    /// <param name="columns">The new number of columns.</param>
+    /// <param name="rows">The new number of rows.</param>
+    /// <param name="state">The cursor state to update, or <see langword="null"/>.</param>
     public void Resize(int columns, int rows, TerminalState? state)
         => Resize(columns, rows, state, pushScrollback: true);
 
+    /// <summary>Resizes the active grid and optionally adjusts the cursor state and scrollback.</summary>
+    /// <param name="columns">The new number of columns.</param>
+    /// <param name="rows">The new number of rows.</param>
+    /// <param name="state">The cursor state to update, or <see langword="null"/>.</param>
+    /// <param name="pushScrollback">Whether rows dropped from the top should be pushed into scrollback.</param>
     public void Resize(int columns, int rows, TerminalState? state, bool pushScrollback)
     {
         columns = Math.Max(1, columns);
@@ -471,6 +556,7 @@ public sealed class TerminalScreenBuffer : IDisposable
     /// <summary>Snapshot of the scrollback rows (oldest first). Used by the renderer for history.</summary>
     public IReadOnlyList<TerminalRow> GetScrollback() => Array.AsReadOnly(_scrollback.ToArray());
 
+    /// <summary>Releases resources used by the screen buffer.</summary>
     public void Dispose()
     {
         if (_disposed)

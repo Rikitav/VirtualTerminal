@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 
 namespace VirtualTerminal.Interop;
@@ -18,8 +18,14 @@ public struct ProcessCreationInfo
     /// </summary>
     public string? CommandLine;
 
+    /// <summary>
+    /// Optional environment block passed to <c>CreateProcess</c>.
+    /// </summary>
     public string? Environment;
 
+    /// <summary>
+    /// Optional working directory passed to <c>CreateProcess</c>.
+    /// </summary>
     public string? CurrentDirectory;
 }
 

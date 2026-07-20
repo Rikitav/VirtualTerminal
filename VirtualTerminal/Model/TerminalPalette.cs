@@ -4,8 +4,7 @@ namespace VirtualTerminal.Model;
 
 /// <summary>
 /// The 256-entry ANSI color palette (16 system + 216 cube + 24 grayscale). Mutable so
-/// OSC 4 / 10 / 11 / 12 can recolor entries at runtime; <see cref="TerminalPaletteExtensions.GetColor"/>
-/// resolves a 0–255 index to a <see cref="System.Drawing.Color"/>.
+/// OSC 4 / 10 / 11 / 12 can recolor entries at runtime.
 /// </summary>
 public sealed class TerminalPalette
 {
@@ -13,6 +12,7 @@ public sealed class TerminalPalette
 
     private readonly Color[] _colors = new Color[256];
 
+    /// <summary>Initializes a new instance with the standard xterm 256-color palette.</summary>
     public TerminalPalette() => LoadXtermDefaults();
 
     /// <summary>Gets or sets the color at the given ANSI index (0–255).</summary>
@@ -32,6 +32,8 @@ public sealed class TerminalPalette
         }
     }
 
+    /// <summary>Returns the underlying palette colors as a span.</summary>
+    /// <returns>A span over the 256-entry palette.</returns>
     public Span<Color> AsSpan() => _colors.AsSpan();
 
     /// <summary>Resolves an ANSI index to its <see cref="Color"/> (clamped to 0–255).</summary>
@@ -46,6 +48,9 @@ public sealed class TerminalPalette
         return _colors[index];
     }
 
+    /// <summary>Sets the color at the given ANSI index.</summary>
+    /// <param name="index">The ANSI color index (0–255).</param>
+    /// <param name="color">The color to assign.</param>
     public void SetAnsiColor(int index, Color color)
         => this[index] = color;
 

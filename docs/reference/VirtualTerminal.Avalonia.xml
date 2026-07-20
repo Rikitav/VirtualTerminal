@@ -4,6 +4,19 @@
         <name>VirtualTerminal.Avalonia</name>
     </assembly>
     <members>
+        <member name="T:VirtualTerminal.Helpers.ColorHelper">
+            <summary>Provides extension methods for converting between Avalonia and System.Drawing color types.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Helpers.ColorHelper.ToAvaloniaColor(System.Drawing.Color)">
+            <summary>Converts a <see cref="T:System.Drawing.Color"/> to an Avalonia <see cref="T:Avalonia.Media.Color"/>.</summary>
+            <param name="color">The drawing color to convert.</param>
+            <returns>The equivalent Avalonia color.</returns>
+        </member>
+        <member name="M:VirtualTerminal.Helpers.ColorHelper.ToDrawingColor(Avalonia.Media.Color)">
+            <summary>Converts an Avalonia <see cref="T:Avalonia.Media.Color"/> to a <see cref="T:System.Drawing.Color"/>.</summary>
+            <param name="color">The Avalonia color to convert.</param>
+            <returns>The equivalent drawing color.</returns>
+        </member>
         <member name="T:VirtualTerminal.CommandSubmittedEventArgs">
             <summary>
             Routed event arguments for <see cref="E:VirtualTerminal.PromptBox.CommandSubmitted"/>, containing the submitted command text.
@@ -119,6 +132,34 @@
             Glyph lookups are cached per codepoint.
             </summary>
         </member>
+        <member name="P:VirtualTerminal.Rendering.GlyphCache.IsValid">
+            <summary>Gets a value indicating whether the cache has been configured with a primary typeface.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.GlyphCache.CellWidth">
+            <summary>Gets the width of a single terminal cell in pixels.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.GlyphCache.CellHeight">
+            <summary>Gets the height of a single terminal cell in pixels.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.GlyphCache.Ascent">
+            <summary>Gets the font ascent above the baseline in pixels.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.GlyphCache.UnderlinePosition">
+            <summary>Gets the underline position relative to the baseline in pixels.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.GlyphCache.UnderlineThickness">
+            <summary>Gets the underline thickness in pixels.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.GlyphCache.StrikethroughPosition">
+            <summary>Gets the strikethrough position relative to the baseline in pixels.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.GlyphCache.StrikethroughThickness">
+            <summary>Gets the strikethrough thickness in pixels.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.GlyphCache.Primary">
+            <summary>Gets the primary configured <see cref="T:Avalonia.Media.GlyphTypeface"/>.</summary>
+            <exception cref="T:System.InvalidOperationException">Thrown when the cache has not been configured.</exception>
+        </member>
         <member name="M:VirtualTerminal.Rendering.GlyphCache.Configure(System.String,System.Double,System.Double,System.Collections.Generic.IReadOnlyList{System.String})">
             <summary>Rebuilds the cache for the given primary family, size, line-height, and fallbacks.</summary>
         </member>
@@ -128,11 +169,42 @@
         <member name="M:VirtualTerminal.Rendering.GlyphCache.GetVariant(Avalonia.Media.FontWeight,Avalonia.Media.FontStyle)">
             <summary>Weight/style variant of the primary typeface for bold/italic runs.</summary>
         </member>
+        <member name="M:VirtualTerminal.Rendering.GlyphCache.Dispose">
+            <summary>Releases the primary and fallback typefaces and clears the glyph cache.</summary>
+        </member>
         <member name="T:VirtualTerminal.Rendering.TerminalSelection">
             <summary>
             A rectangular text selection in buffer coordinates (start/end inclusive, normalized so
             Start ≤ End). Used by <see cref="T:VirtualTerminal.Rendering.TerminalRenderer"/> to highlight selected cells.
             </summary>
+        </member>
+        <member name="F:VirtualTerminal.Rendering.TerminalSelection.StartY">
+            <summary>The row index of the selection start (inclusive, normalized).</summary>
+            <summary>
+            Gets or sets the start x.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Rendering.TerminalSelection.StartX">
+            <summary>The column index of the selection start (inclusive, normalized).</summary>
+        </member>
+        <member name="F:VirtualTerminal.Rendering.TerminalSelection.EndY">
+            <summary>The row index of the selection end (inclusive, normalized).</summary>
+        </member>
+        <member name="F:VirtualTerminal.Rendering.TerminalSelection.EndX">
+            <summary>The column index of the selection end (inclusive, normalized).</summary>
+        </member>
+        <member name="M:VirtualTerminal.Rendering.TerminalSelection.#ctor(System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>Initializes a new selection, normalizing the coordinates so start ≤ end.</summary>
+            <param name="x1">Column of the first point.</param>
+            <param name="y1">Row of the first point.</param>
+            <param name="x2">Column of the second point.</param>
+            <param name="y2">Row of the second point.</param>
+        </member>
+        <member name="M:VirtualTerminal.Rendering.TerminalSelection.Contains(System.Int32,System.Int32)">
+            <summary>Determines whether the specified cell is within the selection.</summary>
+            <param name="y">The row index of the cell.</param>
+            <param name="x">The column index of the cell.</param>
+            <returns><c>true</c> if the cell is inside the selection; otherwise, <c>false</c>.</returns>
         </member>
         <member name="T:VirtualTerminal.Rendering.TerminalRenderer">
             <summary>
@@ -142,12 +214,41 @@
             wide glyphs render at single-cell width in Phase 1.
             </summary>
         </member>
+        <member name="F:VirtualTerminal.Rendering.TerminalRenderer._emSize">
+            <summary>
+            Releases all resources used by the current object.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.TerminalRenderer.IsValid">
+            <summary>Gets a value indicating whether the renderer has a valid font configuration.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.TerminalRenderer.CellSize">
+            <summary>Gets the size of a single terminal cell.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.TerminalRenderer.Baseline">
+            <summary>Gets the font baseline offset from the top of a cell.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.TerminalRenderer.CellWidth">
+            <summary>Gets the width of a single terminal cell in pixels.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.TerminalRenderer.CellHeight">
+            <summary>Gets the height of a single terminal cell in pixels.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Rendering.TerminalRenderer.Configure(System.String,System.Double,VirtualTerminal.Options.TerminalOptions)">
+            <summary>Configures the renderer with the specified font family, size, and terminal options.</summary>
+            <param name="family">The primary font family name.</param>
+            <param name="emSize">The font size in device-independent pixels.</param>
+            <param name="options">The terminal options controlling colors, line height, and fallbacks.</param>
+        </member>
+        <member name="M:VirtualTerminal.Rendering.TerminalRenderer.Dispose">
+            <summary>Releases the glyph cache and rendering resources.</summary>
+        </member>
         <member name="M:VirtualTerminal.Rendering.TerminalRenderer.RenderCursor(Avalonia.Media.DrawingContext,System.Int32,VirtualTerminal.Buffer.CursorShape)">
             <summary>Renders the cursor shape at column <paramref name="col"/> (row-local y=0). The caller
             decides visibility by clearing the cursor group when the cursor should be hidden.</summary>
         </member>
         <member name="M:VirtualTerminal.Rendering.TerminalRenderer.RenderRow(Avalonia.Media.DrawingContext,System.Span{VirtualTerminal.Model.TerminalCellInfo},System.Nullable{VirtualTerminal.Rendering.TerminalSelection},System.Int32)">
-            <summary>Renders a single row into <paramref name="dc"/> (local origin = row top-left).</summary>
+            <summary>Renders a single row into <paramref name="drawingContext"/> (local origin = row top-left).</summary>
         </member>
         <member name="T:VirtualTerminal.TerminalControl">
             <summary>
@@ -219,11 +320,29 @@
         <member name="F:VirtualTerminal.TerminalControl.ClearCommand">
             <summary>Clears the terminal screen and scrollback.</summary>
         </member>
+        <member name="M:VirtualTerminal.TerminalControl.#ctor">
+            <summary>Initializes a new instance of the <see cref="T:VirtualTerminal.TerminalControl"/> class and creates render, blink, and resize timers.</summary>
+        </member>
         <member name="M:VirtualTerminal.TerminalControl.Clear">
             <summary>Sends a clear-screen + home escape sequence to the active session.</summary>
         </member>
         <member name="M:VirtualTerminal.TerminalControl.SelectAll">
             <summary>Selects the entire visible screen.</summary>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.OnPropertyChanged(Avalonia.AvaloniaPropertyChangedEventArgs)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.OnAttachedToVisualTree(Avalonia.VisualTreeAttachmentEventArgs)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.OnDetachedFromVisualTree(Avalonia.VisualTreeAttachmentEventArgs)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.OnSizeChanged(Avalonia.Controls.SizeChangedEventArgs)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.Render(Avalonia.Media.DrawingContext)">
+            <inheritdoc/>
         </member>
         <member name="M:VirtualTerminal.TerminalControl.RenderViewportRow(System.Int32,System.Collections.Generic.IReadOnlyList{VirtualTerminal.Buffer.TerminalRow})">
             <summary>
@@ -231,6 +350,30 @@
             the row's source is computed from the (scrollback + active) stream; otherwise it is the
             active buffer row at the same index.
             </summary>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.OnGotFocus(Avalonia.Input.FocusChangedEventArgs)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.OnLostFocus(Avalonia.Input.FocusChangedEventArgs)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.OnKeyDown(Avalonia.Input.KeyEventArgs)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.OnTextInput(Avalonia.Input.TextInputEventArgs)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.OnPointerPressed(Avalonia.Input.PointerPressedEventArgs)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.OnPointerMoved(Avalonia.Input.PointerEventArgs)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.OnPointerReleased(Avalonia.Input.PointerReleasedEventArgs)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.OnPointerWheelChanged(Avalonia.Input.PointerWheelEventArgs)">
+            <inheritdoc/>
         </member>
         <member name="M:VirtualTerminal.TerminalControl.ScrollBy(System.Int32)">
             <summary>Scrolls the viewport by <paramref name="lines"/> (positive = up into history).</summary>

@@ -19,6 +19,9 @@ public class SimpleTuiDemoSession : TerminalUserInterfaceSession
     private int _selectedIndex;
     private string _status = "Ready";
 
+    /// <summary>
+    /// Renders the demo TUI, including the bordered menu, selection highlight, and status bar.
+    /// </summary>
     protected override void Render()
     {
         ClearScreen();
@@ -49,6 +52,10 @@ public class SimpleTuiDemoSession : TerminalUserInterfaceSession
         ResetColor();
     }
 
+    /// <summary>
+    /// Handles keyboard input to navigate the menu or activate the selected item.
+    /// </summary>
+    /// <param name="key">The key that was pressed.</param>
     protected override void OnKey(ConsoleKey key)
     {
         switch (key)

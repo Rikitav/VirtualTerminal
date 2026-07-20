@@ -26,14 +26,32 @@ public sealed class GlyphCache : IDisposable
     private double _strikePos;
     private double _strikeThickness;
 
+    /// <summary>Gets a value indicating whether the cache has been configured with a primary typeface.</summary>
     public bool IsValid => _primary is not null;
+
+    /// <summary>Gets the width of a single terminal cell in pixels.</summary>
     public double CellWidth => _cellWidth;
+
+    /// <summary>Gets the height of a single terminal cell in pixels.</summary>
     public double CellHeight => _cellHeight;
+
+    /// <summary>Gets the font ascent above the baseline in pixels.</summary>
     public double Ascent => _ascent;
+
+    /// <summary>Gets the underline position relative to the baseline in pixels.</summary>
     public double UnderlinePosition => _underlinePos;
+
+    /// <summary>Gets the underline thickness in pixels.</summary>
     public double UnderlineThickness => _underlineThickness;
+
+    /// <summary>Gets the strikethrough position relative to the baseline in pixels.</summary>
     public double StrikethroughPosition => _strikePos;
+
+    /// <summary>Gets the strikethrough thickness in pixels.</summary>
     public double StrikethroughThickness => _strikeThickness;
+
+    /// <summary>Gets the primary configured <see cref="GlyphTypeface"/>.</summary>
+    /// <exception cref="InvalidOperationException">Thrown when the cache has not been configured.</exception>
     public GlyphTypeface Primary => _primary ?? throw new InvalidOperationException("GlyphCache not configured.");
 
     /// <summary>Rebuilds the cache for the given primary family, size, line-height, and fallbacks.</summary>
@@ -133,6 +151,7 @@ public sealed class GlyphCache : IDisposable
     private static ushort GetRawGlyph(GlyphTypeface tf, char c)
         => GetRawGlyph(tf, (uint)c);
 
+    /// <summary>Releases the primary and fallback typefaces and clears the glyph cache.</summary>
     public void Dispose()
     {
         _primary?.Dispose();

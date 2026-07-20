@@ -15,11 +15,24 @@ namespace VirtualTerminal.Rendering;
 /// </summary>
 public readonly struct TerminalSelection
 {
+    /// <summary>The row index of the selection start (inclusive, normalized).</summary>
+    /// <summary>
+    /// Gets or sets the start x.
+    /// </summary>
     public readonly int StartY;
+    /// <summary>The column index of the selection start (inclusive, normalized).</summary>
     public readonly int StartX;
+    /// <summary>The row index of the selection end (inclusive, normalized).</summary>
     public readonly int EndY;
+
+    /// <summary>The column index of the selection end (inclusive, normalized).</summary>
     public readonly int EndX;
 
+    /// <summary>Initializes a new selection, normalizing the coordinates so start ≤ end.</summary>
+    /// <param name="x1">Column of the first point.</param>
+    /// <param name="y1">Row of the first point.</param>
+    /// <param name="x2">Column of the second point.</param>
+    /// <param name="y2">Row of the second point.</param>
     public TerminalSelection(int x1, int y1, int x2, int y2)
     {
         if (y1 < y2 || (y1 == y2 && x1 <= x2))
@@ -38,6 +51,10 @@ public readonly struct TerminalSelection
         }
     }
 
+    /// <summary>Determines whether the specified cell is within the selection.</summary>
+    /// <param name="y">The row index of the cell.</param>
+    /// <param name="x">The column index of the cell.</param>
+    /// <returns><c>true</c> if the cell is inside the selection; otherwise, <c>false</c>.</returns>
     public bool Contains(int y, int x)
     {
         if (y < StartY || y > EndY)
@@ -52,7 +69,6 @@ public readonly struct TerminalSelection
         return true;
     }
 }
-
 /// <summary>
 /// Paints terminal rows using <see cref="GlyphRun"/>: coalesces same-style cells into runs,
 /// resolves default/inverse/conceal colors, draws backgrounds, underlines, strikethrough,
@@ -64,14 +80,30 @@ public sealed class TerminalRenderer : IDisposable
     private readonly GlyphCache _glyphs = new();
     private readonly Dictionary<uint, IBrush> _brushes = [];
     private TerminalOptions _options = new();
+    /// <summary>
+    /// Releases all resources used by the current object.
+    /// </summary>
     private double _emSize = 14;
 
+    /// <summary>Gets a value indicating whether the renderer has a valid font configuration.</summary>
     public bool IsValid => _glyphs.IsValid;
+
+    /// <summary>Gets the size of a single terminal cell.</summary>
     public Size CellSize => new(_glyphs.CellWidth, _glyphs.CellHeight);
+
+    /// <summary>Gets the font baseline offset from the top of a cell.</summary>
     public double Baseline => _glyphs.Ascent;
+
+    /// <summary>Gets the width of a single terminal cell in pixels.</summary>
     public double CellWidth => _glyphs.CellWidth;
+
+    /// <summary>Gets the height of a single terminal cell in pixels.</summary>
     public double CellHeight => _glyphs.CellHeight;
 
+    /// <summary>Configures the renderer with the specified font family, size, and terminal options.</summary>
+    /// <param name="family">The primary font family name.</param>
+    /// <param name="emSize">The font size in device-independent pixels.</param>
+    /// <param name="options">The terminal options controlling colors, line height, and fallbacks.</param>
     public void Configure(string family, double emSize, TerminalOptions options)
     {
         _options = options;
@@ -80,6 +112,7 @@ public sealed class TerminalRenderer : IDisposable
         _brushes.Clear();
     }
 
+    /// <summary>Releases the glyph cache and rendering resources.</summary>
     public void Dispose()
         => _glyphs.Dispose();
 
@@ -102,7 +135,7 @@ public sealed class TerminalRenderer : IDisposable
         drawingContext.DrawRectangle(brush, null, rect);
     }
 
-    /// <summary>Renders a single row into <paramref name="dc"/> (local origin = row top-left).</summary>
+    /// <summary>Renders a single row into <paramref name="drawingContext"/> (local origin = row top-left).</summary>
     public void RenderRow(DrawingContext drawingContext, Span<TerminalCellInfo> row, TerminalSelection? selection, int rowIndex)
     {
         double cellW = _glyphs.CellWidth;

@@ -362,4 +362,3 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /diff.txt
-/VirtualTerminal/Buffer/TerminalModes.cs

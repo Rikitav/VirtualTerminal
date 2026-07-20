@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Text;
 using VirtualTerminal.Buffer;
 using VirtualTerminal.Interfaces;
@@ -72,6 +72,9 @@ public abstract class TerminalSession : ITerminalSession
     /// <inheritdoc />
     public int AvailableDataLength => _inputQueue.Count;
 
+    /// <summary>
+    /// Gets the underlying <see cref="TerminalDecoder"/> used to parse VT input for this session.
+    /// </summary>
     protected TerminalDecoder InternalDecoder => _decoder;
 
     /// <summary>
@@ -193,6 +196,9 @@ public abstract class TerminalSession : ITerminalSession
     /// <param name="disposing"><c>true</c> when called from <see cref="Dispose()"/>; otherwise <c>false</c>.</param>
     protected abstract void Dispose(bool disposing);
 
+    /// <summary>
+    /// Throws <see cref="ObjectDisposedException"/> if the session has already been disposed.
+    /// </summary>
     protected void ThrowIfDisposed()
     {
         if (_disposed)

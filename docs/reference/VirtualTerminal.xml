@@ -128,20 +128,70 @@
         <member name="F:VirtualTerminal.Buffer.TerminalModes.CursorBlinking">
             <summary>Whether the cursor blinks (DECSCUSR 1/2/3) vs steady (0/4).</summary>
         </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalModes.Clone">
+            <summary>Creates a copy of the current mode state.</summary>
+            <returns>A new <see cref="T:VirtualTerminal.Buffer.TerminalModes"/> instance with the same flag values.</returns>
+        </member>
         <member name="T:VirtualTerminal.Buffer.MouseTrackingMode">
             <summary>Mouse tracking mode (off / X10 click / button-event / any-event motion).</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.MouseTrackingMode.Off">
+            <summary>No mouse reporting.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.MouseTrackingMode.X10">
+            <summary>Legacy X11/X10 mode: report only button presses with coordinates.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.MouseTrackingMode.ButtonEvent">
+            <summary>Normal tracking: report button press and release events.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.MouseTrackingMode.AnyEvent">
+            <summary>Any-event tracking: report press, release, and motion events.</summary>
         </member>
         <member name="T:VirtualTerminal.Buffer.CursorShape">
             <summary>Cursor shape (DECSCUSR).</summary>
         </member>
+        <member name="F:VirtualTerminal.Buffer.CursorShape.Block">
+            <summary>Solid block cursor.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CursorShape.Underline">
+            <summary>Horizontal underline cursor.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CursorShape.Bar">
+            <summary>Vertical bar cursor.</summary>
+        </member>
         <member name="T:VirtualTerminal.Buffer.TerminalRow">
             <summary>A single grid line: a cell array plus wrap/dirty metadata.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.TerminalRow.Cells">
+            <summary>The cell array for this row.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.TerminalRow.Wrapped">
+            <summary>Whether this row wraps onto the next line.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.TerminalRow.Dirty">
+            <summary>Whether this row has changed and needs to be redrawn.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalRow.#ctor(System.Int32)">
+            <summary>Initializes a new row with the specified number of blank columns.</summary>
+            <param name="columns">The number of columns in the row.</param>
+        </member>
+        <member name="P:VirtualTerminal.Buffer.TerminalRow.Length">
+            <summary>Gets the number of cells in this row.</summary>
         </member>
         <member name="M:VirtualTerminal.Buffer.TerminalRow.Clear">
             <summary>Blanks every cell and clears the wrap flag.</summary>
         </member>
         <member name="M:VirtualTerminal.Buffer.TerminalRow.ClearRange(System.Int32,System.Int32)">
             <summary>Blanks <paramref name="count"/> cells starting at <paramref name="start"/>.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalRow.AsSpan">
+            <summary>Returns the row cells as a span.</summary>
+            <returns>A span over the row's cell array.</returns>
+        </member>
+        <member name="P:VirtualTerminal.Buffer.TerminalRow.Item(System.Int32)">
+            <summary>Gets a reference to the cell at the specified column.</summary>
+            <param name="x">The zero-based column index.</param>
+            <returns>A reference to the cell at column <paramref name="x"/>.</returns>
         </member>
         <member name="M:VirtualTerminal.Buffer.TerminalRow.Resize(System.Int32)">
             <summary>Grows or shrinks the cell array, preserving the surviving cells.</summary>
@@ -156,8 +206,82 @@
         <member name="P:VirtualTerminal.Buffer.TerminalScreenBuffer.SyncRoot">
             <summary>Lock object used to serialize buffer mutations and render reads.</summary>
         </member>
+        <member name="P:VirtualTerminal.Buffer.TerminalScreenBuffer.Columns">
+            <summary>Gets the number of columns in the active screen.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Buffer.TerminalScreenBuffer.Rows">
+            <summary>Gets the number of rows in the active screen.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Buffer.TerminalScreenBuffer.ScrollTop">
+            <summary>Gets the top row of the current scroll region (inclusive).</summary>
+        </member>
+        <member name="P:VirtualTerminal.Buffer.TerminalScreenBuffer.ScrollBottom">
+            <summary>Gets the bottom row of the current scroll region (inclusive).</summary>
+        </member>
+        <member name="P:VirtualTerminal.Buffer.TerminalScreenBuffer.IsAlternate">
+            <summary>Gets a value indicating whether the alternate screen is active.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Buffer.TerminalScreenBuffer.ScrollbackCount">
+            <summary>Gets the number of rows currently stored in scrollback.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Buffer.TerminalScreenBuffer.ScrollbackMax">
+            <summary>Gets the maximum number of rows to retain in scrollback.</summary>
+        </member>
         <member name="P:VirtualTerminal.Buffer.TerminalScreenBuffer.GridSize">
             <summary>Convenience size (columns, rows) for consumers expecting the legacy shape.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.#ctor(System.Int32,System.Int32,System.Int32)">
+            <summary>Initializes a new screen buffer.</summary>
+            <param name="columns">Number of columns.</param>
+            <param name="rows">Number of rows.</param>
+            <param name="scrollbackMax">Maximum scrollback rows to retain.</param>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.SetScrollbackMax(System.Int32)">
+            <summary>Sets the maximum scrollback size and trims excess rows.</summary>
+            <param name="max">The new maximum number of scrollback rows.</param>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.GetRow(System.Int32)">
+            <summary>Returns the cells of row <paramref name="y"/> as a span.</summary>
+            <param name="y">The zero-based row index.</param>
+            <returns>A span over the row's cells.</returns>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.GetRowObject(System.Int32)">
+            <summary>Returns the <see cref="T:VirtualTerminal.Buffer.TerminalRow"/> object at row <paramref name="y"/>.</summary>
+            <param name="y">The zero-based row index.</param>
+            <returns>The row object.</returns>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.GetCell(System.Int32,System.Int32)">
+            <summary>Returns a reference to the cell at (<paramref name="y"/>, <paramref name="x"/>).</summary>
+            <param name="y">The zero-based row index.</param>
+            <param name="x">The zero-based column index.</param>
+            <returns>A reference to the requested cell.</returns>
+        </member>
+        <member name="P:VirtualTerminal.Buffer.TerminalScreenBuffer.HasDirtyRows">
+            <summary>Gets a value indicating whether any row on the active screen is dirty.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.IsRowDirty(System.Int32)">
+            <summary>Determines whether row <paramref name="y"/> is dirty.</summary>
+            <param name="y">The zero-based row index.</param>
+            <returns><see langword="true"/> if the row is dirty; otherwise, <see langword="false"/>.</returns>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.MarkRowDirty(System.Int32)">
+            <summary>Marks row <paramref name="y"/> dirty if it is within bounds.</summary>
+            <param name="y">The zero-based row index.</param>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.MarkRowsDirty(System.Int32,System.Int32)">
+            <summary>Marks a range of rows dirty.</summary>
+            <param name="from">The starting row index.</param>
+            <param name="count">The number of rows to mark.</param>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.MarkRowClean(System.Int32)">
+            <summary>Marks row <paramref name="y"/> clean if it is within bounds.</summary>
+            <param name="y">The zero-based row index.</param>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.MarkAllDirty">
+            <summary>Marks every row on the active screen dirty.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.ClearAll">
+            <summary>Clears every cell on the active screen and marks all rows dirty.</summary>
         </member>
         <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.ClearRows(System.Int32,System.Int32)">
             <summary>Clears rows in [<paramref name="from"/>, <paramref name="from"/>+count).</summary>
@@ -165,17 +289,53 @@
         <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.ClearCells(System.Int32,System.Int32,System.Int32)">
             <summary>Blanks <paramref name="count"/> cells in row <paramref name="y"/> from column <paramref name="x"/>.</summary>
         </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.IsTabStop(System.Int32)">
+            <summary>Determines whether a tab stop is set at column <paramref name="x"/>.</summary>
+            <param name="x">The zero-based column index.</param>
+            <returns><see langword="true"/> if a tab stop exists at the column; otherwise, <see langword="false"/>.</returns>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.SetTabStop(System.Int32)">
+            <summary>Sets a tab stop at column <paramref name="x"/>.</summary>
+            <param name="x">The zero-based column index.</param>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.ClearTabStop(System.Int32)">
+            <summary>Clears the tab stop at column <paramref name="x"/>.</summary>
+            <param name="x">The zero-based column index.</param>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.ClearAllTabStops">
+            <summary>Clears all tab stops.</summary>
+        </member>
         <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.NextTabStop(System.Int32)">
             <summary>Next tab stop at or after <paramref name="x"/> (clamped to last column).</summary>
         </member>
         <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.PrevTabStop(System.Int32)">
             <summary>Previous tab stop before <paramref name="x"/> (clamped to 0).</summary>
         </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.SetScrollRegion(System.Int32,System.Int32)">
+            <summary>Sets the scroll region to the specified inclusive row range.</summary>
+            <param name="top">The top row of the region.</param>
+            <param name="bottom">The bottom row of the region.</param>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.ResetScrollRegion">
+            <summary>Resets the scroll region to cover the entire screen.</summary>
+        </member>
         <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.ScrollUp(System.Int32)">
             <summary>Scrolls the current scroll region up by <paramref name="n"/> (content moves up).</summary>
         </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.ScrollUp(System.Int32,System.Int32,System.Int32)">
+            <summary>Scrolls rows in [<paramref name="top"/>, <paramref name="bottom"/>] up by <paramref name="n"/> lines.</summary>
+            <param name="top">The top row of the region.</param>
+            <param name="bottom">The bottom row of the region.</param>
+            <param name="n">The number of lines to scroll.</param>
+        </member>
         <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.ScrollDown(System.Int32)">
             <summary>Scrolls the current scroll region down by <paramref name="n"/> (content moves down).</summary>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.ScrollDown(System.Int32,System.Int32,System.Int32)">
+            <summary>Scrolls rows in [<paramref name="top"/>, <paramref name="bottom"/>] down by <paramref name="n"/> lines.</summary>
+            <param name="top">The top row of the region.</param>
+            <param name="bottom">The bottom row of the region.</param>
+            <param name="n">The number of lines to scroll.</param>
         </member>
         <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.InsertLines(System.Int32,System.Int32,System.Int32)">
             <summary>Inserts <paramref name="n"/> blank lines at row <paramref name="y"/>, scrolling within [<paramref name="y"/>, <paramref name="bottom"/>].</summary>
@@ -183,11 +343,53 @@
         <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.DeleteLines(System.Int32,System.Int32,System.Int32)">
             <summary>Deletes <paramref name="n"/> lines at row <paramref name="y"/>, scrolling within [<paramref name="y"/>, <paramref name="bottom"/>].</summary>
         </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.InsertChars(System.Int32,System.Int32,System.Int32)">
+            <summary>Inserts <paramref name="n"/> blank cells at (<paramref name="y"/>, <paramref name="x"/>), shifting existing cells right.</summary>
+            <param name="y">The zero-based row index.</param>
+            <param name="x">The zero-based column index.</param>
+            <param name="n">The number of blank cells to insert.</param>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.DeleteChars(System.Int32,System.Int32,System.Int32)">
+            <summary>Deletes <paramref name="n"/> cells at (<paramref name="y"/>, <paramref name="x"/>), shifting remaining cells left and blanking the right edge.</summary>
+            <param name="y">The zero-based row index.</param>
+            <param name="x">The zero-based column index.</param>
+            <param name="n">The number of cells to delete.</param>
+        </member>
         <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.EraseChars(System.Int32,System.Int32,System.Int32)">
             <summary>Erases <paramref name="n"/> characters starting at (<paramref name="y"/>, <paramref name="x"/>) without moving the cursor.</summary>
         </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.EnterAlternateScreen">
+            <summary>Switches to the alternate screen, clearing it and resetting the scroll region.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.LeaveAlternateScreen">
+            <summary>Returns to the primary screen and marks all rows dirty.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.ClearAlternateScreen">
+            <summary>Clears every cell on the alternate screen if it is active.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.Resize(System.Int32,System.Int32)">
+            <summary>Resizes the active grid to the specified dimensions, pushing dropped rows to scrollback.</summary>
+            <param name="columns">The new number of columns.</param>
+            <param name="rows">The new number of rows.</param>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.Resize(System.Int32,System.Int32,VirtualTerminal.Buffer.TerminalState)">
+            <summary>Resizes the active grid and adjusts the cursor state.</summary>
+            <param name="columns">The new number of columns.</param>
+            <param name="rows">The new number of rows.</param>
+            <param name="state">The cursor state to update, or <see langword="null"/>.</param>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.Resize(System.Int32,System.Int32,VirtualTerminal.Buffer.TerminalState,System.Boolean)">
+            <summary>Resizes the active grid and optionally adjusts the cursor state and scrollback.</summary>
+            <param name="columns">The new number of columns.</param>
+            <param name="rows">The new number of rows.</param>
+            <param name="state">The cursor state to update, or <see langword="null"/>.</param>
+            <param name="pushScrollback">Whether rows dropped from the top should be pushed into scrollback.</param>
+        </member>
         <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.GetScrollback">
             <summary>Snapshot of the scrollback rows (oldest first). Used by the renderer for history.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.Dispose">
+            <summary>Releases resources used by the screen buffer.</summary>
         </member>
         <member name="T:VirtualTerminal.Buffer.ColorSource">
             <summary>How a color attribute was specified, so <see cref="M:VirtualTerminal.Buffer.CharAttributes.ToCellStyle(VirtualTerminal.Model.TerminalPalette,System.Boolean)"/> can resolve it.</summary>
@@ -208,17 +410,192 @@
             bold-as-bright, default-color sentinels) at the moment a cell is written.
             </summary>
         </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.ForegroundSource">
+            <summary>How the foreground color was specified.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.ForegroundIndex">
+            <summary>The ANSI palette index for the foreground when <see cref="F:VirtualTerminal.Buffer.CharAttributes.ForegroundSource"/> is <see cref="F:VirtualTerminal.Buffer.ColorSource.Indexed"/>.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.ForegroundRgb">
+            <summary>The direct RGB foreground color when <see cref="F:VirtualTerminal.Buffer.CharAttributes.ForegroundSource"/> is <see cref="F:VirtualTerminal.Buffer.ColorSource.Direct"/>.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.BackgroundSource">
+            <summary>How the background color was specified.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.BackgroundIndex">
+            <summary>The ANSI palette index for the background when <see cref="F:VirtualTerminal.Buffer.CharAttributes.BackgroundSource"/> is <see cref="F:VirtualTerminal.Buffer.ColorSource.Indexed"/>.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.BackgroundRgb">
+            <summary>The direct RGB background color when <see cref="F:VirtualTerminal.Buffer.CharAttributes.BackgroundSource"/> is <see cref="F:VirtualTerminal.Buffer.ColorSource.Direct"/>.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.UnderlineSource">
+            <summary>How the underline color was specified.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.UnderlineIndex">
+            <summary>The ANSI palette index for the underline color when <see cref="F:VirtualTerminal.Buffer.CharAttributes.UnderlineSource"/> is <see cref="F:VirtualTerminal.Buffer.ColorSource.Indexed"/>.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.UnderlineRgb">
+            <summary>The direct RGB underline color when <see cref="F:VirtualTerminal.Buffer.CharAttributes.UnderlineSource"/> is <see cref="F:VirtualTerminal.Buffer.ColorSource.Direct"/>.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.Bold">
+            <summary>SGR 1: bold (bright).</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.Faint">
+            <summary>SGR 2: faint (dim).</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.Italic">
+            <summary>SGR 3: italic.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.Conceal">
+            <summary>SGR 8: conceal (hide text).</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.Inverse">
+            <summary>SGR 7: inverse video (swap foreground and background).</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.Strikethrough">
+            <summary>SGR 9: strikethrough.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.Overline">
+            <summary>SGR 53: overline.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.Fraktur">
+            <summary>SGR 20: Fraktur typeface.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.Framed">
+            <summary>SGR 51: framed.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.Encircled">
+            <summary>SGR 52: encircled.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.DoublyUnderlined">
+            <summary>SGR 21: doubly underlined.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.UnderlineStyle">
+            <summary>The underline style.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.Blink">
+            <summary>The blink mode.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.CharAttributes.HyperlinkId">
+            <summary>Identifier of the active hyperlink, or 0 if none.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Buffer.CharAttributes.Default">
+            <summary>Gets the default attribute state.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.CharAttributes.Reset">
+            <summary>Resets all attributes to their default values.</summary>
+        </member>
         <member name="M:VirtualTerminal.Buffer.CharAttributes.ToCellStyle(VirtualTerminal.Model.TerminalPalette,System.Boolean)">
             <summary>Resolves the current attributes into a <see cref="T:VirtualTerminal.Model.CellRenderStyle"/> for a cell.</summary>
         </member>
         <member name="T:VirtualTerminal.Buffer.TerminalState">
             <summary>Cursor and saved-state owned by the decoder, outside the screen buffer.</summary>
         </member>
+        <member name="F:VirtualTerminal.Buffer.TerminalState.CursorX">
+            <summary>The zero-based cursor column.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.TerminalState.CursorY">
+            <summary>The zero-based cursor row.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.TerminalState.WrapPending">
+            <summary>Whether the cursor wrapped to the next line and the next print should start there.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.TerminalState.Attributes">
+            <summary>The current character attributes applied to newly written cells.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.TerminalState.Modes">
+            <summary>The current terminal modes.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.TerminalState.SavedCursorX">
+            <summary>The saved cursor column from <see cref="M:VirtualTerminal.Buffer.TerminalState.SaveCursor"/>.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.TerminalState.SavedCursorY">
+            <summary>The saved cursor row from <see cref="M:VirtualTerminal.Buffer.TerminalState.SaveCursor"/>.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.TerminalState.SavedAttributes">
+            <summary>The saved character attributes from <see cref="M:VirtualTerminal.Buffer.TerminalState.SaveCursor"/>.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.TerminalState.SavedOriginMode">
+            <summary>The saved origin mode from <see cref="M:VirtualTerminal.Buffer.TerminalState.SaveCursor"/>.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Buffer.TerminalState.SavedWrapPending">
+            <summary>The saved wrap-pending flag from <see cref="M:VirtualTerminal.Buffer.TerminalState.SaveCursor"/>.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalState.SaveCursor">
+            <summary>Saves the current cursor position, attributes, origin mode, and wrap state.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalState.RestoreCursor">
+            <summary>Restores the cursor position, attributes, origin mode, and wrap state previously saved by <see cref="M:VirtualTerminal.Buffer.TerminalState.SaveCursor"/>.</summary>
+        </member>
         <member name="T:VirtualTerminal.Enums.Blink">
             <summary>Blink attribute (SGR 5 slow / 6 rapid).</summary>
         </member>
+        <member name="F:VirtualTerminal.Enums.Blink.None">
+            <summary>No blinking.</summary>
+            <summary>
+            Slow.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Enums.Blink.Slow">
+            <summary>
+            Rapid.
+            </summary>
+            <summary>Slow blink (SGR 5).</summary>
+        </member>
+        <member name="F:VirtualTerminal.Enums.Blink.Rapid">
+            <summary>Rapid blink (SGR 6).</summary>
+        </member>
         <member name="T:VirtualTerminal.Enums.Underline">
             <summary>Underline style for a cell (SGR 4 / 4:0..4 / 21).</summary>
+        </member>
+        <member name="F:VirtualTerminal.Enums.Underline.None">
+            <summary>No underline.</summary>
+            <summary>
+            Single.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Enums.Underline.Single">
+            <summary>
+            Double.
+            </summary>
+            <summary>Single straight underline.</summary>
+            <summary>
+            Dotted.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Enums.Underline.Double">
+            <summary>
+            Dashed.
+            </summary>
+            <summary>Double straight underline.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Enums.Underline.Curly">
+            <summary>Wavy / curly underline.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Enums.Underline.Dotted">
+            <summary>Dotted underline.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Enums.Underline.Dashed">
+            <summary>Dashed underline.</summary>
+        </member>
+        <member name="T:VirtualTerminal.Extensions.EncodingHelpers">
+            <summary>
+            Helpers for converting between character encodings.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Extensions.EncodingHelpers.Convert(System.Text.Encoding,System.Text.Encoding,System.ReadOnlySpan{System.Byte})">
+            <summary>
+            Converts <paramref name="bytes"/> from <paramref name="srcEncoding"/> to <paramref name="dstEncoding"/>.
+            </summary>
+            <param name="srcEncoding">Encoding of the input bytes.</param>
+            <param name="dstEncoding">Encoding to produce.</param>
+            <param name="bytes">Input bytes in <paramref name="srcEncoding"/>.</param>
+            <returns>The re-encoded byte array.</returns>
+        </member>
+        <member name="T:VirtualTerminal.Extensions.TerminalDecoderExtensions">
+            <summary>
+            Extension methods for writing text and encoded bytes to an <see cref="T:VirtualTerminal.Interfaces.ITerminalDecoder"/>.
+            </summary>
         </member>
         <member name="M:VirtualTerminal.Extensions.TerminalDecoderExtensions.WriteFromEncoding(VirtualTerminal.Interfaces.ITerminalDecoder,System.Text.Encoding,System.ReadOnlySpan{System.Byte})">
             <summary>
@@ -406,21 +783,213 @@
             UI-agnostic terminal key identifiers used by <see cref="T:VirtualTerminal.Input.KeyboardEncoder"/>.
             </summary>
         </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.None">
+            <summary>No key.</summary>
+            <summary>
+            Enter.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.Enter">
+            <summary>
+            Back.
+            </summary>
+            <summary>Return / Enter key.</summary>
+            <summary>
+            Escape.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.Back">
+            <summary>
+            Up.
+            </summary>
+            <summary>Backspace key.</summary>
+            <summary>
+            Right.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.Tab">
+            <summary>
+            Left.
+            </summary>
+            <summary>Tab key.</summary>
+            <summary>
+            Insert.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.Escape">
+            <summary>
+            Delete.
+            </summary>
+            <summary>Escape key.</summary>
+            <summary>
+            Page up.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.Up">
+            <summary>
+            Page down.
+            </summary>
+            <summary>Up arrow key.</summary>
+            <summary>
+            F2.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.Down">
+            <summary>
+            F3.
+            </summary>
+            <summary>Down arrow key.</summary>
+            <summary>
+            F5.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.Right">
+            <summary>
+            F6.
+            </summary>
+            <summary>Right arrow key.</summary>
+            <summary>
+            F8.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.Left">
+            <summary>
+            F9.
+            </summary>
+            <summary>Left arrow key.</summary>
+            <summary>
+            F11.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.Home">
+            <summary>
+            F12.
+            </summary>
+            <summary>Home key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.Insert">
+            <summary>Insert key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.Delete">
+            <summary>Delete key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.End">
+            <summary>End key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.PageUp">
+            <summary>Page up key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.PageDown">
+            <summary>Page down key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.F1">
+            <summary>F1 key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.F2">
+            <summary>F2 key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.F3">
+            <summary>F3 key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.F4">
+            <summary>F4 key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.F5">
+            <summary>F5 key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.F6">
+            <summary>F6 key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.F7">
+            <summary>F7 key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.F8">
+            <summary>F8 key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.F9">
+            <summary>F9 key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.F10">
+            <summary>F10 key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.F11">
+            <summary>F11 key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalKey.F12">
+            <summary>F12 key.</summary>
+        </member>
         <member name="T:VirtualTerminal.Input.TerminalModifier">
             <summary>
             UI-agnostic modifier key flags used by <see cref="T:VirtualTerminal.Input.KeyboardEncoder"/> and <see cref="T:VirtualTerminal.Input.MouseEncoder"/>.
             </summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalModifier.None">
+            <summary>No modifier held.</summary>
+            <summary>
+            Shift.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalModifier.Shift">
+            <summary>
+            Alt.
+            </summary>
+            <summary>Shift key.</summary>
+            <summary>
+            Meta.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalModifier.Alt">
+            <summary>Alt key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalModifier.Control">
+            <summary>Control key.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalModifier.Meta">
+            <summary>Meta / Windows / Command key.</summary>
         </member>
         <member name="T:VirtualTerminal.Input.TerminalMouseButton">
             <summary>
             UI-agnostic mouse button identifiers used by <see cref="T:VirtualTerminal.Input.MouseEncoder"/>.
             </summary>
         </member>
+        <member name="F:VirtualTerminal.Input.TerminalMouseButton.None">
+            <summary>No button.</summary>
+            <summary>
+            Left.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalMouseButton.Left">
+            <summary>
+            Middle.
+            </summary>
+            <summary>Left mouse button.</summary>
+            <summary>
+            X button1.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalMouseButton.Middle">
+            <summary>
+            X button2.
+            </summary>
+            <summary>Middle mouse button.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalMouseButton.Right">
+            <summary>Right mouse button.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalMouseButton.XButton1">
+            <summary>First extended mouse button.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Input.TerminalMouseButton.XButton2">
+            <summary>Second extended mouse button.</summary>
+        </member>
         <member name="T:VirtualTerminal.Interfaces.ITerminalDecoder">
             <summary>
             A VT/ANSI byte-stream decoder. Feeds raw bytes via <see cref="M:VirtualTerminal.Interfaces.ITerminalDecoder.Write(System.ReadOnlySpan{System.Byte})"/>; the decoder maintains
             terminal state and mutates a screen buffer. Robust decoders never throw on malformed input.
             </summary>
+        </member>
+        <member name="P:VirtualTerminal.Interfaces.ITerminalDecoder.Encoding">
+            <summary>Gets the encoding used to interpret the byte stream.</summary>
         </member>
         <member name="M:VirtualTerminal.Interfaces.ITerminalDecoder.Write(System.ReadOnlySpan{System.Byte})">
             <summary>
@@ -509,10 +1078,19 @@
         <member name="T:VirtualTerminal.Model.CellRenderStyle">
             <summary>
             The render-relevant attributes of a cell, intentionally excluding the character glyph.
-            The TerminalRenderer coalesces consecutive cells that share an equal
-            <see cref="T:VirtualTerminal.Model.CellRenderStyle"/> into a single glyph run, so <see cref="M:VirtualTerminal.Model.CellRenderStyle.Equals(VirtualTerminal.Model.CellRenderStyle)"/> and
-            <see cref="M:VirtualTerminal.Model.CellRenderStyle.GetHashCode"/> must cover every field.
+            The terminal renderer coalesces consecutive cells that share an equal
+            <see cref="T:VirtualTerminal.Model.CellRenderStyle"/> into a single glyph run, so equality and
+            hashing must cover every field.
             </summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.Foreground">
+            <summary>Gets the foreground color.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.Background">
+            <summary>Gets the background color.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.UnderlineColor">
+            <summary>Gets the underline color.</summary>
         </member>
         <member name="P:VirtualTerminal.Model.CellRenderStyle.Flags">
             <summary>Bitfield of boolean attributes plus default-color sentinels and width flags.</summary>
@@ -522,6 +1100,57 @@
         </member>
         <member name="P:VirtualTerminal.Model.CellRenderStyle.HyperlinkId">
             <summary>Index into the buffer's hyperlink table (0 = none).</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.ForegroundIsDefault">
+            <summary>Gets a value indicating whether the foreground uses the terminal default color.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.BackgroundIsDefault">
+            <summary>Gets a value indicating whether the background uses the terminal default color.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.UnderlineColorIsDefault">
+            <summary>Gets a value indicating whether the underline color uses the terminal default color.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.Bold">
+            <summary>Gets a value indicating whether the text is bold (or intense).</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.Faint">
+            <summary>Gets a value indicating whether the text is faint (dim).</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.Italic">
+            <summary>Gets a value indicating whether the text is italic.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.Conceal">
+            <summary>Gets a value indicating whether the text is concealed (hidden).</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.Inverse">
+            <summary>Gets a value indicating whether foreground and background colors are swapped.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.Strikethrough">
+            <summary>Gets a value indicating whether the text is struck through.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.Overline">
+            <summary>Gets a value indicating whether the text has an overline.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.Fraktur">
+            <summary>Gets a value indicating whether the text uses a Fraktur (blackletter) typeface.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.Framed">
+            <summary>Gets a value indicating whether the cell is framed.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.Encircled">
+            <summary>Gets a value indicating whether the cell is encircled.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.DoublyUnderlined">
+            <summary>Gets a value indicating whether the text is doubly underlined.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.Wide">
+            <summary>Gets a value indicating whether this cell is the first half of a full-width character.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.Continuation">
+            <summary>Gets a value indicating whether this cell is the second (empty) half of a full-width character.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.CellRenderStyle.Blink">
+            <summary>Gets the blink style (slow, rapid, or none).</summary>
         </member>
         <member name="P:VirtualTerminal.Model.CellRenderStyle.Default">
             <summary>A clean default: default foreground/background, no attributes.</summary>
@@ -543,6 +1172,63 @@
         </member>
         <member name="T:VirtualTerminal.Model.CellStyleFlags">
             <summary>Boolean cell attributes, default-color sentinels, blink, and width flags.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.None">
+            <summary>No style flags set.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.Bold">
+            <summary>SGR bold (increased weight / bright color mapping).</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.Faint">
+            <summary>SGR faint (decreased intensity).</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.Italic">
+            <summary>SGR italic.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.Conceal">
+            <summary>SGR conceal (hidden text).</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.Inverse">
+            <summary>SGR inverse video (foreground and background swapped).</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.Strikethrough">
+            <summary>SGR strikethrough.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.Overline">
+            <summary>SGR overline.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.Fraktur">
+            <summary>SGR Fraktur (blackletter).</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.Framed">
+            <summary>SGR framed.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.Encircled">
+            <summary>SGR encircled.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.ForegroundIsDefault">
+            <summary>Foreground uses the terminal default color.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.BackgroundIsDefault">
+            <summary>Background uses the terminal default color.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.UnderlineColorIsDefault">
+            <summary>Underline color uses the terminal default color.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.Wide">
+            <summary>Cell is the first half of a full-width character.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.Continuation">
+            <summary>Cell is the continuation (second half) of a full-width character.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.BlinkSlow">
+            <summary>SGR slow blink.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.BlinkRapid">
+            <summary>SGR rapid blink.</summary>
+        </member>
+        <member name="F:VirtualTerminal.Model.CellStyleFlags.DoublyUnderlined">
+            <summary>SGR doubly underlined.</summary>
         </member>
         <member name="T:VirtualTerminal.Model.TerminalCellInfo">
             <summary>
@@ -570,18 +1256,52 @@
         <member name="M:VirtualTerminal.Model.TerminalCellInfo.Clear">
             <summary>Resets the cell to a blank space while preserving nothing.</summary>
         </member>
+        <member name="M:VirtualTerminal.Model.TerminalCellInfo.Equals(VirtualTerminal.Model.TerminalCellInfo)">
+            <summary>Indicates whether the current cell is equal to another cell.</summary>
+            <param name="other">The cell to compare.</param>
+            <returns>true if the cells have the same character and style; otherwise false.</returns>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalCellInfo.Equals(System.Object)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalCellInfo.GetHashCode">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalCellInfo.op_Equality(VirtualTerminal.Model.TerminalCellInfo,VirtualTerminal.Model.TerminalCellInfo)">
+            <summary>Determines whether two cells are equal.</summary>
+            <param name="left">The first cell to compare.</param>
+            <param name="right">The second cell to compare.</param>
+            <returns>true if the cells are equal; otherwise false.</returns>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalCellInfo.op_Inequality(VirtualTerminal.Model.TerminalCellInfo,VirtualTerminal.Model.TerminalCellInfo)">
+            <summary>Determines whether two cells are not equal.</summary>
+            <param name="left">The first cell to compare.</param>
+            <param name="right">The second cell to compare.</param>
+            <returns>true if the cells are not equal; otherwise false.</returns>
+        </member>
         <member name="T:VirtualTerminal.Model.TerminalPalette">
             <summary>
             The 256-entry ANSI color palette (16 system + 216 cube + 24 grayscale). Mutable so
-            OSC 4 / 10 / 11 / 12 can recolor entries at runtime; <see cref="!:TerminalPaletteExtensions.GetColor"/>
-            resolves a 0–255 index to a <see cref="T:System.Drawing.Color"/>.
+            OSC 4 / 10 / 11 / 12 can recolor entries at runtime.
             </summary>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalPalette.#ctor">
+            <summary>Initializes a new instance with the standard xterm 256-color palette.</summary>
         </member>
         <member name="P:VirtualTerminal.Model.TerminalPalette.Item(System.Int32)">
             <summary>Gets or sets the color at the given ANSI index (0–255).</summary>
         </member>
+        <member name="M:VirtualTerminal.Model.TerminalPalette.AsSpan">
+            <summary>Returns the underlying palette colors as a span.</summary>
+            <returns>A span over the 256-entry palette.</returns>
+        </member>
         <member name="M:VirtualTerminal.Model.TerminalPalette.GetColor(System.Int32)">
             <summary>Resolves an ANSI index to its <see cref="T:System.Drawing.Color"/> (clamped to 0–255).</summary>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalPalette.SetAnsiColor(System.Int32,System.Drawing.Color)">
+            <summary>Sets the color at the given ANSI index.</summary>
+            <param name="index">The ANSI color index (0–255).</param>
+            <param name="color">The color to assign.</param>
         </member>
         <member name="M:VirtualTerminal.Model.TerminalPalette.LoadXtermDefaults">
             <summary>Loads the standard xterm palette: 16 system colors, 6×6×6 cube, 24 grays.</summary>
@@ -608,12 +1328,21 @@
         <member name="T:VirtualTerminal.Options.TerminalOptions">
             <summary>
             Customization knobs for a terminal instance: palette, default colors, cursor, scrollback,
-            layout, font fallback, and consent gates for OSC features. Bound to a <see cref="!:TerminalControl"/>
-            via StyledProperties and/or set directly on the session's decoder.
+            layout, font fallback, and consent gates for OSC features. Typically bound to a UI control
+            via styled properties and/or set directly on the session's decoder.
             </summary>
         </member>
         <member name="P:VirtualTerminal.Options.TerminalOptions.Palette">
             <summary>The 256-entry ANSI palette (mutable; OSC 4/10/11/12 recolor entries).</summary>
+        </member>
+        <member name="P:VirtualTerminal.Options.TerminalOptions.DefaultForeground">
+            <summary>Default foreground color used when no SGR foreground is active.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Options.TerminalOptions.DefaultBackground">
+            <summary>Default background color used when no SGR background is active.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Options.TerminalOptions.DefaultCursorColor">
+            <summary>Default cursor color.</summary>
         </member>
         <member name="P:VirtualTerminal.Options.TerminalOptions.CursorShape">
             <summary>Cursor shape (also settable via DECSCUSR).</summary>
@@ -642,6 +1371,10 @@
         <member name="P:VirtualTerminal.Options.TerminalOptions.AllowClipboard">
             <summary>Allow OSC 52 clipboard access.</summary>
         </member>
+        <member name="M:VirtualTerminal.Options.TerminalOptions.Clone">
+            <summary>Creates a shallow copy of these options.</summary>
+            <returns>A new options instance with the same values.</returns>
+        </member>
         <member name="T:VirtualTerminal.Session.CanonicalTerminalSession">
             <summary>
             A canonical, in-memory terminal session with a real line editor: positional cursor editing
@@ -650,11 +1383,46 @@
             rather than treating input as raw characters.
             </summary>
         </member>
+        <member name="P:VirtualTerminal.Session.CanonicalTerminalSession.ShellPrompt">
+            <summary>Gets or sets the prompt displayed before user input.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Session.CanonicalTerminalSession.Writer">
+            <summary>Gets a <see cref="T:System.IO.TextWriter"/> that feeds output into this session.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Session.CanonicalTerminalSession.Reader">
+            <summary>Gets a <see cref="T:System.IO.TextReader"/> that reads from this session.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Session.CanonicalTerminalSession.#ctor">
+            <summary>
+            Initializes a new canonical terminal session with default I/O wrappers and prompt.
+            </summary>
+        </member>
         <member name="M:VirtualTerminal.Session.CanonicalTerminalSession.ReadLineAsync">
             <summary>Completes when the user submits a line while a caller is awaiting input.</summary>
         </member>
+        <member name="M:VirtualTerminal.Session.CanonicalTerminalSession.FeedOutput(System.ReadOnlySpan{System.Byte})">
+            <summary>
+            Feeds raw output bytes to the terminal decoder and queues them for <see cref="M:VirtualTerminal.Session.CanonicalTerminalSession.Read(System.Span{System.Byte})"/>.
+            </summary>
+            <param name="data">Output bytes to process.</param>
+        </member>
+        <member name="M:VirtualTerminal.Session.CanonicalTerminalSession.FeedOutput(System.String)">
+            <summary>
+            Encodes <paramref name="text"/> and feeds the resulting bytes to <see cref="M:VirtualTerminal.Session.CanonicalTerminalSession.FeedOutput(System.ReadOnlySpan{System.Byte})"/>.
+            </summary>
+            <param name="text">Text to output.</param>
+        </member>
+        <member name="M:VirtualTerminal.Session.CanonicalTerminalSession.Write(System.ReadOnlySpan{System.Byte})">
+            <summary>
+            Processes input bytes as xterm key sequences or raw characters.
+            </summary>
+            <param name="data">Input bytes to process.</param>
+        </member>
         <member name="M:VirtualTerminal.Session.CanonicalTerminalSession.RedrawLine">
             <summary>Reprints the active prompt + current input, clears the trailing tail, and positions the caret.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Session.CanonicalTerminalSession.PrintPrompt">
+            <summary>Resets the input line and prints a fresh prompt.</summary>
         </member>
         <member name="M:VirtualTerminal.Session.CanonicalTerminalSession.ExecuteCommandAsync(System.String)">
             <summary>
@@ -663,6 +1431,25 @@
             simply prints a fresh prompt.
             </summary>
             <param name="rawCommand">The submitted line.</param>
+        </member>
+        <member name="M:VirtualTerminal.Session.CanonicalTerminalSession.Read(System.Span{System.Byte})">
+            <summary>
+            Copies up to <paramref name="buffer"/>.Length bytes from the output queue into <paramref name="buffer"/>.
+            </summary>
+            <param name="buffer">Destination span.</param>
+            <returns>The number of bytes read.</returns>
+        </member>
+        <member name="M:VirtualTerminal.Session.CanonicalTerminalSession.ReadAll">
+            <summary>
+            Reads all queued output bytes into a newly allocated array.
+            </summary>
+            <returns>A byte array containing all queued output, or an empty array if none is available.</returns>
+        </member>
+        <member name="M:VirtualTerminal.Session.CanonicalTerminalSession.Dispose(System.Boolean)">
+            <summary>
+            Releases resources held by this session.
+            </summary>
+            <param name="disposing"><c>true</c> when called from <see cref="M:System.IDisposable.Dispose"/>; otherwise <c>false</c>.</param>
         </member>
         <member name="T:VirtualTerminal.Session.DummyTerminalSession">
             <summary>
@@ -712,6 +1499,11 @@
         <member name="P:VirtualTerminal.Session.TerminalSession.AvailableDataLength">
             <inheritdoc />
         </member>
+        <member name="P:VirtualTerminal.Session.TerminalSession.InternalDecoder">
+            <summary>
+            Gets the underlying <see cref="T:VirtualTerminal.TerminalDecoder"/> used to parse VT input for this session.
+            </summary>
+        </member>
         <member name="M:VirtualTerminal.Session.TerminalSession.#ctor">
             <summary>
             Initializes a new session with a fresh <see cref="T:VirtualTerminal.Buffer.TerminalScreenBuffer"/> and default input encoding.
@@ -755,6 +1547,11 @@
             Releases resources held by a derived session implementation.
             </summary>
             <param name="disposing"><c>true</c> when called from <see cref="M:VirtualTerminal.Session.TerminalSession.Dispose"/>; otherwise <c>false</c>.</param>
+        </member>
+        <member name="M:VirtualTerminal.Session.TerminalSession.ThrowIfDisposed">
+            <summary>
+            Throws <see cref="T:System.ObjectDisposedException"/> if the session has already been disposed.
+            </summary>
         </member>
         <member name="M:VirtualTerminal.Session.TerminalSession.Dispose">
             <summary>
@@ -827,6 +1624,15 @@
             name so existing casts (<c>is TerminalDecoder</c>) keep working.
             </summary>
         </member>
+        <member name="P:VirtualTerminal.TerminalDecoder.Buffer">
+            <summary>Gets the terminal screen buffer being modified by this decoder.</summary>
+        </member>
+        <member name="P:VirtualTerminal.TerminalDecoder.State">
+            <summary>Gets the current terminal state (cursor, attributes, modes).</summary>
+        </member>
+        <member name="P:VirtualTerminal.TerminalDecoder.Options">
+            <summary>Gets or sets options that control rendering and behavior.</summary>
+        </member>
         <member name="P:VirtualTerminal.TerminalDecoder.Title">
             <summary>Current window title (OSC 0/1/2).</summary>
         </member>
@@ -839,8 +1645,34 @@
         <member name="P:VirtualTerminal.TerminalDecoder.SendOutput">
             <summary>Wire to the session output queue so reports (DSR/DA/…) reach the client.</summary>
         </member>
+        <member name="P:VirtualTerminal.TerminalDecoder.CursorPosition">
+            <summary>Gets the current cursor position as a point.</summary>
+        </member>
+        <member name="P:VirtualTerminal.TerminalDecoder.Encoding">
+            <summary>Gets the encoding used by the underlying VT parser.</summary>
+        </member>
+        <member name="M:VirtualTerminal.TerminalDecoder.#ctor(VirtualTerminal.Buffer.TerminalScreenBuffer,VirtualTerminal.Options.TerminalOptions)">
+            <summary>
+            Initializes a new <see cref="T:VirtualTerminal.TerminalDecoder"/> with an optional buffer and options.
+            </summary>
+            <param name="buffer">Screen buffer to use, or <c>null</c> to create a default buffer.</param>
+            <param name="options">Options to use, or <c>null</c> to use default options.</param>
+        </member>
+        <member name="M:VirtualTerminal.TerminalDecoder.Write(System.ReadOnlySpan{System.Byte})">
+            <summary>Writes a span of raw VT/ANSI bytes to the decoder.</summary>
+            <param name="data">Bytes to process.</param>
+        </member>
         <member name="M:VirtualTerminal.TerminalDecoder.Resize(System.UInt16,System.UInt16)">
             <summary>Resizes the underlying screen buffer and clamps the cursor into the new bounds.</summary>
+        </member>
+        <member name="M:VirtualTerminal.TerminalDecoder.Resize(System.UInt16,System.UInt16,System.Boolean)">
+            <summary>Resizes the underlying screen buffer and clamps the cursor into the new bounds.</summary>
+            <param name="columns">New number of columns.</param>
+            <param name="rows">New number of rows.</param>
+            <param name="pushScrollback"><c>true</c> to push removed rows into scrollback.</param>
+        </member>
+        <member name="M:VirtualTerminal.TerminalDecoder.Dispose">
+            <summary>Releases the underlying VT parser resources.</summary>
         </member>
         <member name="M:VirtualTerminal.TerminalDecoder.Print(System.Text.Rune)">
             <inheritdoc/>
@@ -895,6 +1727,16 @@
         </member>
         <member name="M:VirtualTerminal.Vt.CsiParams.GetEnumerator">
             <summary>Enumerates (index, value, isSubParam).</summary>
+        </member>
+        <member name="T:VirtualTerminal.Vt.CsiParams.Enumerator">
+            <summary>Supports iterating over the parameters of a <see cref="T:VirtualTerminal.Vt.CsiParams"/> value.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Vt.CsiParams.Enumerator.MoveNext">
+            <summary>Advances the enumerator to the next parameter.</summary>
+            <returns>true if another parameter is available; otherwise false.</returns>
+        </member>
+        <member name="P:VirtualTerminal.Vt.CsiParams.Enumerator.Current">
+            <summary>Gets the current parameter index, value, and sub-parameter flag.</summary>
         </member>
         <member name="T:VirtualTerminal.Vt.IVtHandler">
             <summary>
@@ -971,11 +1813,20 @@
              </para>
              </summary>
         </member>
+        <member name="P:VirtualTerminal.Vt.VtDecoder.Encoding">
+            <summary>Gets the encoding used by this decoder (always UTF-8).</summary>
+        </member>
         <member name="M:VirtualTerminal.Vt.VtDecoder.Write(System.ReadOnlySpan{System.Byte})">
             <summary>Feeds a raw byte stream through the state machine.</summary>
         </member>
         <member name="M:VirtualTerminal.Vt.VtDecoder.Reset">
             <summary>Resets the parser to <see cref="F:VirtualTerminal.Vt.VtDecoder.State.Ground"/> and discards any in-flight sequence.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Vt.VtDecoder.Dispose">
+            <summary>
+            Releases all resources used by the current object.
+            </summary>
+            <summary>Releases resources used by the decoder and resets the parser state.</summary>
         </member>
         <member name="T:Microsoft.CodeAnalysis.EmbeddedAttribute">
             <summary>

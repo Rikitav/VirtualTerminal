@@ -216,6 +216,16 @@
             Optional command line passed to <c>CreateProcess</c>.
             </summary>
         </member>
+        <member name="F:VirtualTerminal.Interop.ProcessCreationInfo.Environment">
+            <summary>
+            Optional environment block passed to <c>CreateProcess</c>.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Interop.ProcessCreationInfo.CurrentDirectory">
+            <summary>
+            Optional working directory passed to <c>CreateProcess</c>.
+            </summary>
+        </member>
         <member name="T:VirtualTerminal.Interop.Win32ProcessFactory">
             <summary>
             Starts a Win32 process, optionally attaching it to a ConPTY pseudo console via extended startup info.

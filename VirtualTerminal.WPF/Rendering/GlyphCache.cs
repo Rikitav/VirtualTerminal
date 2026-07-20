@@ -30,14 +30,31 @@ public sealed class GlyphCache : IDisposable
     private double _strikePos;
     private double _strikeThickness;
 
+    /// <summary>Gets a value indicating whether the cache has been configured with a valid primary typeface.</summary>
     public bool IsValid => _primary is not null;
+
+    /// <summary>Gets the advance width of a single cell in pixels.</summary>
     public double CellWidth => _cellWidth;
+
+    /// <summary>Gets the height of a single cell in pixels.</summary>
     public double CellHeight => _cellHeight;
+
+    /// <summary>Gets the typographic ascent used to position glyphs within the cell.</summary>
     public double Ascent => _ascent;
+
+    /// <summary>Gets the underline offset from the baseline.</summary>
     public double UnderlinePosition => _underlinePos;
+
+    /// <summary>Gets the recommended underline thickness.</summary>
     public double UnderlineThickness => _underlineThickness;
+
+    /// <summary>Gets the strikethrough offset from the baseline.</summary>
     public double StrikethroughPosition => _strikePos;
+
+    /// <summary>Gets the recommended strikethrough thickness.</summary>
     public double StrikethroughThickness => _strikeThickness;
+
+    /// <summary>Gets the primary glyph typeface used for rendering.</summary>
     public GlyphTypeface Primary => _primary ?? throw new InvalidOperationException("GlyphCache not configured.");
 
     /// <summary>Rebuilds the cache for the given primary family, size, line-height, and fallbacks.</summary>
@@ -153,6 +170,7 @@ public sealed class GlyphCache : IDisposable
         return 0;
     }
 
+    /// <summary>Releases the glyph cache resources.</summary>
     public void Dispose()
     {
         _primary = null;

@@ -1,8 +1,11 @@
-﻿using System.Text;
+using System.Text;
 using VirtualTerminal.Interfaces;
 
 namespace VirtualTerminal.Extensions;
 
+/// <summary>
+/// Extension methods for writing text and encoded bytes to an <see cref="ITerminalDecoder"/>.
+/// </summary>
 public static class TerminalDecoderExtensions
 {
     /// <summary>

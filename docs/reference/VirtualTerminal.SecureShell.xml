@@ -36,14 +36,12 @@
             Initializes a new SSH session using an externally created client. The session does not own the client.
             </summary>
             <param name="client">SSH client instance.</param>
-            <param name="encoding">Input encoding (defaults to UTF-8).</param>
         </member>
         <member name="M:VirtualTerminal.SecureShellSession.#ctor(Renci.SshNet.ConnectionInfo)">
             <summary>
             Initializes a new SSH session by creating and owning a new client from the given connection info.
             </summary>
             <param name="connectionInfo">SSH connection info.</param>
-            <param name="encoding">Input encoding (defaults to UTF-8).</param>
         </member>
         <member name="M:VirtualTerminal.SecureShellSession.#ctor(System.String,System.Int32,System.String,System.String)">
             <summary>
@@ -54,7 +52,6 @@
             <param name="port">Remote SSH port.</param>
             <param name="username">SSH username.</param>
             <param name="password">SSH password.</param>
-            <param name="encoding">Input encoding (defaults to UTF-8).</param>
         </member>
         <member name="M:VirtualTerminal.SecureShellSession.#ctor(System.String,System.String,System.String)">
             <summary>
@@ -64,7 +61,6 @@
             <param name="host">Remote host name or IP address.</param>
             <param name="username">SSH username.</param>
             <param name="password">SSH password.</param>
-            <param name="encoding">Input encoding (defaults to UTF-8).</param>
         </member>
         <member name="M:VirtualTerminal.SecureShellSession.#ctor(System.String,System.Int32,System.String,Renci.SshNet.IPrivateKeySource[])">
             <summary>
@@ -74,7 +70,6 @@
             <param name="host">Remote host name or IP address.</param>
             <param name="port">Remote SSH port.</param>
             <param name="username">SSH username.</param>
-            <param name="encoding">Input encoding (defaults to UTF-8).</param>
             <param name="keyFiles">Private key sources used for authentication.</param>
         </member>
         <member name="M:VirtualTerminal.SecureShellSession.#ctor(System.String,System.String,Renci.SshNet.IPrivateKeySource[])">
@@ -84,7 +79,6 @@
             </summary>
             <param name="host">Remote host name or IP address.</param>
             <param name="username">SSH username.</param>
-            <param name="encoding">Input encoding (defaults to UTF-8).</param>
             <param name="keyFiles">Private key sources used for authentication.</param>
         </member>
         <member name="M:VirtualTerminal.SecureShellSession.ConnectAsync(System.Threading.CancellationToken)">

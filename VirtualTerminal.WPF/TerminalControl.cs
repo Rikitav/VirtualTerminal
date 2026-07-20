@@ -205,7 +205,7 @@ public partial class TerminalControl : Control, IDisposable
         Debug.WriteLine($"[{GetType().Name}] Constructor");
         _renderTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Background, DispatcherRenderHandler, Dispatcher);
         _blinkTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(530), DispatcherPriority.Background, DispatcherBlinkHandler, Dispatcher);
-        _resizeTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(150), DispatcherPriority.Background, (s, e) => { _resizeTimer.Stop(); ResizeSessionToBounds(); }, Dispatcher);
+        _resizeTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(150), DispatcherPriority.Background, (s, e) => { _resizeTimer!.Stop(); ResizeSessionToBounds(); }, Dispatcher);
 
         Focusable = true;
         Loaded += (o, e) => Debug.WriteLine($"[{GetType().Name}] Loaded: Actual={ActualWidth}x{ActualHeight}, RenderSize={RenderSize}");
@@ -229,6 +229,7 @@ public partial class TerminalControl : Control, IDisposable
     }
 
     // ---- Property change handling ----
+    /// <inheritdoc />
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
@@ -337,6 +338,7 @@ public partial class TerminalControl : Control, IDisposable
         => Bell?.Invoke(this, e);
 
     // ---- Lifecycle ----
+    /// <inheritdoc />
     protected override void OnRender(DrawingContext context)
     {
         Debug.WriteLine($"[{GetType().Name}] OnRender: decoder={_decoder is not null}, configured={_rendererConfigured}, RenderSize={RenderSize}");
@@ -494,6 +496,7 @@ public partial class TerminalControl : Control, IDisposable
         }
     }
 
+    /// <inheritdoc />
     protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
     {
         Debug.WriteLine($"[{GetType().Name}] OnRenderSizeChanged: old={sizeInfo.PreviousSize}, new={sizeInfo.NewSize}, Actual={ActualWidth}x{ActualHeight}, rendererConfigured={_rendererConfigured}");
@@ -554,6 +557,7 @@ public partial class TerminalControl : Control, IDisposable
     }
 
     // ---- Focus ----
+    /// <inheritdoc />
     protected override void OnGotKeyboardFocus(KeyboardFocusChangedEventArgs e)
     {
         base.OnGotKeyboardFocus(e);
@@ -561,6 +565,7 @@ public partial class TerminalControl : Control, IDisposable
         InvalidateVisual();
     }
 
+    /// <inheritdoc />
     protected override void OnLostKeyboardFocus(KeyboardFocusChangedEventArgs e)
     {
         base.OnLostKeyboardFocus(e);
@@ -568,6 +573,7 @@ public partial class TerminalControl : Control, IDisposable
     }
 
     // ---- Keyboard input ----
+    /// <inheritdoc />
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         base.OnPreviewKeyDown(e);
@@ -618,6 +624,7 @@ public partial class TerminalControl : Control, IDisposable
         }
     }
 
+    /// <inheritdoc />
     protected override void OnPreviewTextInput(TextCompositionEventArgs e)
     {
         base.OnPreviewTextInput(e);
@@ -688,6 +695,7 @@ public partial class TerminalControl : Control, IDisposable
     }
 
     // ---- Mouse selection ----
+    /// <inheritdoc />
     protected override void OnMouseDown(MouseButtonEventArgs e)
     {
         base.OnMouseDown(e);
@@ -732,6 +740,7 @@ public partial class TerminalControl : Control, IDisposable
         }
     }
 
+    /// <inheritdoc />
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
@@ -747,6 +756,7 @@ public partial class TerminalControl : Control, IDisposable
         InvalidateVisual();
     }
 
+    /// <inheritdoc />
     protected override void OnMouseUp(MouseButtonEventArgs e)
     {
         base.OnMouseUp(e);
@@ -771,6 +781,7 @@ public partial class TerminalControl : Control, IDisposable
     }
 
     // ---- Scrollback navigation ----
+    /// <inheritdoc />
     protected override void OnPreviewMouseWheel(MouseWheelEventArgs e)
     {
         base.OnPreviewMouseWheel(e);
@@ -935,6 +946,7 @@ public partial class TerminalControl : Control, IDisposable
     }
 
     // ---- Dispose ----
+    /// <summary>Releases timers, unsubscribes from session events, and disposes the renderer.</summary>
     public void Dispose()
     {
         _renderTimer.Stop();
@@ -952,11 +964,9 @@ public partial class TerminalControl : Control, IDisposable
 
             // Do not dispose, we do not own the session
         }
-
         _renderer.Dispose();
         GC.SuppressFinalize(this);
     }
-
     /// <summary>Raised when the connected program changes the title (OSC 0/1/2).</summary>
     public event EventHandler<string>? TitleChanged;
 
@@ -964,54 +974,71 @@ public partial class TerminalControl : Control, IDisposable
     public event EventHandler? Bell;
 
     // ---- DependencyProperty registrations ----
+    /// <summary>Defines the <see cref="Session"/> dependency property.</summary>
     public static readonly DependencyProperty SessionProperty = DependencyProperty.Register(
         nameof(Session), typeof(ITerminalSession), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: null));
-
+    /// <summary>Defines the <see cref="AllowDirectInput"/> dependency property.</summary>
     public static readonly DependencyProperty AllowDirectInputProperty = DependencyProperty.Register(
         nameof(AllowDirectInput), typeof(bool), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: true));
 
+    /// <summary>Defines the <see cref="CursorBlinking"/> dependency property.</summary>
     public static readonly DependencyProperty CursorBlinkingProperty = DependencyProperty.Register(
         nameof(CursorBlinking), typeof(bool), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: true));
 
+    /// <summary>Defines the <see cref="ScrollDownVisible"/> dependency property.</summary>
+    /// <summary>
+    /// Defines the <see cref="CursorColor"/> dependency property.
+    /// </summary>
     public static readonly DependencyProperty ScrollDownVisibleProperty = DependencyProperty.Register(
         nameof(ScrollDownVisible), typeof(bool), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: true));
 
+    /// <summary>Defines the <see cref="ScreenBackground"/> dependency property.</summary>
     public static readonly DependencyProperty ScreenBackgroundProperty = DependencyProperty.Register(
         nameof(ScreenBackground), typeof(WindowsColor), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: Colors.Black));
-
+    /// <summary>Defines the <see cref="ScreenForeground"/> dependency property.</summary>
     public static readonly DependencyProperty ScreenForegroundProperty = DependencyProperty.Register(
         nameof(ScreenForeground), typeof(WindowsColor), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: Colors.White));
 
+    /// <summary>Defines the <see cref="CursorVisible"/> dependency property.</summary>
     public static readonly DependencyProperty CursorVisibleProperty = DependencyProperty.Register(
         nameof(CursorVisible), typeof(bool), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: true));
 
+    /// <summary>Defines the <see cref="CursorColor"/> dependency property.</summary>
+    /// <summary>
+    /// Defines the <see cref="AutoScrolling"/> dependency property.
+    /// </summary>
     public static readonly DependencyProperty CursorColorProperty = DependencyProperty.Register(
         nameof(CursorColor), typeof(WindowsColor), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: Colors.White));
 
+    /// <summary>Defines the <see cref="CursorShape"/> dependency property.</summary>
     public static readonly DependencyProperty CursorShapeProperty = DependencyProperty.Register(
         nameof(CursorShape), typeof(CursorShape), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: CursorShape.Block));
 
+    /// <summary>Defines the <see cref="ScrollbackLines"/> dependency property.</summary>
     public static readonly DependencyProperty ScrollbackLinesProperty = DependencyProperty.Register(
         nameof(ScrollbackLines), typeof(int), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: 10000));
 
+    /// <summary>Defines the <see cref="LineHeight"/> dependency property.</summary>
     public static readonly DependencyProperty LineHeightProperty = DependencyProperty.Register(
         nameof(LineHeight), typeof(double), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: 1.0));
 
+    /// <summary>Defines the <see cref="OutputText"/> dependency property.</summary>
     public static readonly DependencyProperty OutputTextProperty = DependencyProperty.Register(
         nameof(OutputText), typeof(string), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: string.Empty));
 
+    /// <summary>Defines the <see cref="AutoScrolling"/> dependency property.</summary>
     public static readonly DependencyProperty AutoScrollingProperty = DependencyProperty.Register(
         nameof(AutoScrolling), typeof(bool), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: true));

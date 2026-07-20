@@ -6,16 +6,21 @@ namespace VirtualTerminal.Options;
 
 /// <summary>
 /// Customization knobs for a terminal instance: palette, default colors, cursor, scrollback,
-/// layout, font fallback, and consent gates for OSC features. Bound to a <see cref="TerminalControl"/>
-/// via StyledProperties and/or set directly on the session's decoder.
+/// layout, font fallback, and consent gates for OSC features. Typically bound to a UI control
+/// via styled properties and/or set directly on the session's decoder.
 /// </summary>
 public sealed class TerminalOptions
 {
     /// <summary>The 256-entry ANSI palette (mutable; OSC 4/10/11/12 recolor entries).</summary>
     public TerminalPalette Palette { get; set; } = new();
 
+    /// <summary>Default foreground color used when no SGR foreground is active.</summary>
     public Color DefaultForeground { get; set; } = Color.White;
+
+    /// <summary>Default background color used when no SGR background is active.</summary>
     public Color DefaultBackground { get; set; } = Color.Black;
+
+    /// <summary>Default cursor color.</summary>
     public Color DefaultCursorColor { get; set; } = Color.White;
 
     /// <summary>Cursor shape (also settable via DECSCUSR).</summary>
@@ -45,6 +50,8 @@ public sealed class TerminalOptions
     /// <summary>Allow OSC 52 clipboard access.</summary>
     public bool AllowClipboard { get; set; } = true;
 
+    /// <summary>Creates a shallow copy of these options.</summary>
+    /// <returns>A new options instance with the same values.</returns>
     public TerminalOptions Clone() => new()
     {
         Palette = Palette,

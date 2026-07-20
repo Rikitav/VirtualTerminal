@@ -11,17 +11,22 @@ using WindowsColor = System.Windows.Media.Color;
 
 namespace VirtualTerminal.Rendering;
 
-/// <summary>
-/// A rectangular text selection in buffer coordinates (start/end inclusive, normalized so
-/// Start ≤ End). Used by <see cref="TerminalRenderer"/> to highlight selected cells.
-/// </summary>
+/// <summary>Represents a rectangular selection between two buffer coordinates.</summary>
 public readonly struct TerminalSelection
 {
-    public readonly int StartY;
-    public readonly int StartX;
-    public readonly int EndY;
-    public readonly int EndX;
+    /// <summary>Starting column of the selection.</summary>
+    public int StartX { get; }
 
+    /// <summary>Starting row of the selection.</summary>
+    public int StartY { get; }
+
+    /// <summary>Ending column of the selection.</summary>
+    public int EndX { get; }
+
+    /// <summary>Ending row of the selection.</summary>
+    public int EndY { get; }
+
+    /// <summary>Initializes a selection from two buffer coordinates and normalizes them.</summary>
     public TerminalSelection(int x1, int y1, int x2, int y2)
     {
         if (y1 < y2 || (y1 == y2 && x1 <= x2))
@@ -40,6 +45,7 @@ public readonly struct TerminalSelection
         }
     }
 
+    /// <summary>Determines whether the specified cell lies inside the selection.</summary>
     public bool Contains(int y, int x)
     {
         if (y < StartY || y > EndY)
@@ -67,12 +73,22 @@ public sealed class TerminalRenderer : IDisposable
     private TerminalOptions _options = new();
     private double _emSize = 14;
 
+    /// <summary>Gets a value indicating whether the renderer has been configured with a valid font.</summary>
     public bool IsValid => _glyphs.IsValid;
+
+    /// <summary>Gets the size of one terminal cell in device-independent pixels.</summary>
     public Size CellSize => new Size(_glyphs.CellWidth, _glyphs.CellHeight);
+
+    /// <summary>Gets the baseline offset within a cell.</summary>
     public double Baseline => _glyphs.Ascent;
+
+    /// <summary>Gets the width of one terminal cell.</summary>
     public double CellWidth => _glyphs.CellWidth;
+
+    /// <summary>Gets the height of one terminal cell.</summary>
     public double CellHeight => _glyphs.CellHeight;
 
+    /// <summary>Configures the renderer with the specified font family, size, and terminal options.</summary>
     public void Configure(string family, double emSize, TerminalOptions options)
     {
         _options = options;
@@ -82,6 +98,7 @@ public sealed class TerminalRenderer : IDisposable
         _brushes.Clear();
     }
 
+    /// <summary>Releases the renderer resources.</summary>
     public void Dispose()
         => _glyphs.Dispose();
 
@@ -103,7 +120,7 @@ public sealed class TerminalRenderer : IDisposable
         drawingContext.DrawRectangle(brush, null, rect);
     }
 
-    /// <summary>Renders a single row into <paramref name="dc"/> (local origin = row top-left).</summary>
+    /// <summary>Renders a single row into <paramref name="drawingContext"/> (local origin = row top-left).</summary>
     public void RenderRow(DrawingContext drawingContext, Span<TerminalCellInfo> row, TerminalSelection? selection, int rowIndex, float pixelsPerDip)
     {
         double cellW = _glyphs.CellWidth;

@@ -60,7 +60,6 @@ public class SecureShellSession : TerminalSession
     /// Initializes a new SSH session using an externally created client. The session does not own the client.
     /// </summary>
     /// <param name="client">SSH client instance.</param>
-    /// <param name="encoding">Input encoding (defaults to UTF-8).</param>
     public SecureShellSession(ISshClient client) : base()
     {
         _client = client;
@@ -71,7 +70,6 @@ public class SecureShellSession : TerminalSession
     /// Initializes a new SSH session by creating and owning a new client from the given connection info.
     /// </summary>
     /// <param name="connectionInfo">SSH connection info.</param>
-    /// <param name="encoding">Input encoding (defaults to UTF-8).</param>
     public SecureShellSession(ConnectionInfo connectionInfo) : base()
     {
         _client = new SshClient(connectionInfo);
@@ -86,7 +84,6 @@ public class SecureShellSession : TerminalSession
     /// <param name="port">Remote SSH port.</param>
     /// <param name="username">SSH username.</param>
     /// <param name="password">SSH password.</param>
-    /// <param name="encoding">Input encoding (defaults to UTF-8).</param>
     public SecureShellSession(string host, int port, string username, string password) : base()
     {
         _client = new SshClient(host, port, username, password);
@@ -100,7 +97,6 @@ public class SecureShellSession : TerminalSession
     /// <param name="host">Remote host name or IP address.</param>
     /// <param name="username">SSH username.</param>
     /// <param name="password">SSH password.</param>
-    /// <param name="encoding">Input encoding (defaults to UTF-8).</param>
     public SecureShellSession(string host, string username, string password) : base()
     {
         _client = new SshClient(host, username, password);
@@ -114,7 +110,6 @@ public class SecureShellSession : TerminalSession
     /// <param name="host">Remote host name or IP address.</param>
     /// <param name="port">Remote SSH port.</param>
     /// <param name="username">SSH username.</param>
-    /// <param name="encoding">Input encoding (defaults to UTF-8).</param>
     /// <param name="keyFiles">Private key sources used for authentication.</param>
     public SecureShellSession(string host, int port, string username, params IPrivateKeySource[] keyFiles) : base()
     {
@@ -128,7 +123,6 @@ public class SecureShellSession : TerminalSession
     /// </summary>
     /// <param name="host">Remote host name or IP address.</param>
     /// <param name="username">SSH username.</param>
-    /// <param name="encoding">Input encoding (defaults to UTF-8).</param>
     /// <param name="keyFiles">Private key sources used for authentication.</param>
     public SecureShellSession(string host, string username, params IPrivateKeySource[] keyFiles) : base()
     {

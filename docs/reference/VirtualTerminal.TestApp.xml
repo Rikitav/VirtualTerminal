@@ -12,6 +12,11 @@
             App
             </summary>
         </member>
+        <member name="M:VirtualTerminal.TestApp.App.#ctor">
+            <summary>
+            Initializes the test application and configures debug tracing to a log file.
+            </summary>
+        </member>
         <member name="M:VirtualTerminal.TestApp.App.InitializeComponent">
             <summary>
             InitializeComponent
@@ -42,6 +47,17 @@
             Minimal demo TUI application running inside a terminal session.
             Shows a navigable list inside a box; the selected item can be activated with Enter.
             </summary>
+        </member>
+        <member name="M:VirtualTerminal.TestApp.SimpleTuiDemoSession.Render">
+            <summary>
+            Renders the demo TUI, including the bordered menu, selection highlight, and status bar.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.TestApp.SimpleTuiDemoSession.OnKey(System.ConsoleKey)">
+            <summary>
+            Handles keyboard input to navigate the menu or activate the selected item.
+            </summary>
+            <param name="key">The key that was pressed.</param>
         </member>
     </members>
 </doc>

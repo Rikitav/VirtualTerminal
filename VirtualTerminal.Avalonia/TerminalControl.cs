@@ -184,11 +184,12 @@ public class TerminalControl : TemplatedControl, IDisposable
         static c => c.Clear(),
         static c => c._decoder is not null);
 
+    /// <summary>Initializes a new instance of the <see cref="TerminalControl"/> class and creates render, blink, and resize timers.</summary>
     public TerminalControl()
     {
         _renderTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Background, Dispatcher.CurrentDispatcher, DispatcherRenderHandler);
         _blinkTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(530), DispatcherPriority.Background, Dispatcher.CurrentDispatcher, DispatcherBlinkHandler);
-        _resizeTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(150), DispatcherPriority.Background, Dispatcher.CurrentDispatcher, (s, e) => { _resizeTimer.Stop(); ResizeSessionToBounds(); });
+        _resizeTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(150), DispatcherPriority.Background, Dispatcher.CurrentDispatcher, (s, e) => { _resizeTimer!.Stop(); ResizeSessionToBounds(); });
 
         _rootDrawingGroup.Children.Add(_contentGroup);
         _rootDrawingGroup.Children.Add(_cursorVisual);
@@ -221,6 +222,7 @@ public class TerminalControl : TemplatedControl, IDisposable
     }
 
     // ---- Property change handling ----
+    /// <inheritdoc/>
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -285,8 +287,8 @@ public class TerminalControl : TemplatedControl, IDisposable
 
     private void OnDecoderBell(object? sender, EventArgs e)
         => Bell?.Invoke(this, e);
-
     // ---- Lifecycle ----
+    /// <inheritdoc/>
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
@@ -295,6 +297,7 @@ public class TerminalControl : TemplatedControl, IDisposable
         _blinkTimer.Start();
     }
 
+    /// <inheritdoc/>
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
@@ -329,6 +332,7 @@ public class TerminalControl : TemplatedControl, IDisposable
         _contentGroup.Transform = new TranslateTransform(Padding.Left, Padding.Top);
     }
 
+    /// <inheritdoc/>
     protected override void OnSizeChanged(SizeChangedEventArgs e)
     {
         base.OnSizeChanged(e);
@@ -380,6 +384,7 @@ public class TerminalControl : TemplatedControl, IDisposable
     }
 
     // ---- Rendering ----
+    /// <inheritdoc/>
     public override void Render(DrawingContext context)
     {
         base.Render(context);
@@ -627,6 +632,7 @@ public class TerminalControl : TemplatedControl, IDisposable
     }
 
     // ---- Focus ----
+    /// <inheritdoc/>
     protected override void OnGotFocus(FocusChangedEventArgs e)
     {
         base.OnGotFocus(e);
@@ -640,6 +646,7 @@ public class TerminalControl : TemplatedControl, IDisposable
         InvalidateVisual();
     }
 
+    /// <inheritdoc/>
     protected override void OnLostFocus(FocusChangedEventArgs e)
     {
         base.OnLostFocus(e);
@@ -653,6 +660,7 @@ public class TerminalControl : TemplatedControl, IDisposable
     }
 
     // ---- Keyboard input ----
+    /// <inheritdoc/>
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
@@ -746,6 +754,7 @@ public class TerminalControl : TemplatedControl, IDisposable
         return result;
     }
 
+    /// <inheritdoc/>
     protected override void OnTextInput(TextInputEventArgs e)
     {
         base.OnTextInput(e);
@@ -768,6 +777,7 @@ public class TerminalControl : TemplatedControl, IDisposable
     }
 
     // ---- Mouse selection ----
+    /// <inheritdoc/>
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
@@ -821,6 +831,7 @@ public class TerminalControl : TemplatedControl, IDisposable
         }
     }
 
+    /// <inheritdoc/>
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
@@ -836,6 +847,7 @@ public class TerminalControl : TemplatedControl, IDisposable
         InvalidateVisual();
     }
 
+    /// <inheritdoc/>
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
@@ -853,6 +865,7 @@ public class TerminalControl : TemplatedControl, IDisposable
     }
 
     // ---- Scrollback navigation ----
+    /// <inheritdoc/>
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);

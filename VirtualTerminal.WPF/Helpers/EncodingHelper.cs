@@ -1,9 +1,15 @@
-﻿using System.Text;
+using System.Text;
 
 namespace VirtualTerminal.Helpers;
 
+/// <summary>Helpers for converting data between character encodings.</summary>
 public static class EncodingHelper
 {
+    /// <summary>
+    /// Converts the provided <paramref name="bytes"/> from <paramref name="srcEncoding"/> to
+    /// <paramref name="dstEncoding"/>.
+    /// </summary>
+    /// <returns>A byte array containing the encoded result.</returns>
     public static byte[] Convert(Encoding srcEncoding, Encoding dstEncoding, ReadOnlySpan<byte> bytes)
     {
         if (srcEncoding == dstEncoding)

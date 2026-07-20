@@ -24,34 +24,76 @@ public enum ColorSource
 /// </summary>
 public struct CharAttributes
 {
+    /// <summary>How the foreground color was specified.</summary>
     public ColorSource ForegroundSource;
+
+    /// <summary>The ANSI palette index for the foreground when <see cref="ForegroundSource"/> is <see cref="ColorSource.Indexed"/>.</summary>
     public int ForegroundIndex;
+
+    /// <summary>The direct RGB foreground color when <see cref="ForegroundSource"/> is <see cref="ColorSource.Direct"/>.</summary>
     public Color ForegroundRgb;
 
+    /// <summary>How the background color was specified.</summary>
     public ColorSource BackgroundSource;
+
+    /// <summary>The ANSI palette index for the background when <see cref="BackgroundSource"/> is <see cref="ColorSource.Indexed"/>.</summary>
     public int BackgroundIndex;
+
+    /// <summary>The direct RGB background color when <see cref="BackgroundSource"/> is <see cref="ColorSource.Direct"/>.</summary>
     public Color BackgroundRgb;
 
+    /// <summary>How the underline color was specified.</summary>
     public ColorSource UnderlineSource;
+
+    /// <summary>The ANSI palette index for the underline color when <see cref="UnderlineSource"/> is <see cref="ColorSource.Indexed"/>.</summary>
     public int UnderlineIndex;
+
+    /// <summary>The direct RGB underline color when <see cref="UnderlineSource"/> is <see cref="ColorSource.Direct"/>.</summary>
     public Color UnderlineRgb;
 
+    /// <summary>SGR 1: bold (bright).</summary>
     public bool Bold;
+
+    /// <summary>SGR 2: faint (dim).</summary>
     public bool Faint;
+
+    /// <summary>SGR 3: italic.</summary>
     public bool Italic;
+
+    /// <summary>SGR 8: conceal (hide text).</summary>
     public bool Conceal;
+
+    /// <summary>SGR 7: inverse video (swap foreground and background).</summary>
     public bool Inverse;
+
+    /// <summary>SGR 9: strikethrough.</summary>
     public bool Strikethrough;
+
+    /// <summary>SGR 53: overline.</summary>
     public bool Overline;
+
+    /// <summary>SGR 20: Fraktur typeface.</summary>
     public bool Fraktur;
+
+    /// <summary>SGR 51: framed.</summary>
     public bool Framed;
+
+    /// <summary>SGR 52: encircled.</summary>
     public bool Encircled;
+
+    /// <summary>SGR 21: doubly underlined.</summary>
     public bool DoublyUnderlined;
 
+    /// <summary>The underline style.</summary>
     public Underline UnderlineStyle;
+
+    /// <summary>The blink mode.</summary>
     public Blink Blink;
+
+    /// <summary>Identifier of the active hyperlink, or 0 if none.</summary>
     public byte HyperlinkId;
 
+    /// <summary>Gets the default attribute state.</summary>
     public static CharAttributes Default => new()
     {
         ForegroundSource = ColorSource.Default,
@@ -61,6 +103,7 @@ public struct CharAttributes
         Blink = Blink.None,
     };
 
+    /// <summary>Resets all attributes to their default values.</summary>
     public void Reset()
     {
         ForegroundSource = ColorSource.Default;
@@ -163,20 +206,38 @@ public struct CharAttributes
 /// <summary>Cursor and saved-state owned by the decoder, outside the screen buffer.</summary>
 public sealed class TerminalState
 {
+    /// <summary>The zero-based cursor column.</summary>
     public int CursorX;
+
+    /// <summary>The zero-based cursor row.</summary>
     public int CursorY;
+
+    /// <summary>Whether the cursor wrapped to the next line and the next print should start there.</summary>
     public bool WrapPending;
 
+    /// <summary>The current character attributes applied to newly written cells.</summary>
     public CharAttributes Attributes = CharAttributes.Default;
+
+    /// <summary>The current terminal modes.</summary>
     public TerminalModes Modes = new();
 
     // DECSC saved state.
+    /// <summary>The saved cursor column from <see cref="SaveCursor"/>.</summary>
     public int SavedCursorX;
+
+    /// <summary>The saved cursor row from <see cref="SaveCursor"/>.</summary>
     public int SavedCursorY;
+
+    /// <summary>The saved character attributes from <see cref="SaveCursor"/>.</summary>
     public CharAttributes SavedAttributes = CharAttributes.Default;
+
+    /// <summary>The saved origin mode from <see cref="SaveCursor"/>.</summary>
     public bool SavedOriginMode;
+
+    /// <summary>The saved wrap-pending flag from <see cref="SaveCursor"/>.</summary>
     public bool SavedWrapPending;
 
+    /// <summary>Saves the current cursor position, attributes, origin mode, and wrap state.</summary>
     public void SaveCursor()
     {
         SavedCursorX = CursorX;
@@ -186,6 +247,7 @@ public sealed class TerminalState
         SavedWrapPending = WrapPending;
     }
 
+    /// <summary>Restores the cursor position, attributes, origin mode, and wrap state previously saved by <see cref="SaveCursor"/>.</summary>
     public void RestoreCursor()
     {
         CursorX = SavedCursorX;

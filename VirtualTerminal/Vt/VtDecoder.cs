@@ -71,6 +71,7 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
     private State _state = State.Ground;
     private bool _disposed;
 
+    /// <summary>Gets the encoding used by this decoder (always UTF-8).</summary>
     public Encoding Encoding
     {
         get => Encoding.UTF8;
@@ -672,7 +673,11 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
         FlushUtf8();
         ResetToGround();
     }
+ /// <summary>
+ /// Releases all resources used by the current object.
+ /// </summary>
 
+    /// <summary>Releases resources used by the decoder and resets the parser state.</summary>
     public void Dispose()
     {
         if (_disposed)

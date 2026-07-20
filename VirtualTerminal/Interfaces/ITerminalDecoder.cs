@@ -8,6 +8,7 @@ namespace VirtualTerminal.Interfaces;
 /// </summary>
 public interface ITerminalDecoder : IDisposable
 {
+    /// <summary>Gets the encoding used to interpret the byte stream.</summary>
     Encoding Encoding { get; }
 
     /// <summary>

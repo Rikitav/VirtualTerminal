@@ -21,8 +21,13 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     private readonly VtDecoder _parser;
     private readonly List<string> _hyperlinks = [];
 
+    /// <summary>Gets the terminal screen buffer being modified by this decoder.</summary>
     public TerminalScreenBuffer Buffer { get; }
+
+    /// <summary>Gets the current terminal state (cursor, attributes, modes).</summary>
     public TerminalState State { get; } = new();
+
+    /// <summary>Gets or sets options that control rendering and behavior.</summary>
     public TerminalOptions Options { get; set; }
 
     /// <summary>Current window title (OSC 0/1/2).</summary>
@@ -37,13 +42,17 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     /// <summary>Wire to the session output queue so reports (DSR/DA/…) reach the client.</summary>
     public Action<ReadOnlySpan<byte>>? SendOutput { get; set; }
 
+    /// <summary>Gets the current cursor position as a point.</summary>
     public Point CursorPosition => new(State.CursorX, State.CursorY);
 
-    public Encoding Encoding
-    {
-        get => _parser.Encoding;
-    }
+    /// <summary>Gets the encoding used by the underlying VT parser.</summary>
+    public Encoding Encoding => _parser.Encoding;
 
+    /// <summary>
+    /// Initializes a new <see cref="TerminalDecoder"/> with an optional buffer and options.
+    /// </summary>
+    /// <param name="buffer">Screen buffer to use, or <c>null</c> to create a default buffer.</param>
+    /// <param name="options">Options to use, or <c>null</c> to use default options.</param>
     public TerminalDecoder(TerminalScreenBuffer? buffer = null, TerminalOptions? options = null)
     {
         Buffer = buffer ?? new TerminalScreenBuffer(128, 20);
@@ -52,10 +61,13 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         _parser = new VtDecoder(this);
     }
 
+    /// <summary>Writes a span of raw VT/ANSI bytes to the decoder.</summary>
+    /// <param name="data">Bytes to process.</param>
     public void Write(ReadOnlySpan<byte> data)
     {
         if (data.IsEmpty)
             return;
+
         lock (Buffer.SyncRoot)
             _parser.Write(data);
     }
@@ -64,12 +76,17 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     public void Resize(ushort columns, ushort rows)
         => Resize(columns, rows, pushScrollback: true);
 
+    /// <summary>Resizes the underlying screen buffer and clamps the cursor into the new bounds.</summary>
+    /// <param name="columns">New number of columns.</param>
+    /// <param name="rows">New number of rows.</param>
+    /// <param name="pushScrollback"><c>true</c> to push removed rows into scrollback.</param>
     public void Resize(ushort columns, ushort rows, bool pushScrollback)
     {
         lock (Buffer.SyncRoot)
             Buffer.Resize(columns, rows, State, pushScrollback);
     }
 
+    /// <summary>Releases the underlying VT parser resources.</summary>
     public void Dispose()
         => _parser.Dispose();
 
@@ -415,19 +432,16 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     /// <inheritdoc/>
     public void DcsPut(byte b)
     {
-
     }
 
     /// <inheritdoc/>
     public void DcsUnhook()
     {
-
     }
 
     /// <inheritdoc/>
     public void SosPmApcDispatch(byte kind, ReadOnlySpan<byte> data)
     {
-
     }
 
     // ============== Movement primitives ==============
