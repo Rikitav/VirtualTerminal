@@ -66,12 +66,6 @@ public static partial class Win32PipeFactory
             int dwMask,
             int dwFlags);
 
-        // El 3er parametro nativo de CreatePipe es LPSECURITY_ATTRIBUTES (un
-        // puntero a la estructura). Antes se declaraba por valor (SECURITY_ATTRIBUTES)
-        // y, con LibraryImport en Release, no se pasaba como puntero: CreatePipe
-        // desreferenciaba basura y reventaba con ExecutionEngineException (fatal, no
-        // capturable) al abrir un terminal en la build publicada. Se pasa por ref
-        // para garantizar el puntero, igual que CreateProcess pasa sus structs por ref.
         [LibraryImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static partial bool CreatePipe(

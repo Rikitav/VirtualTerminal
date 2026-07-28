@@ -77,15 +77,16 @@
         </member>
         <member name="M:VirtualTerminal.Interop.KeyHelper.GetCharFromKey(System.Windows.Input.Key,System.Boolean)">
             <summary>
-            Idem pero, con <paramref name="ignoreAlt"/> a true, neutraliza Alt del estado del teclado
-            antes de llamar a ToUnicode. Se usa para componer la secuencia meta (ESC + caracter base)
-            de Alt izquierdo + caracter: la convencion xterm manda ESC seguido del caracter que daria
-            la tecla sin Alt (respetando Shift/Bloq Mayus), no del que producira con Alt pulsado.
+            Same as above, but with <paramref name="ignoreAlt"/> set to true; this neutralizes the Alt key state
+            before calling ToUnicode. It is used to compose the meta sequence (ESC + base character)
+            for Left Alt + character: the xterm convention dictates sending ESC followed by the character
+            produced without Alt (respecting Shift/Caps Lock), rather than the one produced with Alt pressed.
             </summary>
         </member>
         <member name="M:VirtualTerminal.Interop.KeyHelper.IsRightAltPressed">
-            <summary>True si el Alt derecho (AltGr) esta pulsado. AltGr compone caracteres
-            alternativos en layouts europeos y NO es meta: se diferencia del Alt izquierdo.</summary>
+            <summary>
+            True if the right Alt (AltGr) key is pressed. AltGr produces alternative characters in European layouts and is NOT a meta key; it is distinct from the left Alt key.
+            </summary>
         </member>
         <member name="M:VirtualTerminal.Interop.KeyHelper.IsModifier(System.Windows.Input.Key)">
             <summary>
@@ -474,9 +475,11 @@
             <summary>Snaps the viewport back to the live bottom of the buffer.</summary>
         </member>
         <member name="M:VirtualTerminal.TerminalControl.GetVisibleScreenText">
-            <summary>Devuelve el texto de la pantalla visible (buffer principal o
-            alternate), una fila por linea, leyendo bajo el lock del buffer. Lo usa el
-            host para buscar sentinels (p. ej. el marcador de pregunta pendiente).</summary>
+            <summary>
+            Returns the text of the visible screen (main or
+            alternate buffer), one row per line, reading under the buffer lock. Used by
+            the host to search for sentinels (e.g., the pending question marker).
+            </summary>
         </member>
         <member name="M:VirtualTerminal.TerminalControl.Dispose">
             <summary>
@@ -507,9 +510,6 @@
         </member>
         <member name="F:VirtualTerminal.TerminalControl.ScrollDownVisibleProperty">
             <summary>Defines the <see cref="P:VirtualTerminal.TerminalControl.ScrollDownVisible"/> dependency property.</summary>
-            <summary>
-            Defines the <see cref="P:VirtualTerminal.TerminalControl.CursorColor"/> dependency property.
-            </summary>
         </member>
         <member name="F:VirtualTerminal.TerminalControl.ScreenBackgroundProperty">
             <summary>Defines the <see cref="P:VirtualTerminal.TerminalControl.ScreenBackground"/> dependency property.</summary>
@@ -522,9 +522,6 @@
         </member>
         <member name="F:VirtualTerminal.TerminalControl.CursorColorProperty">
             <summary>Defines the <see cref="P:VirtualTerminal.TerminalControl.CursorColor"/> dependency property.</summary>
-            <summary>
-            Defines the <see cref="P:VirtualTerminal.TerminalControl.AutoScrolling"/> dependency property.
-            </summary>
         </member>
         <member name="F:VirtualTerminal.TerminalControl.CursorShapeProperty">
             <summary>Defines the <see cref="P:VirtualTerminal.TerminalControl.CursorShape"/> dependency property.</summary>

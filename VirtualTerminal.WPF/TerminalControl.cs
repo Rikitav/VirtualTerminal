@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Text;
-using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -10,8 +9,8 @@ using VirtualTerminal.Buffer;
 using VirtualTerminal.Extensions;
 using VirtualTerminal.Helpers;
 using VirtualTerminal.Input;
-using VirtualTerminal.Interop;
 using VirtualTerminal.Interfaces;
+using VirtualTerminal.Interop;
 using VirtualTerminal.Model;
 using VirtualTerminal.Options;
 using VirtualTerminal.Rendering;
@@ -616,9 +615,9 @@ public partial class TerminalControl : Control, IDisposable
         if (_scrollOffset > 0)
             ScrollToBottom();
 
-        // Con Alt pulsado WPF pone e.Key = Key.System y la tecla real en e.SystemKey
-        // (y ademas no dispara TextInput, ver mas abajo). Sin esto, cualquier
-        // combinacion con Alt se ignoraria: e.Key=System -> ToTerminalKey -> None.
+        // With Alt pressed, WPF sets e.Key = Key.System and the actual key in e.SystemKey
+        // (and also does not trigger TextInput; see below). Without this, any
+        // combination involving Alt would be ignored: e.Key=System -> ToTerminalKey -> None.
         Key key = e.Key == Key.System ? e.SystemKey : e.Key;
         ModifierKeys mods = Keyboard.Modifiers;
 
@@ -660,16 +659,17 @@ public partial class TerminalControl : Control, IDisposable
             return;
         }
 
-        // Alt izquierdo + caracter imprimible: WPF NO dispara TextInput con Alt
-        // pulsado (lo trata como mnemonic de menu), asi que las teclas de caracter
-        // con Alt no llegan nunca por la via del texto. La convencion xterm para
-        // meta es ESC + caracter base. Se excluye AltGr (Alt derecho, que Windows
-        // reporta como Ctrl+Alt): ese SI produce TextInput con el caracter
-        // alternativo (p. ej. AltGr+2 = @) y ya lo envia OnPreviewTextInput, asi
-        // que aqui no se toca. Tambien se excluyen Alt+Ctrl (no es meta puro).
+        // Left Alt + printable character: WPF does NOT trigger TextInput when Alt
+        // is pressed (it treats it as a menu mnemonic), so character keys
+        // combined with Alt never arrive via the text input path. The xterm convention
+        // for Meta is ESC + base character. AltGr is excluded (Right Alt, which Windows
+        // reports as Ctrl+Alt): that DOES produce TextInput with the
+        // alternate character (e.g., AltGr+2 = @) and is already handled by OnPreviewTextInput,
+        // so it is left alone here. Alt+Ctrl combinations are also excluded (not pure Meta).
         bool leftAlt = (mods & ModifierKeys.Alt) != 0
             && (mods & ModifierKeys.Control) == 0
             && !KeyHelper.IsRightAltPressed();
+
         if (leftAlt && !KeyHelper.IsModifier(key))
         {
             string? ch = KeyHelper.GetCharFromKey(key, ignoreAlt: true);
@@ -1095,15 +1095,18 @@ public partial class TerminalControl : Control, IDisposable
 
             Debug.WriteLine($"[{GetType().Name}] OnSessionBufferUpdated -> InvalidateVisual");
             InvalidateVisual();
-            // Se dispara tras invalidar para que el host lea la pantalla ya actualizada.
-            // Nivel Background: no retrase el render por el escaneo del host.
+
+            // Triggered after invalidation so the host reads the updated screen.
+            // Background level: do not delay rendering due to host scanning.
             Dispatcher.BeginInvoke(() => ScreenUpdated?.Invoke(this, EventArgs.Empty), DispatcherPriority.Background);
         }, DispatcherPriority.Render);
     }
 
-    /// <summary>Devuelve el texto de la pantalla visible (buffer principal o
-    /// alternate), una fila por linea, leyendo bajo el lock del buffer. Lo usa el
-    /// host para buscar sentinels (p. ej. el marcador de pregunta pendiente).</summary>
+    /// <summary>
+    /// Returns the text of the visible screen (main or
+    /// alternate buffer), one row per line, reading under the buffer lock. Used by
+    /// the host to search for sentinels (e.g., the pending question marker).
+    /// </summary>
     public string GetVisibleScreenText()
     {
         if (_decoder is null)
@@ -1157,6 +1160,7 @@ public partial class TerminalControl : Control, IDisposable
         _renderer.Dispose();
         GC.SuppressFinalize(this);
     }
+
     /// <summary>Raised when the connected program changes the title (OSC 0/1/2).</summary>
     public event EventHandler<string>? TitleChanged;
 
@@ -1173,6 +1177,7 @@ public partial class TerminalControl : Control, IDisposable
     public static readonly DependencyProperty SessionProperty = DependencyProperty.Register(
         nameof(Session), typeof(ITerminalSession), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: null));
+
     /// <summary>Defines the <see cref="AllowDirectInput"/> dependency property.</summary>
     public static readonly DependencyProperty AllowDirectInputProperty = DependencyProperty.Register(
         nameof(AllowDirectInput), typeof(bool), typeof(TerminalControl),
@@ -1184,9 +1189,6 @@ public partial class TerminalControl : Control, IDisposable
         new PropertyMetadata(defaultValue: true));
 
     /// <summary>Defines the <see cref="ScrollDownVisible"/> dependency property.</summary>
-    /// <summary>
-    /// Defines the <see cref="CursorColor"/> dependency property.
-    /// </summary>
     public static readonly DependencyProperty ScrollDownVisibleProperty = DependencyProperty.Register(
         nameof(ScrollDownVisible), typeof(bool), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: true));
@@ -1206,9 +1208,6 @@ public partial class TerminalControl : Control, IDisposable
         new PropertyMetadata(defaultValue: true));
 
     /// <summary>Defines the <see cref="CursorColor"/> dependency property.</summary>
-    /// <summary>
-    /// Defines the <see cref="AutoScrolling"/> dependency property.
-    /// </summary>
     public static readonly DependencyProperty CursorColorProperty = DependencyProperty.Register(
         nameof(CursorColor), typeof(WindowsColor), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: Colors.White));

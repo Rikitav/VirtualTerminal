@@ -48,11 +48,6 @@ public static partial class Win32ProcessFactory
         SECURITY_ATTRIBUTES lpProcessAttributes = new SECURITY_ATTRIBUTES() { nLength = Marshal.SizeOf<SECURITY_ATTRIBUTES>() };
         SECURITY_ATTRIBUTES lpThreadAttributes = new SECURITY_ATTRIBUTES() { nLength = Marshal.SizeOf<SECURITY_ATTRIBUTES>() };
 
-        // lpEnvironment/lpCurrentDirectory en null hacen que el hijo herede el
-        // entorno y el cwd del padre; al pasar info.Environment / info.CurrentDirectory
-        // CreateProcess los aplica. Sin esto, el directorio de trabajo configurado
-        // para la sesion ConPTY (ProcessCreationInfo.CurrentDirectory) se ignora y el
-        // shell arranca en el cwd de start_servers en vez del suyo.
         bool processSuccess = NativeMethods.CreateProcess(
             info.ApplicationName,
             info.CommandLine,

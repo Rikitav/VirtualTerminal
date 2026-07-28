@@ -86,10 +86,10 @@ public static partial class KeyHelper
     public static string? GetCharFromKey(Key key) => GetCharFromKey(key, ignoreAlt: false);
 
     /// <summary>
-    /// Idem pero, con <paramref name="ignoreAlt"/> a true, neutraliza Alt del estado del teclado
-    /// antes de llamar a ToUnicode. Se usa para componer la secuencia meta (ESC + caracter base)
-    /// de Alt izquierdo + caracter: la convencion xterm manda ESC seguido del caracter que daria
-    /// la tecla sin Alt (respetando Shift/Bloq Mayus), no del que producira con Alt pulsado.
+    /// Same as above, but with <paramref name="ignoreAlt"/> set to true; this neutralizes the Alt key state
+    /// before calling ToUnicode. It is used to compose the meta sequence (ESC + base character)
+    /// for Left Alt + character: the xterm convention dictates sending ESC followed by the character
+    /// produced without Alt (respecting Shift/Caps Lock), rather than the one produced with Alt pressed.
     /// </summary>
     public static string? GetCharFromKey(Key key, bool ignoreAlt)
     {
@@ -124,8 +124,9 @@ public static partial class KeyHelper
         return result > 0 ? stringBuilder.ToString() : null;
     }
 
-    /// <summary>True si el Alt derecho (AltGr) esta pulsado. AltGr compone caracteres
-    /// alternativos en layouts europeos y NO es meta: se diferencia del Alt izquierdo.</summary>
+    /// <summary>
+    /// True if the right Alt (AltGr) key is pressed. AltGr produces alternative characters in European layouts and is NOT a meta key; it is distinct from the left Alt key.
+    /// </summary>
     public static bool IsRightAltPressed()
         => (NativeMethods.GetKeyState(0xA5) & 0x8000) != 0; // VK_RMENU alto = pulsado
 
@@ -134,8 +135,8 @@ public static partial class KeyHelper
     /// </summary>
     public static bool IsModifier(Key key)
         => key == Key.LeftShift || key == Key.RightShift
-        || key == Key.LeftCtrl  || key == Key.RightCtrl
-        || key == Key.LeftAlt   || key == Key.RightAlt;
+        || key == Key.LeftCtrl || key == Key.RightCtrl
+        || key == Key.LeftAlt || key == Key.RightAlt;
 
     private static partial class NativeMethods
     {
