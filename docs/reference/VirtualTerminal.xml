@@ -775,6 +775,11 @@
         <member name="M:VirtualTerminal.Input.MouseEncoder.EncodeButton(VirtualTerminal.Input.TerminalMouseButton,System.Boolean,System.Int32,System.Int32,VirtualTerminal.Input.TerminalModifier,System.Boolean)">
             <summary>Encodes a button event using SGR (1006) if enabled, else the legacy form.</summary>
         </member>
+        <member name="M:VirtualTerminal.Input.MouseEncoder.EncodeMotion(System.Nullable{VirtualTerminal.Input.TerminalMouseButton},System.Int32,System.Int32,VirtualTerminal.Input.TerminalModifier,System.Boolean)">
+            <summary>Encodes a pointer-motion (drag/hover) report.
+            <paramref name="button"/> is the currently held button, or <c>null</c> when reporting
+            motion with no button down (any-event mode). Bit 5 (value 32) of the code marks a motion event.</summary>
+        </member>
         <member name="M:VirtualTerminal.Input.MouseEncoder.EncodeWheel(System.Boolean,System.Int32,System.Int32,VirtualTerminal.Input.TerminalModifier,System.Boolean)">
             <summary>Encodes a mouse-wheel event.</summary>
         </member>

@@ -40,7 +40,7 @@ public static partial class Win32PipeFactory
             lpSecurityDescriptor = IntPtr.Zero
         };
 
-        if (!NativeMethods.CreatePipe(out hRead, out hWrite, sa, 0))
+        if (!NativeMethods.CreatePipe(out hRead, out hWrite, ref sa, 0))
             throw new Win32Exception(Marshal.GetLastWin32Error(), "Failed to create ipc pipe");
         /*
         Important point:
@@ -66,12 +66,18 @@ public static partial class Win32PipeFactory
             int dwMask,
             int dwFlags);
 
+        // El 3er parametro nativo de CreatePipe es LPSECURITY_ATTRIBUTES (un
+        // puntero a la estructura). Antes se declaraba por valor (SECURITY_ATTRIBUTES)
+        // y, con LibraryImport en Release, no se pasaba como puntero: CreatePipe
+        // desreferenciaba basura y reventaba con ExecutionEngineException (fatal, no
+        // capturable) al abrir un terminal en la build publicada. Se pasa por ref
+        // para garantizar el puntero, igual que CreateProcess pasa sus structs por ref.
         [LibraryImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static partial bool CreatePipe(
             out IntPtr hReadPipe,
             out IntPtr hWritePipe,
-            SECURITY_ATTRIBUTES lpPipeAttributes,
+            ref SECURITY_ATTRIBUTES lpPipeAttributes,
             int nSize);
     }
 

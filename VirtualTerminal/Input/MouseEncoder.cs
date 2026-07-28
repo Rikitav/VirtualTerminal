@@ -28,6 +28,17 @@ public static class MouseEncoder
         return LegacyEncode(code, x, y);
     }
 
+    /// <summary>Encodes a pointer-motion (drag/hover) report.
+    /// <paramref name="button"/> is the currently held button, or <c>null</c> when reporting
+    /// motion with no button down (any-event mode). Bit 5 (value 32) of the code marks a motion event.</summary>
+    public static string EncodeMotion(TerminalMouseButton? button, int x, int y, TerminalModifier modifiers, bool sgrEncoding)
+    {
+        int code = ((button is { } b ? ButtonCode(b, pressed: true) : 3) | 32) | ModifierFlags(modifiers);
+        return sgrEncoding
+            ? $"\x1b[<{code};{x + 1};{y + 1}M"
+            : LegacyEncode(code, x, y);
+    }
+
     /// <summary>Encodes a mouse-wheel event.</summary>
     public static string EncodeWheel(bool up, int x, int y, TerminalModifier modifiers, bool sgrEncoding)
     {

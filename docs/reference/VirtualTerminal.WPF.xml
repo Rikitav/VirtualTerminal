@@ -75,6 +75,18 @@
             Attempts to translate a WPF <see cref="T:System.Windows.Input.Key"/> into a Unicode character using Windows keyboard state APIs.
             </summary>
         </member>
+        <member name="M:VirtualTerminal.Interop.KeyHelper.GetCharFromKey(System.Windows.Input.Key,System.Boolean)">
+            <summary>
+            Idem pero, con <paramref name="ignoreAlt"/> a true, neutraliza Alt del estado del teclado
+            antes de llamar a ToUnicode. Se usa para componer la secuencia meta (ESC + caracter base)
+            de Alt izquierdo + caracter: la convencion xterm manda ESC seguido del caracter que daria
+            la tecla sin Alt (respetando Shift/Bloq Mayus), no del que producira con Alt pulsado.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Interop.KeyHelper.IsRightAltPressed">
+            <summary>True si el Alt derecho (AltGr) esta pulsado. AltGr compone caracteres
+            alternativos en layouts europeos y NO es meta: se diferencia del Alt izquierdo.</summary>
+        </member>
         <member name="M:VirtualTerminal.Interop.KeyHelper.IsModifier(System.Windows.Input.Key)">
             <summary>
             Returns <c>true</c> if the key is a modifier (Shift/Ctrl/Alt).
@@ -440,6 +452,9 @@
         <member name="M:VirtualTerminal.TerminalControl.OnPreviewTextInput(System.Windows.Input.TextCompositionEventArgs)">
             <inheritdoc />
         </member>
+        <member name="M:VirtualTerminal.TerminalControl.ShouldReportMotion">
+            <summary>True when motion reports must be sent under the current tracking mode.</summary>
+        </member>
         <member name="M:VirtualTerminal.TerminalControl.OnMouseDown(System.Windows.Input.MouseButtonEventArgs)">
             <inheritdoc />
         </member>
@@ -458,14 +473,28 @@
         <member name="M:VirtualTerminal.TerminalControl.ScrollToBottom">
             <summary>Snaps the viewport back to the live bottom of the buffer.</summary>
         </member>
+        <member name="M:VirtualTerminal.TerminalControl.GetVisibleScreenText">
+            <summary>Devuelve el texto de la pantalla visible (buffer principal o
+            alternate), una fila por linea, leyendo bajo el lock del buffer. Lo usa el
+            host para buscar sentinels (p. ej. el marcador de pregunta pendiente).</summary>
+        </member>
         <member name="M:VirtualTerminal.TerminalControl.Dispose">
-            <summary>Releases timers, unsubscribes from session events, and disposes the renderer.</summary>
+            <summary>
+            Releases timers, unsubscribes from session events, and disposes the renderer.
+            Must be called by whoever owns the control (removing it from the visual tree is not
+            enough): the control is unusable afterwards and only paints its background.
+            </summary>
         </member>
         <member name="E:VirtualTerminal.TerminalControl.TitleChanged">
             <summary>Raised when the connected program changes the title (OSC 0/1/2).</summary>
         </member>
         <member name="E:VirtualTerminal.TerminalControl.Bell">
             <summary>Raised on BEL.</summary>
+        </member>
+        <member name="E:VirtualTerminal.TerminalControl.ScreenUpdated">
+            <summary>Raised on the UI thread after the session buffer has been updated with new
+            output (same tick that invalidates the visual). Lets the host scan the visible
+            screen for sentinels (e.g. a "pregunta pendiente" marker) without polling.</summary>
         </member>
         <member name="F:VirtualTerminal.TerminalControl.SessionProperty">
             <summary>Defines the <see cref="P:VirtualTerminal.TerminalControl.Session"/> dependency property.</summary>

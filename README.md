@@ -252,3 +252,24 @@ Both controls expose static commands for common terminal operations. If no `Cont
 
 - **ConPTY resize**: ConPTY handles its own reflow. The engine resizes the local geometry and lets ConPTY repaint/overwrite the visible area. A minimum grid size (10×3) is enforced to avoid shell resets at extremely small sizes.
 - **Windows-only backends**: `VirtualTerminal.CommandLine` and `VirtualTerminal.SecureShell` target `net10.0-windows`. The core engine and Avalonia control target `net10.0`.
+
+---
+
+## Changelog
+
+### Unreleased
+
+#### WPF `TerminalControl`
+
+- **xterm mouse tracking forwarding.** When the running app has enabled mouse reporting (`DECSET 1000/1002/1003`), clicks, drags and wheel are forwarded to it as xterm sequences (SGR 1006 when enabled, legacy otherwise) instead of being used for local selection and scrollback. This lets full-screen TUIs (e.g. `claude` in fullscreen mode) receive mouse events. `Shift` bypasses forwarding so the user can still copy text from a mouse-owning app. New internal helpers: `IsMouseReporting`, `ShouldForwardToApp`, `MapMouseButton`, `ShouldReportMotion`; state `_trackedButton` tracks the held button for button-event/any-event motion.
+- **Meta (Alt) key sequences.** WPF does not fire `TextInput` while Alt is held, so character keys with Alt were dropped. The control now composes the xterm meta sequence `ESC + <base char>` for **left Alt** + printable, resolving `e.SystemKey` (WPF reports `Key.System` under Alt). **AltGr (right Alt)** is excluded: it composes alternate characters (e.g. `AltGr+2 = @`) and already arrives through `OnPreviewTextInput`. `Ctrl+Alt` is also excluded (not pure meta). New `KeyHelper.GetCharFromKey(Key, bool ignoreAlt)` neutralizes Alt in the keyboard state before `ToUnicode`, and `KeyHelper.IsRightAltPressed()` distinguishes AltGr.
+- **Lifecycle fix.** `Unloaded` no longer disposes the control: WPF raises `Unloaded` whenever the control leaves the visual tree (reparenting, template re-application, content swap) but the same instance can be reattached and must keep rendering. `OnControlLoaded`/`OnControlUnloaded` now only start/stop the dispatcher timers; tearing down the renderer is the owner's job via `Dispose`. Previously, disposing on `Unloaded` left `_rendererConfigured` true with a released `GlyphCache` and every later `OnRender` threw "GlyphCache not configured". `Dispose` is now idempotent and gates renders via `_disposed` / `_rendererConfigured`.
+- **Host screen scan.** New `GetVisibleScreenText()` returns the visible screen (primary or alternate buffer) one row per line, read under the buffer lock, and the `ScreenUpdated` event is raised on the UI thread (at `DispatcherPriority.Background`, after the visual is invalidated) whenever the session buffer updates. Lets the host scan the visible screen for sentinels (e.g. a pending-question marker) without polling.
+
+#### `VirtualTerminal.Input.MouseEncoder`
+
+- New `EncodeMotion(TerminalMouseButton?, int x, int y, TerminalModifier, bool sgrEncoding)` for pointer-motion (drag/hover) reports. Bit 5 (value 32) of the code marks a motion event; `button == null` reports motion with no button down (any-event mode).
+
+#### `VirtualTerminal.CommandLine` (Win32ProcessFactory)
+
+- `CreateProcess` now receives `info.Environment` and `info.CurrentDirectory` instead of `null`/`null`. Previously the configured working directory for the ConPTY session (`ProcessCreationInfo.CurrentDirectory`) was ignored and the shell started in the host's cwd.

@@ -83,13 +83,32 @@ public static partial class KeyHelper
     /// <summary>
     /// Attempts to translate a WPF <see cref="Key"/> into a Unicode character using Windows keyboard state APIs.
     /// </summary>
-    public static string? GetCharFromKey(Key key)
+    public static string? GetCharFromKey(Key key) => GetCharFromKey(key, ignoreAlt: false);
+
+    /// <summary>
+    /// Idem pero, con <paramref name="ignoreAlt"/> a true, neutraliza Alt del estado del teclado
+    /// antes de llamar a ToUnicode. Se usa para componer la secuencia meta (ESC + caracter base)
+    /// de Alt izquierdo + caracter: la convencion xterm manda ESC seguido del caracter que daria
+    /// la tecla sin Alt (respetando Shift/Bloq Mayus), no del que producira con Alt pulsado.
+    /// </summary>
+    public static string? GetCharFromKey(Key key, bool ignoreAlt)
     {
         int virtualKey = KeyInterop.VirtualKeyFromKey(key);
+        if (virtualKey == 0)
+            return null;
+
         byte[] keyboardState = new byte[256];
 
         if (!NativeMethods.GetKeyboardState(keyboardState))
             return null;
+
+        if (ignoreAlt)
+        {
+            const byte VK_MENU = 0x12;    // Alt (generico)
+            const byte VK_LMENU = 0xA4;   // Alt izquierdo
+            keyboardState[VK_MENU] = 0;
+            keyboardState[VK_LMENU] = 0;
+        }
 
         uint scanCode = NativeMethods.MapVirtualKey((uint)virtualKey, 0);
         StringBuilder stringBuilder = new StringBuilder(5);
@@ -104,6 +123,11 @@ public static partial class KeyHelper
 
         return result > 0 ? stringBuilder.ToString() : null;
     }
+
+    /// <summary>True si el Alt derecho (AltGr) esta pulsado. AltGr compone caracteres
+    /// alternativos en layouts europeos y NO es meta: se diferencia del Alt izquierdo.</summary>
+    public static bool IsRightAltPressed()
+        => (NativeMethods.GetKeyState(0xA5) & 0x8000) != 0; // VK_RMENU alto = pulsado
 
     /// <summary>
     /// Returns <c>true</c> if the key is a modifier (Shift/Ctrl/Alt).
@@ -130,5 +154,8 @@ public static partial class KeyHelper
 
         [LibraryImport("user32.dll", EntryPoint = "MapVirtualKeyW")]
         public static partial uint MapVirtualKey(uint uCode, uint uMapType);
+
+        [LibraryImport("user32.dll", EntryPoint = "GetKeyState")]
+        public static partial short GetKeyState(int nVirtKey);
     }
 }

@@ -10,6 +10,7 @@ using VirtualTerminal.Buffer;
 using VirtualTerminal.Extensions;
 using VirtualTerminal.Helpers;
 using VirtualTerminal.Input;
+using VirtualTerminal.Interop;
 using VirtualTerminal.Interfaces;
 using VirtualTerminal.Model;
 using VirtualTerminal.Options;
@@ -37,11 +38,18 @@ public partial class TerminalControl : Control, IDisposable
     private bool _cursorBlinkState = true;
     private bool _rendererConfigured;
     private bool _invalidatePending;
+    private bool _disposed;
 
     // Text selection (mouse drag).
     private TerminalSelection? _selection;
     private bool _isSelecting = false;
     private Point _selectStart = new Point(0, 0);
+
+    // When the running app has enabled xterm mouse tracking (e.g. claude in fullscreen
+    // mode), mouse events are forwarded to it instead of being used for local selection
+    // and scrollback navigation. Holds the button currently held by the user while
+    // forwarding, so motion and release can be reported in button-event mode.
+    private TerminalMouseButton? _trackedButton;
 
     // Scrollback navigation (mouse wheel). 0 = live at the bottom; >0 = rows scrolled back into history.
     private int _scrollOffset;
@@ -208,8 +216,8 @@ public partial class TerminalControl : Control, IDisposable
         _resizeTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(150), DispatcherPriority.Background, (s, e) => { _resizeTimer!.Stop(); ResizeSessionToBounds(); }, Dispatcher);
 
         Focusable = true;
-        Loaded += (o, e) => Debug.WriteLine($"[{GetType().Name}] Loaded: Actual={ActualWidth}x{ActualHeight}, RenderSize={RenderSize}");
-        Unloaded += (o, e) => Dispose();
+        Loaded += OnControlLoaded;
+        Unloaded += OnControlUnloaded;
 
         CommandBindings.Add(new CommandBinding(CopyCommand,
             (s, e) => { _ = CopySelectionToClipboardAsync(); e.Handled = true; },
@@ -338,6 +346,31 @@ public partial class TerminalControl : Control, IDisposable
         => Bell?.Invoke(this, e);
 
     // ---- Lifecycle ----
+    // WPF raises Unloaded whenever the control leaves the visual tree, which is not
+    // necessarily the end of its life: the same instance can be reattached (reparenting,
+    // template re-application, window content swap) and must keep rendering. So Unloaded
+    // only parks the control (stops the dispatcher timers, which is what would otherwise
+    // keep it alive while detached); tearing down the renderer is the owner's job, through
+    // Dispose. Disposing here left _rendererConfigured true with a disposed GlyphCache and
+    // every later OnRender threw "GlyphCache not configured".
+    private void OnControlLoaded(object sender, RoutedEventArgs e)
+    {
+        Debug.WriteLine($"[{GetType().Name}] Loaded: Actual={ActualWidth}x{ActualHeight}, RenderSize={RenderSize}, disposed={_disposed}");
+        if (_disposed)
+            return;
+
+        _renderTimer.Start();
+        _blinkTimer.Start();
+    }
+
+    private void OnControlUnloaded(object sender, RoutedEventArgs e)
+    {
+        Debug.WriteLine($"[{GetType().Name}] Unloaded: disposed={_disposed}");
+        _renderTimer.Stop();
+        _blinkTimer.Stop();
+        _resizeTimer.Stop();
+    }
+
     /// <inheritdoc />
     protected override void OnRender(DrawingContext context)
     {
@@ -583,7 +616,10 @@ public partial class TerminalControl : Control, IDisposable
         if (_scrollOffset > 0)
             ScrollToBottom();
 
-        Key key = e.Key;
+        // Con Alt pulsado WPF pone e.Key = Key.System y la tecla real en e.SystemKey
+        // (y ademas no dispara TextInput, ver mas abajo). Sin esto, cualquier
+        // combinacion con Alt se ignoraria: e.Key=System -> ToTerminalKey -> None.
+        Key key = e.Key == Key.System ? e.SystemKey : e.Key;
         ModifierKeys mods = Keyboard.Modifiers;
 
         // Ctrl+Shift+C always copies the current selection.
@@ -621,6 +657,27 @@ public partial class TerminalControl : Control, IDisposable
         {
             Session?.Append(keySequence);
             e.Handled = true;
+            return;
+        }
+
+        // Alt izquierdo + caracter imprimible: WPF NO dispara TextInput con Alt
+        // pulsado (lo trata como mnemonic de menu), asi que las teclas de caracter
+        // con Alt no llegan nunca por la via del texto. La convencion xterm para
+        // meta es ESC + caracter base. Se excluye AltGr (Alt derecho, que Windows
+        // reporta como Ctrl+Alt): ese SI produce TextInput con el caracter
+        // alternativo (p. ej. AltGr+2 = @) y ya lo envia OnPreviewTextInput, asi
+        // que aqui no se toca. Tambien se excluyen Alt+Ctrl (no es meta puro).
+        bool leftAlt = (mods & ModifierKeys.Alt) != 0
+            && (mods & ModifierKeys.Control) == 0
+            && !KeyHelper.IsRightAltPressed();
+        if (leftAlt && !KeyHelper.IsModifier(key))
+        {
+            string? ch = KeyHelper.GetCharFromKey(key, ignoreAlt: true);
+            if (!string.IsNullOrEmpty(ch))
+            {
+                Session?.Append("\x1b" + ch);
+                e.Handled = true;
+            }
         }
     }
 
@@ -694,6 +751,40 @@ public partial class TerminalControl : Control, IDisposable
         return result;
     }
 
+    // ---- Mouse forwarding (xterm mouse tracking) ----
+    // Real terminals hand wheel/click/drag to the app when it has enabled xterm mouse
+    // reporting (DECSET 1000/1002/1003). Without this, a TUI like claude (fullscreen mode)
+    // never receives the events: the wheel would scroll an empty primary scrollback and
+    // clicks would start a local selection the app cannot see.
+    private bool IsMouseReporting()
+        => _decoder is not null && _decoder.State.Modes.MouseTracking != MouseTrackingMode.Off;
+
+    // Shift bypasses tracking (xterm/Windows Terminal behavior): holding Shift keeps the
+    // local selection/scrollback so the user can still copy text from a TUI that owns the mouse.
+    private static bool ShouldForwardToApp(bool reporting, ModifierKeys modifiers)
+        => reporting && (modifiers & ModifierKeys.Shift) == 0;
+
+    private static TerminalMouseButton MapMouseButton(MouseButton button) => button switch
+    {
+        MouseButton.Left => TerminalMouseButton.Left,
+        MouseButton.Middle => TerminalMouseButton.Middle,
+        MouseButton.Right => TerminalMouseButton.Right,
+        MouseButton.XButton1 => TerminalMouseButton.XButton1,
+        MouseButton.XButton2 => TerminalMouseButton.XButton2,
+        _ => TerminalMouseButton.None,
+    };
+
+    /// <summary>True when motion reports must be sent under the current tracking mode.</summary>
+    private bool ShouldReportMotion()
+    {
+        if (_decoder is null)
+            return false;
+
+        MouseTrackingMode mode = _decoder.State.Modes.MouseTracking;
+        // Any-event reports motion with or without a held button; button-event only while dragging.
+        return mode == MouseTrackingMode.AnyEvent || (mode == MouseTrackingMode.ButtonEvent && _trackedButton is not null);
+    }
+
     // ---- Mouse selection ----
     /// <inheritdoc />
     protected override void OnMouseDown(MouseButtonEventArgs e)
@@ -703,6 +794,21 @@ public partial class TerminalControl : Control, IDisposable
             return;
 
         Focus();
+
+        ModifierKeys modifiers = Keyboard.Modifiers;
+        TerminalMouseButton mappedButton = MapMouseButton(e.ChangedButton);
+        if (ShouldForwardToApp(IsMouseReporting(), modifiers) && mappedButton != TerminalMouseButton.None)
+        {
+            Point cell = GetCellPosition(e);
+            if (cell.X < 0)
+                return;
+
+            _trackedButton = mappedButton;
+            Session?.Append(MouseEncoder.EncodeButton(mappedButton, pressed: true, (int)cell.X, (int)cell.Y,
+                ToTerminalModifier(modifiers), _decoder.State.Modes.SgrMouseEncoding));
+            e.Handled = true;
+            return;
+        }
 
         if (e.ChangedButton == MouseButton.Left)
         {
@@ -744,7 +850,23 @@ public partial class TerminalControl : Control, IDisposable
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        if (!_isSelecting || _decoder is null)
+        if (_decoder is null)
+            return;
+
+        ModifierKeys modifiers = Keyboard.Modifiers;
+        if (ShouldForwardToApp(IsMouseReporting(), modifiers) && ShouldReportMotion())
+        {
+            Point cell = GetCellPosition(e);
+            if (cell.X < 0)
+                return;
+
+            Session?.Append(MouseEncoder.EncodeMotion(_trackedButton, (int)cell.X, (int)cell.Y,
+                ToTerminalModifier(modifiers), _decoder.State.Modes.SgrMouseEncoding));
+            e.Handled = true;
+            return;
+        }
+
+        if (!_isSelecting)
             return;
 
         Point p = GetCellPosition(e);
@@ -760,6 +882,23 @@ public partial class TerminalControl : Control, IDisposable
     protected override void OnMouseUp(MouseButtonEventArgs e)
     {
         base.OnMouseUp(e);
+
+        if (_trackedButton is { } releasedButton)
+        {
+            // X10 only reports presses, never releases.
+            if (_decoder is not null && _decoder.State.Modes.MouseTracking != MouseTrackingMode.X10)
+            {
+                Point cell = GetCellPosition(e);
+                int x = cell.X < 0 ? 0 : (int)cell.X;
+                int y = cell.Y < 0 ? 0 : (int)cell.Y;
+                Session?.Append(MouseEncoder.EncodeButton(releasedButton, pressed: false, x, y,
+                    ToTerminalModifier(Keyboard.Modifiers), _decoder.State.Modes.SgrMouseEncoding));
+            }
+            _trackedButton = null;
+            e.Handled = true;
+            return;
+        }
+
         if (!_isSelecting)
             return;
 
@@ -789,13 +928,27 @@ public partial class TerminalControl : Control, IDisposable
         if (_decoder is null || e.Handled)
             return;
 
+        ModifierKeys modifiers = Keyboard.Modifiers;
+
         // Ctrl+wheel is zoom; leave it alone.
-        if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
+        if ((modifiers & ModifierKeys.Control) != 0)
             return;
 
         int direction = e.Delta > 0 ? 1 : (e.Delta < 0 ? -1 : 0);
         if (direction == 0)
             return;
+
+        // When the app tracks the mouse, the wheel scrolls its content (e.g. claude's
+        // conversation) instead of the local scrollback.
+        if (ShouldForwardToApp(IsMouseReporting(), modifiers))
+        {
+            Point cell = GetCellPosition(e);
+            if (cell.X >= 0)
+                Session?.Append(MouseEncoder.EncodeWheel(up: direction > 0, (int)cell.X, (int)cell.Y,
+                    ToTerminalModifier(modifiers), _decoder.State.Modes.SgrMouseEncoding));
+            e.Handled = true;
+            return;
+        }
 
         ScrollBy(direction * ScrollWheelLines);
         e.Handled = true;
@@ -942,13 +1095,50 @@ public partial class TerminalControl : Control, IDisposable
 
             Debug.WriteLine($"[{GetType().Name}] OnSessionBufferUpdated -> InvalidateVisual");
             InvalidateVisual();
+            // Se dispara tras invalidar para que el host lea la pantalla ya actualizada.
+            // Nivel Background: no retrase el render por el escaneo del host.
+            Dispatcher.BeginInvoke(() => ScreenUpdated?.Invoke(this, EventArgs.Empty), DispatcherPriority.Background);
         }, DispatcherPriority.Render);
     }
 
+    /// <summary>Devuelve el texto de la pantalla visible (buffer principal o
+    /// alternate), una fila por linea, leyendo bajo el lock del buffer. Lo usa el
+    /// host para buscar sentinels (p. ej. el marcador de pregunta pendiente).</summary>
+    public string GetVisibleScreenText()
+    {
+        if (_decoder is null)
+            return string.Empty;
+
+        TerminalScreenBuffer buf = _decoder.Buffer;
+        StringBuilder sb = new(buf.Rows * (buf.Columns + 1));
+        lock (buf.SyncRoot)
+        {
+            for (int y = 0; y < buf.Rows; y++)
+            {
+                Span<TerminalCellInfo> row = buf.GetRow(y);
+                for (int x = 0; x < row.Length; x++)
+                    sb.Append(row[x].Character.ToString());
+                sb.Append('\n');
+            }
+        }
+
+        return sb.ToString();
+    }
+
     // ---- Dispose ----
-    /// <summary>Releases timers, unsubscribes from session events, and disposes the renderer.</summary>
+    /// <summary>
+    /// Releases timers, unsubscribes from session events, and disposes the renderer.
+    /// Must be called by whoever owns the control (removing it from the visual tree is not
+    /// enough): the control is unusable afterwards and only paints its background.
+    /// </summary>
     public void Dispose()
     {
+        // Cleared before releasing the renderer: OnRender/DrawTerminal gate only on
+        // _rendererConfigured, so leaving it set would let a render that arrives after
+        // Dispose ask a released GlyphCache for glyphs.
+        _disposed = true;
+        _rendererConfigured = false;
+
         _renderTimer.Stop();
         _blinkTimer.Stop();
         _resizeTimer.Stop();
@@ -972,6 +1162,11 @@ public partial class TerminalControl : Control, IDisposable
 
     /// <summary>Raised on BEL.</summary>
     public event EventHandler? Bell;
+
+    /// <summary>Raised on the UI thread after the session buffer has been updated with new
+    /// output (same tick that invalidates the visual). Lets the host scan the visible
+    /// screen for sentinels (e.g. a "pregunta pendiente" marker) without polling.</summary>
+    public event EventHandler? ScreenUpdated;
 
     // ---- DependencyProperty registrations ----
     /// <summary>Defines the <see cref="Session"/> dependency property.</summary>
