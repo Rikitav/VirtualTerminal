@@ -95,6 +95,12 @@
         <member name="M:VirtualTerminal.SecureShellSession.ReconnectAsync(System.Threading.CancellationToken)">
             <summary>
             Attempts to reconnect up to a fixed number of times.
+            Authentication failures are not retried; transient network errors are.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.SecureShellSession.IsTransientNetworkException(System.Exception)">
+            <summary>
+            Determines whether an exception represents a transient network failure that is worth retrying.
             </summary>
         </member>
         <member name="M:VirtualTerminal.SecureShellSession.TryReconnectAsync(System.Threading.CancellationToken)">

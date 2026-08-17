@@ -165,9 +165,12 @@ public class SecureShellSession : TerminalSession
 
     /// <summary>
     /// Attempts to reconnect up to a fixed number of times.
+    /// Authentication failures are not retried; transient network errors are.
     /// </summary>
     public virtual async Task ReconnectAsync(CancellationToken cancellationToken = default)
     {
+        Exception? lastException = null;
+
         for (int attempt = 1; attempt <= MaxReconnectAttempts; attempt++)
         {
             try
@@ -175,14 +178,31 @@ public class SecureShellSession : TerminalSession
                 await ConnectAsync(cancellationToken);
                 return;
             }
-            catch
+            catch (SshAuthenticationException)
             {
-                await Task.Delay(ReconnectDelayMs, cancellationToken);
+                // Authentication failures will not be resolved by waiting; fail fast.
+                throw;
+            }
+            catch (Exception ex) when (IsTransientNetworkException(ex))
+            {
+                lastException = ex;
+
+                if (attempt < MaxReconnectAttempts)
+                    await Task.Delay(ReconnectDelayMs, cancellationToken);
             }
         }
 
-        throw new SshConnectionException("Failed to reconnect client");
+        throw new SshConnectionException("Failed to reconnect client after multiple attempts.", lastException!);
     }
+
+    /// <summary>
+    /// Determines whether an exception represents a transient network failure that is worth retrying.
+    /// </summary>
+    private static bool IsTransientNetworkException(Exception exception)
+        => exception is SshConnectionException
+           || exception is SshOperationTimeoutException
+           || exception is System.Net.Sockets.SocketException
+           || exception is IOException;
 
     /// <summary>
     /// Attempts to reconnect without throwing, returning <c>true</c> on success.
@@ -219,7 +239,7 @@ public class SecureShellSession : TerminalSession
     {
         ValidateClient();
         base.Resize(columns, rows, pushScrollback);
-        // TODO: forward the new size to the SSH shell stream when a public API is available.
+        _shellStream.ChangeWindowSize((uint)columns, (uint)rows, 0, 0);
     }
 
     /// <inheritdoc />

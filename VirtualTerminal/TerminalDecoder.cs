@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Text;
@@ -38,6 +39,18 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
 
     /// <summary>Raised on BEL.</summary>
     public event EventHandler? Bell;
+
+    /// <summary>Raised when an OSC 9 desktop notification is received.</summary>
+    public event EventHandler<string>? NotificationReceived;
+
+    /// <summary>Raised when an OSC 52 clipboard set/query is received.</summary>
+    public event EventHandler<ClipboardRequestEventArgs>? ClipboardRequested;
+
+    /// <summary>Raised when an OSC 133 shell-integration mark is received.</summary>
+    public event EventHandler<string>? ShellIntegrationMark;
+
+    /// <summary>Raised when an OSC 1337 iTerm2 annotation is received.</summary>
+    public event EventHandler<string>? Iterm2Annotation;
 
     /// <summary>Wire to the session output queue so reports (DSR/DA/…) reach the client.</summary>
     public Action<ReadOnlySpan<byte>>? SendOutput { get; set; }
@@ -119,6 +132,18 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
 
     private void RaiseBell()
         => Bell?.Invoke(this, EventArgs.Empty);
+
+    internal void RaiseNotification(string message)
+        => NotificationReceived?.Invoke(this, message);
+
+    internal void RaiseClipboardRequested(string selection, string? data)
+        => ClipboardRequested?.Invoke(this, new ClipboardRequestEventArgs(selection, data));
+
+    internal void RaiseShellIntegrationMark(string arguments)
+        => ShellIntegrationMark?.Invoke(this, arguments);
+
+    internal void RaiseIterm2Annotation(string arguments)
+        => Iterm2Annotation?.Invoke(this, arguments);
 
     private void Respond(string response)
     {
@@ -273,7 +298,7 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
             case ')':
             case '*':
             case '+':
-                break;  // charset designation (Phase 2)
+                break;  // G0/G1/G2/G3 charset designation: UTF-8 terminals treat this as a no-op.
             case '#':
                 if (intermediates.Length == 0 || intermediates[0] == '8')
                     AlignmentTest();
@@ -293,6 +318,13 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
             if (fc == 'q' && intermediates.Length == 1 && intermediates[0] == ' ')
             {
                 SetCursorShape(parameters.At(0, 0));
+                return;
+            }
+
+            // DECRQSS: CSI ? Ps $ p
+            if (fc == 'p' && intermediates.Length == 1 && intermediates[0] == '$' && privateMarker == '?')
+            {
+                RequestSelectionOrSetting(parameters.At(0, 0));
                 return;
             }
 
@@ -863,6 +895,33 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         Respond($"\x1b[{(ps == 1 ? 2 : 3)};1;1;112;112;1;0x");
     }
 
+    private void RequestSelectionOrSetting(int ps)
+    {
+        // DECRQSS: respond with the current value of the requested setting.
+        switch (ps)
+        {
+            case 1: // SGR
+                Respond($"\x1bP1$r{EncodeSgr()}\x1b\\");
+                break;
+
+            case 12: // DECSCUSR (cursor style)
+                int code = State.Modes.CursorShape switch
+                {
+                    CursorShape.Block => State.Modes.CursorBlinking ? 1 : 2,
+                    CursorShape.Underline => State.Modes.CursorBlinking ? 3 : 4,
+                    CursorShape.Bar => State.Modes.CursorBlinking ? 5 : 6,
+                    _ => 1,
+                };
+                Respond($"\x1bP1$r{code} q\x1b\\");
+                break;
+
+            default:
+                // Invalid request: respond with DCS 0 $ r ST.
+                Respond("\x1bP0$r\x1b\\");
+                break;
+        }
+    }
+
     // ============== Reset ==============
 
     private void FullReset()
@@ -1226,4 +1285,128 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     }
 
     private static byte ClampByte(int v) => (byte)Math.Clamp(v, 0, 255);
+
+    // ============== SGR serialization (for DECRQSS) ==============
+
+    private string EncodeSgr()
+    {
+        CharAttributes a = State.Attributes;
+        List<int> p = [];
+
+        if (a.Bold) p.Add(1);
+        if (a.Faint) p.Add(2);
+        if (a.Italic) p.Add(3);
+        if (a.Fraktur) p.Add(20);
+
+        switch (a.UnderlineStyle)
+        {
+            case Underline.Single:
+                p.Add(4);
+                break;
+            case Underline.Double:
+                p.Add(21);
+                break;
+            case Underline.Curly:
+                p.Add(4);
+                p.Add(3);
+                break;
+            case Underline.Dotted:
+                p.Add(4);
+                p.Add(4);
+                break;
+            case Underline.Dashed:
+                p.Add(4);
+                p.Add(5);
+                break;
+        }
+
+        if (a.Blink == Blink.Slow) p.Add(5);
+        if (a.Blink == Blink.Rapid) p.Add(6);
+        if (a.Inverse) p.Add(7);
+        if (a.Conceal) p.Add(8);
+        if (a.Strikethrough) p.Add(9);
+        if (a.Framed) p.Add(51);
+        if (a.Encircled) p.Add(52);
+        if (a.Overline) p.Add(53);
+        if (a.DoublyUnderlined && a.UnderlineStyle != Underline.Double) p.Add(21);
+
+        EncodeColor(p, ColorTarget.Foreground, a);
+        EncodeColor(p, ColorTarget.Background, a);
+        EncodeColor(p, ColorTarget.Underline, a);
+
+        if (p.Count == 0)
+            p.Add(0);
+
+        return string.Join(";", p);
+    }
+
+    private static void EncodeColor(List<int> p, ColorTarget target, in CharAttributes a)
+    {
+        ColorSource source;
+        int index;
+        Color rgb;
+
+        switch (target)
+        {
+            case ColorTarget.Foreground:
+                source = a.ForegroundSource;
+                index = a.ForegroundIndex;
+                rgb = a.ForegroundRgb;
+                break;
+            case ColorTarget.Background:
+                source = a.BackgroundSource;
+                index = a.BackgroundIndex;
+                rgb = a.BackgroundRgb;
+                break;
+            case ColorTarget.Underline:
+                source = a.UnderlineSource;
+                index = a.UnderlineIndex;
+                rgb = a.UnderlineRgb;
+                break;
+            default:
+                return;
+        }
+
+        int prefix = target switch
+        {
+            ColorTarget.Foreground => 38,
+            ColorTarget.Background => 48,
+            ColorTarget.Underline => 58,
+            _ => 38,
+        };
+
+        switch (source)
+        {
+            case ColorSource.Default:
+                p.Add(target == ColorTarget.Foreground ? 39
+                    : target == ColorTarget.Background ? 49 : 59);
+                break;
+
+            case ColorSource.Indexed:
+                // Use the compact ANSI forms for the 16 standard colors when possible.
+                if (target == ColorTarget.Foreground)
+                {
+                    if (index < 8) { p.Add(30 + index); break; }
+                    if (index < 16) { p.Add(90 + index - 8); break; }
+                }
+                else if (target == ColorTarget.Background)
+                {
+                    if (index < 8) { p.Add(40 + index); break; }
+                    if (index < 16) { p.Add(100 + index - 8); break; }
+                }
+
+                p.Add(prefix);
+                p.Add(5);
+                p.Add(index);
+                break;
+
+            case ColorSource.Direct:
+                p.Add(prefix);
+                p.Add(2);
+                p.Add(rgb.R);
+                p.Add(rgb.G);
+                p.Add(rgb.B);
+                break;
+        }
+    }
 }

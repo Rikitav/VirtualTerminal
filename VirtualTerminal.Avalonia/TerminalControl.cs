@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Media;
 using Avalonia.Threading;
+using System.Diagnostics;
 using System.Text;
 using System.Windows.Input;
 using VirtualTerminal.Buffer;
@@ -15,6 +16,7 @@ using VirtualTerminal.Interfaces;
 using VirtualTerminal.Model;
 using VirtualTerminal.Options;
 using VirtualTerminal.Rendering;
+using VirtualTerminal.Vt;
 using AvaloniaColor = Avalonia.Media.Color;
 using Color = System.Drawing.Color;
 
@@ -43,6 +45,12 @@ public class TerminalControl : TemplatedControl, IDisposable
     private bool _isSelecting;
     private Point _selectStart;
 
+    // When the running app has enabled xterm mouse tracking, mouse events are forwarded
+    // to it instead of being used for local selection and scrollback navigation. Holds the
+    // button currently held by the user while forwarding, so motion and release can be
+    // reported in button-event mode.
+    private TerminalMouseButton? _trackedButton;
+
     // Scrollback navigation (mouse wheel). 0 = live at the bottom; >0 = rows scrolled back into history.
     private int _scrollOffset;
     private const int ScrollWheelLines = 3;
@@ -65,6 +73,15 @@ public class TerminalControl : TemplatedControl, IDisposable
 
     /// <summary>Raised on BEL.</summary>
     public event EventHandler? Bell;
+
+    /// <summary>Raised when an OSC 9 desktop notification is received.</summary>
+    public event EventHandler<string>? NotificationReceived;
+
+    /// <summary>Raised when an OSC 133 shell-integration mark is received.</summary>
+    public event EventHandler<string>? ShellIntegrationMark;
+
+    /// <summary>Raised when an OSC 1337 iTerm2 annotation is received.</summary>
+    public event EventHandler<string>? Iterm2Annotation;
 
     /// <summary>Gets or sets the active terminal session rendered by this control.</summary>
     public ITerminalSession? CurrentSession
@@ -223,6 +240,10 @@ public class TerminalControl : TemplatedControl, IDisposable
             {
                 oldDec.TitleChanged -= OnDecoderTitleChanged;
                 oldDec.Bell -= OnDecoderBell;
+                oldDec.NotificationReceived -= OnDecoderNotification;
+                oldDec.ShellIntegrationMark -= OnDecoderShellIntegrationMark;
+                oldDec.Iterm2Annotation -= OnDecoderIterm2Annotation;
+                oldDec.ClipboardRequested -= OnDecoderClipboardRequested;
             }
 
             _decoder = (change.NewValue as ITerminalSession)?.Decoder as TerminalDecoder;
@@ -231,6 +252,10 @@ public class TerminalControl : TemplatedControl, IDisposable
                 dec.Options = _options;
                 dec.TitleChanged += OnDecoderTitleChanged;
                 dec.Bell += OnDecoderBell;
+                dec.NotificationReceived += OnDecoderNotification;
+                dec.ShellIntegrationMark += OnDecoderShellIntegrationMark;
+                dec.Iterm2Annotation += OnDecoderIterm2Annotation;
+                dec.ClipboardRequested += OnDecoderClipboardRequested;
             }
 
             SyncOptionsToDecoder();
@@ -275,6 +300,46 @@ public class TerminalControl : TemplatedControl, IDisposable
 
     private void OnDecoderBell(object? sender, EventArgs e)
         => Bell?.Invoke(this, e);
+
+    private void OnDecoderNotification(object? sender, string message)
+        => NotificationReceived?.Invoke(this, message);
+
+    private void OnDecoderShellIntegrationMark(object? sender, string arguments)
+        => ShellIntegrationMark?.Invoke(this, arguments);
+
+    private void OnDecoderIterm2Annotation(object? sender, string arguments)
+        => Iterm2Annotation?.Invoke(this, arguments);
+
+    private async void OnDecoderClipboardRequested(object? sender, ClipboardRequestEventArgs e)
+    {
+        try
+        {
+            IClipboard? clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clipboard is null)
+                return;
+
+            if (e.IsQuery)
+            {
+                string? text = await clipboard.TryGetTextAsync();
+                if (text is null)
+                    return;
+
+                string b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
+                CurrentSession?.Append($"\x1b]52;{e.Selection};{b64}\x07");
+            }
+            else
+            {
+                byte[] bytes = Convert.FromBase64String(e.Data!);
+                string text = Encoding.UTF8.GetString(bytes);
+                await clipboard.SetTextAsync(text);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[{GetType().Name}] Clipboard request failed: {ex}");
+        }
+    }
+
     // ---- Lifecycle ----
     /// <inheritdoc/>
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -505,6 +570,8 @@ public class TerminalControl : TemplatedControl, IDisposable
     {
         base.OnGotFocus(e);
         _cursorBlinkState = true;
+        if (_decoder?.State.Modes.FocusReporting == true)
+            CurrentSession?.Append("\x1b[I");
         InvalidateVisual();
     }
 
@@ -512,6 +579,8 @@ public class TerminalControl : TemplatedControl, IDisposable
     protected override void OnLostFocus(FocusChangedEventArgs e)
     {
         base.OnLostFocus(e);
+        if (_decoder?.State.Modes.FocusReporting == true)
+            CurrentSession?.Append("\x1b[O");
         InvalidateVisual();
     }
 
@@ -610,6 +679,33 @@ public class TerminalControl : TemplatedControl, IDisposable
         return result;
     }
 
+    // ---- Mouse forwarding (xterm mouse tracking) ----
+    private bool IsMouseReporting()
+        => _decoder is not null && _decoder.State.Modes.MouseTracking != MouseTrackingMode.Off;
+
+    // Shift bypasses tracking so the user can still copy text from a mouse-owning app.
+    private static bool ShouldForwardToApp(bool reporting, KeyModifiers modifiers)
+        => reporting && (modifiers & KeyModifiers.Shift) == 0;
+
+    private static TerminalMouseButton MapMouseButton(PointerUpdateKind kind) => kind switch
+    {
+        PointerUpdateKind.LeftButtonPressed or PointerUpdateKind.LeftButtonReleased => TerminalMouseButton.Left,
+        PointerUpdateKind.MiddleButtonPressed or PointerUpdateKind.MiddleButtonReleased => TerminalMouseButton.Middle,
+        PointerUpdateKind.RightButtonPressed or PointerUpdateKind.RightButtonReleased => TerminalMouseButton.Right,
+        PointerUpdateKind.XButton1Pressed or PointerUpdateKind.XButton1Released => TerminalMouseButton.XButton1,
+        PointerUpdateKind.XButton2Pressed or PointerUpdateKind.XButton2Released => TerminalMouseButton.XButton2,
+        _ => TerminalMouseButton.None,
+    };
+
+    private bool ShouldReportMotion()
+    {
+        if (_decoder is null)
+            return false;
+
+        MouseTrackingMode mode = _decoder.State.Modes.MouseTracking;
+        return mode == MouseTrackingMode.AnyEvent || (mode == MouseTrackingMode.ButtonEvent && _trackedButton is not null);
+    }
+
     /// <inheritdoc/>
     protected override void OnTextInput(TextInputEventArgs e)
     {
@@ -652,6 +748,21 @@ public class TerminalControl : TemplatedControl, IDisposable
             return;
 
         var update = e.GetCurrentPoint(this).Properties.PointerUpdateKind;
+        KeyModifiers modifiers = e.KeyModifiers;
+        TerminalMouseButton mappedButton = MapMouseButton(update);
+
+        if (ShouldForwardToApp(IsMouseReporting(), modifiers) && mappedButton != TerminalMouseButton.None)
+        {
+            Point cell = GetCellPosition(e);
+            if (cell.X < 0)
+                return;
+
+            _trackedButton = mappedButton;
+            CurrentSession?.Append(MouseEncoder.EncodeButton(mappedButton, pressed: true, (int)cell.X, (int)cell.Y,
+                ToTerminalModifier(modifiers), _decoder.State.Modes.SgrMouseEncoding));
+            e.Handled = true;
+            return;
+        }
 
         if (update == PointerUpdateKind.LeftButtonPressed)
         {
@@ -694,7 +805,23 @@ public class TerminalControl : TemplatedControl, IDisposable
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
-        if (!_isSelecting || _decoder is null)
+        if (_decoder is null)
+            return;
+
+        KeyModifiers modifiers = e.KeyModifiers;
+        if (ShouldForwardToApp(IsMouseReporting(), modifiers) && ShouldReportMotion())
+        {
+            Point cell = GetCellPosition(e);
+            if (cell.X < 0)
+                return;
+
+            CurrentSession?.Append(MouseEncoder.EncodeMotion(_trackedButton, (int)cell.X, (int)cell.Y,
+                ToTerminalModifier(modifiers), _decoder.State.Modes.SgrMouseEncoding));
+            e.Handled = true;
+            return;
+        }
+
+        if (!_isSelecting)
             return;
 
         Point p = GetCellPosition(e);
@@ -710,6 +837,23 @@ public class TerminalControl : TemplatedControl, IDisposable
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+
+        if (_trackedButton is { } releasedButton)
+        {
+            // X10 only reports presses, never releases.
+            if (_decoder is not null && _decoder.State.Modes.MouseTracking != MouseTrackingMode.X10)
+            {
+                Point cell = GetCellPosition(e);
+                int x = cell.X < 0 ? 0 : (int)cell.X;
+                int y = cell.Y < 0 ? 0 : (int)cell.Y;
+                CurrentSession?.Append(MouseEncoder.EncodeButton(releasedButton, pressed: false, x, y,
+                    ToTerminalModifier(e.KeyModifiers), _decoder.State.Modes.SgrMouseEncoding));
+            }
+            _trackedButton = null;
+            e.Handled = true;
+            return;
+        }
+
         if (!_isSelecting)
             return;
 
@@ -738,6 +882,18 @@ public class TerminalControl : TemplatedControl, IDisposable
         int direction = e.Delta.Y > 0 ? 1 : (e.Delta.Y < 0 ? -1 : 0);
         if (direction == 0)
             return;
+
+        // When the app tracks the mouse, the wheel scrolls its content instead of the
+        // local scrollback.
+        if (ShouldForwardToApp(IsMouseReporting(), e.KeyModifiers))
+        {
+            Point cell = GetCellPosition(e);
+            if (cell.X >= 0)
+                CurrentSession?.Append(MouseEncoder.EncodeWheel(up: direction > 0, (int)cell.X, (int)cell.Y,
+                    ToTerminalModifier(e.KeyModifiers), _decoder.State.Modes.SgrMouseEncoding));
+            e.Handled = true;
+            return;
+        }
 
         ScrollBy(direction * ScrollWheelLines);
         e.Handled = true;
@@ -882,6 +1038,10 @@ public class TerminalControl : TemplatedControl, IDisposable
         {
             dec.TitleChanged -= OnDecoderTitleChanged;
             dec.Bell -= OnDecoderBell;
+            dec.NotificationReceived -= OnDecoderNotification;
+            dec.ShellIntegrationMark -= OnDecoderShellIntegrationMark;
+            dec.Iterm2Annotation -= OnDecoderIterm2Annotation;
+            dec.ClipboardRequested -= OnDecoderClipboardRequested;
         }
 
         _renderer.Dispose();

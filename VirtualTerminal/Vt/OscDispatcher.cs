@@ -7,8 +7,8 @@ namespace VirtualTerminal.Vt;
 
 /// <summary>
 /// Processes OSC (Operating System Command) payloads: window title (0/1/2), palette recolor
-/// (4), default colors (10/11/12), and hyperlinks (8). Queries (4?/10?/…) and clipboard (52)
-/// are gated for Phase 2.
+/// (4), default colors (10/11/12), hyperlinks (8), desktop notifications (9), clipboard (52),
+/// and shell integration marks (133/1337).
 /// </summary>
 internal static class OscDispatcher
 {
@@ -65,8 +65,39 @@ internal static class OscDispatcher
                     break;
                 }
 
+            case "9": // desktop notification: 9 ; message
+                {
+                    if (!string.IsNullOrEmpty(rest))
+                        d.RaiseNotification(rest);
+                    break;
+                }
+
+            case "52": // clipboard: 52 ; selection ; base64-data-or-?
+                {
+                    if (!d.Options.AllowClipboard)
+                        break;
+
+                    int semi = rest.IndexOf(';');
+                    string selection = semi < 0 ? "c" : rest[..semi];
+                    string clipData = semi < 0 ? rest : rest[(semi + 1)..];
+                    d.RaiseClipboardRequested(selection, string.IsNullOrEmpty(clipData) ? null : clipData);
+                    break;
+                }
+
+            case "133": // shell integration mark: 133 ; A|B|C|D ; ...
+                {
+                    d.RaiseShellIntegrationMark(rest);
+                    break;
+                }
+
+            case "1337": // iTerm2 annotation: 1337 ; key=value ; ...
+                {
+                    d.RaiseIterm2Annotation(rest);
+                    break;
+                }
+
             default:
-                break; // OSC 9/52/133/1337 → Phase 2
+                break;
         }
     }
 

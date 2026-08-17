@@ -1647,6 +1647,18 @@
         <member name="E:VirtualTerminal.TerminalDecoder.Bell">
             <summary>Raised on BEL.</summary>
         </member>
+        <member name="E:VirtualTerminal.TerminalDecoder.NotificationReceived">
+            <summary>Raised when an OSC 9 desktop notification is received.</summary>
+        </member>
+        <member name="E:VirtualTerminal.TerminalDecoder.ClipboardRequested">
+            <summary>Raised when an OSC 52 clipboard set/query is received.</summary>
+        </member>
+        <member name="E:VirtualTerminal.TerminalDecoder.ShellIntegrationMark">
+            <summary>Raised when an OSC 133 shell-integration mark is received.</summary>
+        </member>
+        <member name="E:VirtualTerminal.TerminalDecoder.Iterm2Annotation">
+            <summary>Raised when an OSC 1337 iTerm2 annotation is received.</summary>
+        </member>
         <member name="P:VirtualTerminal.TerminalDecoder.SendOutput">
             <summary>Wire to the session output queue so reports (DSR/DA/…) reach the client.</summary>
         </member>
@@ -1785,12 +1797,33 @@
         <member name="T:VirtualTerminal.Vt.OscDispatcher">
             <summary>
             Processes OSC (Operating System Command) payloads: window title (0/1/2), palette recolor
-            (4), default colors (10/11/12), and hyperlinks (8). Queries (4?/10?/…) and clipboard (52)
-            are gated for Phase 2.
+            (4), default colors (10/11/12), hyperlinks (8), desktop notifications (9), clipboard (52),
+            and shell integration marks (133/1337).
             </summary>
         </member>
         <member name="M:VirtualTerminal.Vt.OscDispatcher.ParseColorSpec(System.String)">
             <summary>Parses an XParseColor-style spec: <c>#RRGGBB</c>, <c>#RGB</c>, or <c>rgb:RR/GG/BB</c>.</summary>
+        </member>
+        <member name="T:VirtualTerminal.Vt.ClipboardRequestEventArgs">
+            <summary>
+            Arguments for an OSC 52 clipboard request.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Vt.ClipboardRequestEventArgs.#ctor(System.String,System.String)">
+            <summary>
+            Initializes a new clipboard request.
+            </summary>
+            <param name="selection">The selection character (e.g. <c>c</c>, <c>p</c>, <c>q</c>, <c>s</c>).</param>
+            <param name="data">The base64-encoded clipboard data, or <see langword="null"/> when the terminal is querying the clipboard.</param>
+        </member>
+        <member name="P:VirtualTerminal.Vt.ClipboardRequestEventArgs.Selection">
+            <summary>The clipboard selection identifier.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Vt.ClipboardRequestEventArgs.Data">
+            <summary>The base64-encoded data to write, or <see langword="null"/> for a query.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Vt.ClipboardRequestEventArgs.IsQuery">
+            <summary><see langword="true"/> when the terminal is asking for the current clipboard contents.</summary>
         </member>
         <member name="T:VirtualTerminal.Vt.VtDecoder">
              <summary>

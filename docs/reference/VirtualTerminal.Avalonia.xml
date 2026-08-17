@@ -263,6 +263,15 @@
         <member name="E:VirtualTerminal.TerminalControl.Bell">
             <summary>Raised on BEL.</summary>
         </member>
+        <member name="E:VirtualTerminal.TerminalControl.NotificationReceived">
+            <summary>Raised when an OSC 9 desktop notification is received.</summary>
+        </member>
+        <member name="E:VirtualTerminal.TerminalControl.ShellIntegrationMark">
+            <summary>Raised when an OSC 133 shell-integration mark is received.</summary>
+        </member>
+        <member name="E:VirtualTerminal.TerminalControl.Iterm2Annotation">
+            <summary>Raised when an OSC 1337 iTerm2 annotation is received.</summary>
+        </member>
         <member name="P:VirtualTerminal.TerminalControl.CurrentSession">
             <summary>Gets or sets the active terminal session rendered by this control.</summary>
         </member>

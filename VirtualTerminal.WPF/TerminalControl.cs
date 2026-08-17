@@ -14,6 +14,7 @@ using VirtualTerminal.Interop;
 using VirtualTerminal.Model;
 using VirtualTerminal.Options;
 using VirtualTerminal.Rendering;
+using VirtualTerminal.Vt;
 using WindowsColor = System.Windows.Media.Color;
 
 namespace VirtualTerminal;
@@ -251,6 +252,10 @@ public partial class TerminalControl : Control, IDisposable
                 {
                     oldDec.TitleChanged -= OnDecoderTitleChanged;
                     oldDec.Bell -= OnDecoderBell;
+                    oldDec.NotificationReceived -= OnDecoderNotification;
+                    oldDec.ShellIntegrationMark -= OnDecoderShellIntegrationMark;
+                    oldDec.Iterm2Annotation -= OnDecoderIterm2Annotation;
+                    oldDec.ClipboardRequested -= OnDecoderClipboardRequested;
                 }
             }
 
@@ -260,6 +265,10 @@ public partial class TerminalControl : Control, IDisposable
                 dec.Options = _options;
                 dec.TitleChanged += OnDecoderTitleChanged;
                 dec.Bell += OnDecoderBell;
+                dec.NotificationReceived += OnDecoderNotification;
+                dec.ShellIntegrationMark += OnDecoderShellIntegrationMark;
+                dec.Iterm2Annotation += OnDecoderIterm2Annotation;
+                dec.ClipboardRequested += OnDecoderClipboardRequested;
             }
 
             if (e.NewValue is ITerminalSession newSession)
@@ -343,6 +352,47 @@ public partial class TerminalControl : Control, IDisposable
 
     private void OnDecoderBell(object? sender, EventArgs e)
         => Bell?.Invoke(this, e);
+
+    private void OnDecoderNotification(object? sender, string message)
+        => NotificationReceived?.Invoke(this, message);
+
+    private void OnDecoderShellIntegrationMark(object? sender, string arguments)
+        => ShellIntegrationMark?.Invoke(this, arguments);
+
+    private void OnDecoderIterm2Annotation(object? sender, string arguments)
+        => Iterm2Annotation?.Invoke(this, arguments);
+
+    private void OnDecoderClipboardRequested(object? sender, ClipboardRequestEventArgs e)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => OnDecoderClipboardRequested(sender, e));
+            return;
+        }
+
+        try
+        {
+            if (e.IsQuery)
+            {
+                string? text = Clipboard.GetText();
+                if (text is null)
+                    return;
+
+                string b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
+                Session?.Append($"\x1b]52;{e.Selection};{b64}\x07");
+            }
+            else
+            {
+                byte[] bytes = Convert.FromBase64String(e.Data!);
+                string text = Encoding.UTF8.GetString(bytes);
+                Clipboard.SetText(text);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[{GetType().Name}] Clipboard request failed: {ex}");
+        }
+    }
 
     // ---- Lifecycle ----
     // WPF raises Unloaded whenever the control leaves the visual tree, which is not
@@ -594,6 +644,8 @@ public partial class TerminalControl : Control, IDisposable
     {
         base.OnGotKeyboardFocus(e);
         _cursorBlinkState = true;
+        if (_decoder?.State.Modes.FocusReporting == true)
+            Session?.Append("\x1b[I");
         InvalidateVisual();
     }
 
@@ -601,6 +653,8 @@ public partial class TerminalControl : Control, IDisposable
     protected override void OnLostKeyboardFocus(KeyboardFocusChangedEventArgs e)
     {
         base.OnLostKeyboardFocus(e);
+        if (_decoder?.State.Modes.FocusReporting == true)
+            Session?.Append("\x1b[O");
         InvalidateVisual();
     }
 
@@ -1067,9 +1121,11 @@ public partial class TerminalControl : Control, IDisposable
         if (string.IsNullOrEmpty(text))
             return;
 
-        // Normalize line endings to CR so the terminal interprets them as Enter keys.
+        // Normalize line endings to CR so the terminal interprets them as Enter keys, and
+        // wrap with the bracketed-paste envelope if the terminal requested it (?2004h).
         text = text.ReplaceLineEndings("\r");
-        Session.Append(text);
+        bool bracketed = _decoder?.State.Modes.BracketedPaste == true;
+        Session.Append(KeyboardEncoder.WrapBracketedPaste(text, bracketed));
         await Task.CompletedTask;
     }
 
@@ -1153,6 +1209,10 @@ public partial class TerminalControl : Control, IDisposable
             {
                 dec.TitleChanged -= OnDecoderTitleChanged;
                 dec.Bell -= OnDecoderBell;
+                dec.NotificationReceived -= OnDecoderNotification;
+                dec.ShellIntegrationMark -= OnDecoderShellIntegrationMark;
+                dec.Iterm2Annotation -= OnDecoderIterm2Annotation;
+                dec.ClipboardRequested -= OnDecoderClipboardRequested;
             }
 
             // Do not dispose, we do not own the session
@@ -1166,6 +1226,15 @@ public partial class TerminalControl : Control, IDisposable
 
     /// <summary>Raised on BEL.</summary>
     public event EventHandler? Bell;
+
+    /// <summary>Raised when an OSC 9 desktop notification is received.</summary>
+    public event EventHandler<string>? NotificationReceived;
+
+    /// <summary>Raised when an OSC 133 shell-integration mark is received.</summary>
+    public event EventHandler<string>? ShellIntegrationMark;
+
+    /// <summary>Raised when an OSC 1337 iTerm2 annotation is received.</summary>
+    public event EventHandler<string>? Iterm2Annotation;
 
     /// <summary>Raised on the UI thread after the session buffer has been updated with new
     /// output (same tick that invalidates the visual). Lets the host scan the visible

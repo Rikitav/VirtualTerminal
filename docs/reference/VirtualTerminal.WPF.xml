@@ -494,6 +494,15 @@
         <member name="E:VirtualTerminal.TerminalControl.Bell">
             <summary>Raised on BEL.</summary>
         </member>
+        <member name="E:VirtualTerminal.TerminalControl.NotificationReceived">
+            <summary>Raised when an OSC 9 desktop notification is received.</summary>
+        </member>
+        <member name="E:VirtualTerminal.TerminalControl.ShellIntegrationMark">
+            <summary>Raised when an OSC 133 shell-integration mark is received.</summary>
+        </member>
+        <member name="E:VirtualTerminal.TerminalControl.Iterm2Annotation">
+            <summary>Raised when an OSC 1337 iTerm2 annotation is received.</summary>
+        </member>
         <member name="E:VirtualTerminal.TerminalControl.ScreenUpdated">
             <summary>Raised on the UI thread after the session buffer has been updated with new
             output (same tick that invalidates the visual). Lets the host scan the visible
