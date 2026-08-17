@@ -178,7 +178,11 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
                 Buffer.InsertChars(cy, cx, width);
 
             ref TerminalCellInfo cell = ref Buffer.GetCell(cy, cx);
-            cell = new TerminalCellInfo(rune, style with { Flags = style.Flags | CellStyleFlags.Wide });
+            CellStyleFlags flags = style.Flags;
+            if (width == 2)
+                flags |= CellStyleFlags.Wide;
+
+            cell = new TerminalCellInfo(rune, style with { Flags = flags });
 
             if (width == 2 && cx + 1 < cols)
             {

@@ -1197,6 +1197,7 @@ public partial class TerminalControl : Control, IDisposable
     public static readonly DependencyProperty ScreenBackgroundProperty = DependencyProperty.Register(
         nameof(ScreenBackground), typeof(WindowsColor), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: Colors.Black));
+
     /// <summary>Defines the <see cref="ScreenForeground"/> dependency property.</summary>
     public static readonly DependencyProperty ScreenForegroundProperty = DependencyProperty.Register(
         nameof(ScreenForeground), typeof(WindowsColor), typeof(TerminalControl),

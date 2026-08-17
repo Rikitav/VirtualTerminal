@@ -82,8 +82,8 @@ public abstract class TerminalSession : ITerminalSession
     /// </summary>
     protected TerminalSession()
     {
-        _decoder = new TerminalDecoder();
         _buffer = new TerminalScreenBuffer(128, 20);
+        _decoder = new TerminalDecoder(_buffer);
 
         _title = GetType().Name;
         _decoder.TitleChanged += (_, title) => _title = title;

@@ -4,6 +4,7 @@
   <Project Path="VirtualTerminal.SecureShell/VirtualTerminal.SecureShell.csproj" Id="fec70be4-fcf2-41b4-aaa1-db2de5421502" />
   <Project Path="VirtualTerminal.AvaloniaTestApp/VirtualTerminal.AvaloniaTestApp.csproj" />
   <Project Path="VirtualTerminal.TestApp/VirtualTerminal.TestApp.csproj" />
+  <Project Path="VirtualTerminal.Tests/VirtualTerminal.Tests.csproj" />
   <Project Path="VirtualTerminal.WPF/VirtualTerminal.WPF.csproj" />
   <Project Path="VirtualTerminal/VirtualTerminal.csproj" />
 </Solution>

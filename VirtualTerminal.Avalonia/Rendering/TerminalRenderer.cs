@@ -242,7 +242,7 @@ public sealed class TerminalRenderer : IDisposable
 
         if (style.UnderlineStyle != Enums.Underline.None || style.DoublyUnderlined)
         {
-            double y = cellH + _glyphs.UnderlinePosition;
+            double y = baselineY + _glyphs.UnderlinePosition;
             drawingContext.DrawLine(pen, new Point(x, y), new Point(x + width, y));
             if (style.UnderlineStyle == Enums.Underline.Double)
                 drawingContext.DrawLine(pen, new Point(x, y - thickness - 1), new Point(x + width, y - thickness - 1));
