@@ -1,4 +1,4 @@
-using System.Drawing;
+using System.Text;
 using VirtualTerminal.Model;
 
 namespace VirtualTerminal.Buffer;
@@ -28,6 +28,7 @@ public sealed class TerminalScreenBuffer : IDisposable
 
     private readonly Queue<TerminalRow> _scrollback = new();
     private int _scrollbackMax = DefaultScrollbackMax;
+    private TerminalRow[]? _scrollbackSnapshot;
 
     private bool[] _tabStops;
 
@@ -55,7 +56,7 @@ public sealed class TerminalScreenBuffer : IDisposable
     public int ScrollbackMax => _scrollbackMax;
 
     /// <summary>Convenience size (columns, rows) for consumers expecting the legacy shape.</summary>
-    public Size GridSize => new Size(_columns, _rows);
+    public TerminalSize GridSize => new TerminalSize(_columns, _rows);
 
     /// <summary>Initializes a new screen buffer.</summary>
     /// <param name="columns">Number of columns.</param>
@@ -85,6 +86,8 @@ public sealed class TerminalScreenBuffer : IDisposable
         _scrollbackMax = Math.Max(0, max);
         while (_scrollback.Count > _scrollbackMax)
             _scrollback.Dequeue();
+
+        InvalidateScrollbackSnapshot();
     }
 
     // ---- Row / cell access ----
@@ -312,6 +315,7 @@ public sealed class TerminalScreenBuffer : IDisposable
             }
         }
 
+        InvalidateScrollbackSnapshot();
         MarkAllDirty();
     }
 
@@ -551,10 +555,86 @@ public sealed class TerminalScreenBuffer : IDisposable
             for (int i = old; i < rows; i++)
                 grid[i] = new TerminalRow(columns);
         }
+
+        InvalidateScrollbackSnapshot();
     }
 
     /// <summary>Snapshot of the scrollback rows (oldest first). Used by the renderer for history.</summary>
-    public IReadOnlyList<TerminalRow> GetScrollback() => Array.AsReadOnly(_scrollback.ToArray());
+    public IReadOnlyList<TerminalRow> GetScrollback()
+        => Array.AsReadOnly(_scrollbackSnapshot ??= _scrollback.ToArray());
+
+    private void InvalidateScrollbackSnapshot()
+        => _scrollbackSnapshot = null;
+
+    /// <summary>
+    /// Returns the text of the active screen, one row per line. Continuation cells are skipped
+    /// and trailing blanks are trimmed. Call under <see cref="SyncRoot"/>.
+    /// </summary>
+    public string GetVisibleText()
+    {
+        StringBuilder sb = new(_rows * (_columns + 1));
+        for (int y = 0; y < _rows; y++)
+        {
+            AppendRow(sb, _active[y]);
+            sb.Append('\n');
+        }
+
+        return sb.ToString().TrimEnd('\n');
+    }
+
+    /// <summary>
+    /// Returns the text of the scrollback history plus the active screen, one row per line.
+    /// When the alternate screen is active, only the visible screen is returned.
+    /// Continuation cells are skipped and trailing blanks are trimmed.
+    /// Call under <see cref="SyncRoot"/>.
+    /// </summary>
+    public string GetAllText()
+    {
+        if (_isAlt)
+            return GetVisibleText();
+
+        StringBuilder sb = new((_scrollback.Count + _rows) * (_columns + 1));
+        foreach (TerminalRow row in _scrollback)
+        {
+            AppendRow(sb, row);
+            sb.Append('\n');
+        }
+
+        for (int y = 0; y < _rows; y++)
+        {
+            AppendRow(sb, _active[y]);
+            sb.Append('\n');
+        }
+
+        return sb.ToString().TrimEnd('\n');
+    }
+
+    private static void AppendRow(StringBuilder sb, TerminalRow row)
+    {
+        int last = row.Length - 1;
+        while (last >= 0)
+        {
+            TerminalCellInfo cell = row.Cells[last];
+            if (cell.Style.Continuation)
+            {
+                last--;
+                continue;
+            }
+
+            if (cell.Character.Value != ' ')
+                break;
+
+            last--;
+        }
+
+        for (int i = 0; i <= last; i++)
+        {
+            if (row.Cells[i].Style.Continuation)
+                continue;
+
+            sb.Append(row.Cells[i].Character.ToString());
+        }
+    }
 
     /// <summary>Releases resources used by the screen buffer.</summary>
     public void Dispose()
@@ -563,6 +643,7 @@ public sealed class TerminalScreenBuffer : IDisposable
             return;
 
         _scrollback.Clear();
+        InvalidateScrollbackSnapshot();
         _disposed = true;
     }
 }

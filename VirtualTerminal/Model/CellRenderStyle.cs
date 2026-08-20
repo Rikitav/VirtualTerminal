@@ -1,4 +1,3 @@
-using System.Drawing;
 using VirtualTerminal.Enums;
 
 namespace VirtualTerminal.Model;
@@ -12,13 +11,13 @@ namespace VirtualTerminal.Model;
 public readonly struct CellRenderStyle : IEquatable<CellRenderStyle>
 {
     /// <summary>Gets the foreground color.</summary>
-    public Color Foreground { get; init; }
+    public TerminalColor Foreground { get; init; }
 
     /// <summary>Gets the background color.</summary>
-    public Color Background { get; init; }
+    public TerminalColor Background { get; init; }
 
     /// <summary>Gets the underline color.</summary>
-    public Color UnderlineColor { get; init; }
+    public TerminalColor UnderlineColor { get; init; }
 
     /// <summary>Bitfield of boolean attributes plus default-color sentinels and width flags.</summary>
     public CellStyleFlags Flags { get; init; }
@@ -88,9 +87,9 @@ public readonly struct CellRenderStyle : IEquatable<CellRenderStyle>
     /// <summary>A clean default: default foreground/background, no attributes.</summary>
     public static CellRenderStyle Default { get; } = new()
     {
-        Foreground = Color.White,
-        Background = Color.Black,
-        UnderlineColor = Color.White,
+        Foreground = TerminalColor.White,
+        Background = TerminalColor.Black,
+        UnderlineColor = TerminalColor.White,
         Flags = CellStyleFlags.ForegroundIsDefault | CellStyleFlags.BackgroundIsDefault | CellStyleFlags.UnderlineColorIsDefault,
         UnderlineStyle = Underline.None,
         HyperlinkId = 0,

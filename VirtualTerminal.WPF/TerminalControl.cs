@@ -1,10 +1,12 @@
 using System.Diagnostics;
 using System.Text;
 using System.Windows;
+using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using VirtualTerminal.Automation;
 using VirtualTerminal.Buffer;
 using VirtualTerminal.Extensions;
 using VirtualTerminal.Helpers;
@@ -236,6 +238,10 @@ public partial class TerminalControl : Control, IDisposable
         _blinkTimer.Start();
     }
 
+    /// <inheritdoc />
+    protected override AutomationPeer OnCreateAutomationPeer()
+        => new TerminalControlAutomationPeer(this);
+
     // ---- Property change handling ----
     /// <inheritdoc />
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
@@ -303,8 +309,8 @@ public partial class TerminalControl : Control, IDisposable
         _foregroundBrush = new SolidColorBrush(ScreenForeground);
         _backgroundBrush = new SolidColorBrush(ScreenBackground);
 
-        _options.DefaultBackground = ScreenBackground.ToDrawingColor();
-        _options.DefaultForeground = ScreenForeground.ToDrawingColor();
+        _options.DefaultBackground = ScreenBackground.ToTerminalColor();
+        _options.DefaultForeground = ScreenForeground.ToTerminalColor();
     }
 
     private void InvalidateCommandState()
@@ -331,11 +337,11 @@ public partial class TerminalControl : Control, IDisposable
     private void SyncOptionsToDecoder()
     {
         _options.CursorShape = CursorShape;
-        _options.DefaultCursorColor = CursorColor.ToDrawingColor();
+        _options.DefaultCursorColor = CursorColor.ToTerminalColor();
         _options.ScrollbackMaxLines = ScrollbackLines;
         _options.LineHeight = LineHeight;
-        _options.DefaultForeground = ScreenForeground.ToDrawingColor();
-        _options.DefaultBackground = ScreenBackground.ToDrawingColor();
+        _options.DefaultForeground = ScreenForeground.ToTerminalColor();
+        _options.DefaultBackground = ScreenBackground.ToTerminalColor();
 
         Debug.WriteLine($"[{GetType().Name}] SyncOptionsToDecoder: ScrollbackLines={ScrollbackLines}, ScrollbackMaxLines={_options.ScrollbackMaxLines}");
         if (_decoder?.Buffer is { } buf)
@@ -1152,6 +1158,10 @@ public partial class TerminalControl : Control, IDisposable
             Debug.WriteLine($"[{GetType().Name}] OnSessionBufferUpdated -> InvalidateVisual");
             InvalidateVisual();
 
+            // Notify automation clients that the terminal text has changed.
+            if (UIElementAutomationPeer.FromElement(this) is TerminalControlAutomationPeer peer)
+                peer.UpdateText();
+
             // Triggered after invalidation so the host reads the updated screen.
             // Background level: do not delay rendering due to host scanning.
             Dispatcher.BeginInvoke(() => ScreenUpdated?.Invoke(this, EventArgs.Empty), DispatcherPriority.Background);
@@ -1182,6 +1192,19 @@ public partial class TerminalControl : Control, IDisposable
         }
 
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Returns the full accessible text (scrollback + visible screen) for UI Automation.
+    /// </summary>
+    internal string GetAccessibleText()
+    {
+        if (_decoder is null)
+            return string.Empty;
+
+        TerminalScreenBuffer buf = _decoder.Buffer;
+        lock (buf.SyncRoot)
+            return buf.GetAllText();
     }
 
     // ---- Dispose ----

@@ -6,7 +6,14 @@ namespace VirtualTerminal.Model;
 /// Approximate Unicode character width for terminal grid layout (East Asian Width + emoji).
 /// Returns -1 for non-printable control/format codepoints, 0 for zero-width combining marks,
 /// 1 for normal, 2 for wide/fullwidth (CJK, fullwidth punctuation, emoji). Tables are derived
-/// from the public-domain Markus Kuhn <c>wcwidth</c> data, trimmed to the high-impact ranges.
+/// from the public-domain Markus Kuhn <c>wcwidth</c> data and target approximately Unicode 15.1,
+/// trimmed to the high-impact ranges.
+/// <para>
+/// Unicode evolves: new versions may add wide or zero-width codepoints (especially emoji and
+/// scripts) that are not present in these hand-maintained ranges. When a character is
+/// mis-measured, regenerate the tables from the latest <c>EastAsianWidth.txt</c> and the
+/// Markus Kuhn <c>wcwidth</c> data rather than patching individual values.
+/// </para>
 /// </summary>
 public static class Wcwidth
 {

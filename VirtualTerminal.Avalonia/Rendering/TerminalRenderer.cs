@@ -5,70 +5,10 @@ using VirtualTerminal.Buffer;
 using VirtualTerminal.Model;
 using VirtualTerminal.Options;
 using AvaloniaColor = Avalonia.Media.Color;
-using Color = System.Drawing.Color;
+using Color = VirtualTerminal.Model.TerminalColor;
 
 namespace VirtualTerminal.Rendering;
 
-/// <summary>
-/// A rectangular text selection in buffer coordinates (start/end inclusive, normalized so
-/// Start ≤ End). Used by <see cref="TerminalRenderer"/> to highlight selected cells.
-/// </summary>
-public readonly struct TerminalSelection
-{
-    /// <summary>The row index of the selection start (inclusive, normalized).</summary>
-    /// <summary>
-    /// Gets or sets the start x.
-    /// </summary>
-    public readonly int StartY;
-    /// <summary>The column index of the selection start (inclusive, normalized).</summary>
-    public readonly int StartX;
-    /// <summary>The row index of the selection end (inclusive, normalized).</summary>
-    public readonly int EndY;
-
-    /// <summary>The column index of the selection end (inclusive, normalized).</summary>
-    public readonly int EndX;
-
-    /// <summary>Initializes a new selection, normalizing the coordinates so start ≤ end.</summary>
-    /// <param name="x1">Column of the first point.</param>
-    /// <param name="y1">Row of the first point.</param>
-    /// <param name="x2">Column of the second point.</param>
-    /// <param name="y2">Row of the second point.</param>
-    public TerminalSelection(int x1, int y1, int x2, int y2)
-    {
-        if (y1 < y2 || (y1 == y2 && x1 <= x2))
-        {
-            StartY = y1;
-            StartX = x1;
-            EndY = y2;
-            EndX = x2;
-        }
-        else
-        {
-            StartY = y2;
-            StartX = x2;
-            EndY = y1;
-            EndX = x1;
-        }
-    }
-
-    /// <summary>Determines whether the specified cell is within the selection.</summary>
-    /// <param name="y">The row index of the cell.</param>
-    /// <param name="x">The column index of the cell.</param>
-    /// <returns><c>true</c> if the cell is inside the selection; otherwise, <c>false</c>.</returns>
-    public bool Contains(int y, int x)
-    {
-        if (y < StartY || y > EndY)
-            return false;
-
-        if (y == StartY && x < StartX)
-            return false;
-
-        if (y == EndY && x > EndX)
-            return false;
-
-        return true;
-    }
-}
 /// <summary>
 /// Paints terminal rows using <see cref="GlyphRun"/>: coalesces same-style cells into runs,
 /// resolves default/inverse/conceal colors, draws backgrounds, underlines, strikethrough,
@@ -79,6 +19,8 @@ public sealed class TerminalRenderer : IDisposable
 {
     private readonly GlyphCache _glyphs = new();
     private readonly Dictionary<uint, IBrush> _brushes = [];
+    private readonly StringBuilder _chars = new();
+    private readonly List<ushort> _glyphList = [];
     private TerminalOptions _options = new();
     /// <summary>
     /// Releases all resources used by the current object.
@@ -182,31 +124,33 @@ public sealed class TerminalRenderer : IDisposable
 
         // Accumulate per-typeface segments; flush on typeface change.
         GlyphTypeface? current = null;
-        StringBuilder chars = new();
-        List<ushort> glyphs = [];
+        _chars.Clear();
+        _glyphList.Clear();
         int segCellCount = 0;
         double segX = x;
 
         void Flush()
         {
-            if (current is null || chars.Length == 0)
+            if (current is null || _chars.Length == 0)
             {
                 segCellCount = 0;
+                _chars.Clear();
+                _glyphList.Clear();
                 return;
             }
 
-            string text = chars.ToString();
+            string text = _chars.ToString();
             double segWidth = segCellCount * cellW;
 
             // Snapshot the glyph list into an array. Avalonia may retain the collection
             // internally, and we reuse the builder lists for subsequent segments.
-            GlyphRun run = new GlyphRun(current, _emSize, text.AsMemory(), glyphs.ToArray(), new Point(segX, baselineY), 0);
+            GlyphRun run = new GlyphRun(current, _emSize, text.AsMemory(), _glyphList.ToArray(), new Point(segX, baselineY), 0);
             drawingContext.DrawGlyphRun(fgBrush, run);
             DrawDecorations(drawingContext, style, segX, segWidth, baselineY);
 
             segX += segWidth;
-            chars.Clear();
-            glyphs.Clear();
+            _chars.Clear();
+            _glyphList.Clear();
             segCellCount = 0;
         }
 
@@ -223,8 +167,8 @@ public sealed class TerminalRenderer : IDisposable
                 Flush();
 
             current = tf;
-            chars.Append(rune.ToString());
-            glyphs.Add(glyph);
+            _chars.Append(rune.ToString());
+            _glyphList.Add(glyph);
             segCellCount++;
         }
 

@@ -1,7 +1,7 @@
 using System;
-using System.Drawing;
 using System.Globalization;
 using System.Text;
+using VirtualTerminal.Model;
 
 namespace VirtualTerminal.Vt;
 
@@ -35,7 +35,7 @@ internal static class OscDispatcher
                     int semi = rest.IndexOf(';');
                     if (semi > 0 && int.TryParse(rest[..semi], NumberStyles.Integer, CultureInfo.InvariantCulture, out int c))
                     {
-                        Color? col = ParseColorSpec(rest[(semi + 1)..]);
+                        TerminalColor? col = ParseColorSpec(rest[(semi + 1)..]);
                         if (col.HasValue && c >= 0 && c < 256)
                             d.Options.Palette[c] = col.Value;
                     }
@@ -48,7 +48,7 @@ internal static class OscDispatcher
                 {
                     if (rest == "?")
                         break; // query → Phase 2 (gated by AllowOSCColorQueries)
-                    Color? col = ParseColorSpec(rest);
+                    TerminalColor? col = ParseColorSpec(rest);
                     if (!col.HasValue)
                         break;
                     if (command == "10") d.Options.DefaultForeground = col.Value;
@@ -102,7 +102,7 @@ internal static class OscDispatcher
     }
 
     /// <summary>Parses an XParseColor-style spec: <c>#RRGGBB</c>, <c>#RGB</c>, or <c>rgb:RR/GG/BB</c>.</summary>
-    internal static Color? ParseColorSpec(string spec)
+    internal static TerminalColor? ParseColorSpec(string spec)
     {
         if (string.IsNullOrWhiteSpace(spec))
             return null;
@@ -114,8 +114,8 @@ internal static class OscDispatcher
             string hex = spec[1..];
             return hex.Length switch
             {
-                3 => Color.FromArgb((byte)(Hex(hex, 0) * 17), (byte)(Hex(hex, 1) * 17), (byte)(Hex(hex, 2) * 17)),
-                6 => Color.FromArgb(Hex(hex, 0), Hex(hex, 4), Hex(hex, 8)),
+                3 => TerminalColor.FromArgb((byte)(Hex(hex, 0) * 17), (byte)(Hex(hex, 1) * 17), (byte)(Hex(hex, 2) * 17)),
+                6 => TerminalColor.FromArgb(Hex(hex, 0), Hex(hex, 4), Hex(hex, 8)),
                 _ => null,
             };
         }
@@ -126,7 +126,7 @@ internal static class OscDispatcher
             string[] parts = spec[4..].Split('/', ':');
             if (parts.Length != 3)
                 return null;
-            return Color.FromArgb(ScaledByte(parts[0]), ScaledByte(parts[1]), ScaledByte(parts[2]));
+            return TerminalColor.FromArgb(ScaledByte(parts[0]), ScaledByte(parts[1]), ScaledByte(parts[2]));
         }
 
         return null;

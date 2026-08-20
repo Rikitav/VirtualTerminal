@@ -6,60 +6,10 @@ using VirtualTerminal.Buffer;
 using VirtualTerminal.Enums;
 using VirtualTerminal.Model;
 using VirtualTerminal.Options;
-using Color = System.Drawing.Color;
+using Color = VirtualTerminal.Model.TerminalColor;
 using WindowsColor = System.Windows.Media.Color;
 
 namespace VirtualTerminal.Rendering;
-
-/// <summary>Represents a rectangular selection between two buffer coordinates.</summary>
-public readonly struct TerminalSelection
-{
-    /// <summary>Starting column of the selection.</summary>
-    public int StartX { get; }
-
-    /// <summary>Starting row of the selection.</summary>
-    public int StartY { get; }
-
-    /// <summary>Ending column of the selection.</summary>
-    public int EndX { get; }
-
-    /// <summary>Ending row of the selection.</summary>
-    public int EndY { get; }
-
-    /// <summary>Initializes a selection from two buffer coordinates and normalizes them.</summary>
-    public TerminalSelection(int x1, int y1, int x2, int y2)
-    {
-        if (y1 < y2 || (y1 == y2 && x1 <= x2))
-        {
-            StartY = y1;
-            StartX = x1;
-            EndY = y2;
-            EndX = x2;
-        }
-        else
-        {
-            StartY = y2;
-            StartX = x2;
-            EndY = y1;
-            EndX = x1;
-        }
-    }
-
-    /// <summary>Determines whether the specified cell lies inside the selection.</summary>
-    public bool Contains(int y, int x)
-    {
-        if (y < StartY || y > EndY)
-            return false;
-
-        if (y == StartY && x < StartX)
-            return false;
-
-        if (y == EndY && x > EndX)
-            return false;
-
-        return true;
-    }
-}
 
 /// <summary>
 /// Paints terminal rows using <see cref="GlyphRun"/>: coalesces same-style cells into runs,
@@ -70,6 +20,10 @@ public sealed class TerminalRenderer : IDisposable
 {
     private readonly GlyphCache _glyphs = new();
     private readonly Dictionary<uint, Brush> _brushes = [];
+    private readonly List<char> _chars = [];
+    private readonly List<ushort> _glyphIndices = [];
+    private readonly List<double> _advanceWidths = [];
+    private readonly List<ushort> _clusterMap = [];
     private TerminalOptions _options = new();
     private double _emSize = 14;
 
@@ -158,22 +112,22 @@ public sealed class TerminalRenderer : IDisposable
         double cellW = _glyphs.CellWidth;
 
         GlyphTypeface? current = null;
-        List<char> chars = [];
-        List<ushort> glyphIndices = [];
-        List<double> advanceWidths = [];
-        List<ushort> clusterMap = [];
+        _chars.Clear();
+        _glyphIndices.Clear();
+        _advanceWidths.Clear();
+        _clusterMap.Clear();
         int segCellCount = 0;
         double segX = x;
 
         void Flush()
         {
-            if (current is null || chars.Count == 0)
+            if (current is null || _chars.Count == 0)
             {
                 segCellCount = 0;
-                chars.Clear();
-                glyphIndices.Clear();
-                advanceWidths.Clear();
-                clusterMap.Clear();
+                _chars.Clear();
+                _glyphIndices.Clear();
+                _advanceWidths.Clear();
+                _clusterMap.Clear();
                 return;
             }
 
@@ -188,13 +142,13 @@ public sealed class TerminalRenderer : IDisposable
                 isSideways: false,
                 renderingEmSize: _emSize,
                 pixelsPerDip: pixelsPerDip,
-                glyphIndices: glyphIndices.ToArray(),
+                glyphIndices: _glyphIndices.ToArray(),
                 baselineOrigin: new Point(segX, baselineY),
-                advanceWidths: advanceWidths.ToArray(),
+                advanceWidths: _advanceWidths.ToArray(),
                 glyphOffsets: null,
-                characters: chars.ToArray(),
+                characters: _chars.ToArray(),
                 deviceFontName: null,
-                clusterMap: clusterMap.ToArray(),
+                clusterMap: _clusterMap.ToArray(),
                 caretStops: null,
                 language: XmlLanguage.GetLanguage("en-us"));
 
@@ -202,10 +156,10 @@ public sealed class TerminalRenderer : IDisposable
             DrawDecorations(drawingContext, style, segX, segWidth, baselineY);
 
             segX += segWidth;
-            chars.Clear();
-            glyphIndices.Clear();
-            advanceWidths.Clear();
-            clusterMap.Clear();
+            _chars.Clear();
+            _glyphIndices.Clear();
+            _advanceWidths.Clear();
+            _clusterMap.Clear();
             segCellCount = 0;
         }
 
@@ -224,16 +178,16 @@ public sealed class TerminalRenderer : IDisposable
             current = tf;
 
             string text = rune.ToString();
-            ushort glyphIndex = (ushort)glyphIndices.Count;
+            ushort glyphIndex = (ushort)_glyphIndices.Count;
 
             foreach (char c in text)
             {
-                chars.Add(c);
-                clusterMap.Add(glyphIndex);
+                _chars.Add(c);
+                _clusterMap.Add(glyphIndex);
             }
 
-            glyphIndices.Add(glyph);
-            advanceWidths.Add(cellW);
+            _glyphIndices.Add(glyph);
+            _advanceWidths.Add(cellW);
             segCellCount++;
         }
 

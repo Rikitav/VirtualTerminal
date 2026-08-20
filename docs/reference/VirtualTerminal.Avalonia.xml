@@ -4,18 +4,59 @@
         <name>VirtualTerminal.Avalonia</name>
     </assembly>
     <members>
+        <member name="T:VirtualTerminal.Automation.TerminalControlAutomationPeer">
+            <summary>
+            Automation peer for the Avalonia <see cref="P:VirtualTerminal.Automation.TerminalControlAutomationPeer.TerminalControl"/>.
+            Avalonia 12.0.5 does not ship a cross-platform <c>ITextProvider</c>, so the terminal text is
+            exposed through <see cref="T:Avalonia.Automation.Provider.IValueProvider"/> and the element's live Name property.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.GetAutomationControlTypeCore">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.GetClassNameCore">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.GetNameCore">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.GetAutomationIdCore">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.IsContentElementCore">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.IsControlElementCore">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.IsKeyboardFocusableCore">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.GetProviderCore(System.Type)">
+            <inheritdoc />
+        </member>
+        <member name="P:VirtualTerminal.Automation.TerminalControlAutomationPeer.Value">
+            <inheritdoc />
+        </member>
+        <member name="P:VirtualTerminal.Automation.TerminalControlAutomationPeer.IsReadOnly">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.SetValue(System.String)">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.NotifyTextChanged">
+            <summary>
+            Notifies assistive technologies that the terminal text has changed.
+            </summary>
+        </member>
         <member name="T:VirtualTerminal.Helpers.ColorHelper">
-            <summary>Provides extension methods for converting between Avalonia and System.Drawing color types.</summary>
+            <summary>Provides extension methods for converting between Avalonia and core <see cref="T:VirtualTerminal.Model.TerminalColor"/> types.</summary>
         </member>
-        <member name="M:VirtualTerminal.Helpers.ColorHelper.ToAvaloniaColor(System.Drawing.Color)">
-            <summary>Converts a <see cref="T:System.Drawing.Color"/> to an Avalonia <see cref="T:Avalonia.Media.Color"/>.</summary>
-            <param name="color">The drawing color to convert.</param>
-            <returns>The equivalent Avalonia color.</returns>
+        <member name="M:VirtualTerminal.Helpers.ColorHelper.ToAvaloniaColor(VirtualTerminal.Model.TerminalColor)">
+            <summary>Converts a core <see cref="T:VirtualTerminal.Model.TerminalColor"/> to an Avalonia <see cref="T:Avalonia.Media.Color"/>.</summary>
         </member>
-        <member name="M:VirtualTerminal.Helpers.ColorHelper.ToDrawingColor(Avalonia.Media.Color)">
-            <summary>Converts an Avalonia <see cref="T:Avalonia.Media.Color"/> to a <see cref="T:System.Drawing.Color"/>.</summary>
-            <param name="color">The Avalonia color to convert.</param>
-            <returns>The equivalent drawing color.</returns>
+        <member name="M:VirtualTerminal.Helpers.ColorHelper.ToTerminalColor(Avalonia.Media.Color)">
+            <summary>Converts an Avalonia <see cref="T:Avalonia.Media.Color"/> to a core <see cref="T:VirtualTerminal.Model.TerminalColor"/>.</summary>
         </member>
         <member name="T:VirtualTerminal.CommandSubmittedEventArgs">
             <summary>
@@ -172,40 +213,6 @@
         <member name="M:VirtualTerminal.Rendering.GlyphCache.Dispose">
             <summary>Releases the primary and fallback typefaces and clears the glyph cache.</summary>
         </member>
-        <member name="T:VirtualTerminal.Rendering.TerminalSelection">
-            <summary>
-            A rectangular text selection in buffer coordinates (start/end inclusive, normalized so
-            Start ≤ End). Used by <see cref="T:VirtualTerminal.Rendering.TerminalRenderer"/> to highlight selected cells.
-            </summary>
-        </member>
-        <member name="F:VirtualTerminal.Rendering.TerminalSelection.StartY">
-            <summary>The row index of the selection start (inclusive, normalized).</summary>
-            <summary>
-            Gets or sets the start x.
-            </summary>
-        </member>
-        <member name="F:VirtualTerminal.Rendering.TerminalSelection.StartX">
-            <summary>The column index of the selection start (inclusive, normalized).</summary>
-        </member>
-        <member name="F:VirtualTerminal.Rendering.TerminalSelection.EndY">
-            <summary>The row index of the selection end (inclusive, normalized).</summary>
-        </member>
-        <member name="F:VirtualTerminal.Rendering.TerminalSelection.EndX">
-            <summary>The column index of the selection end (inclusive, normalized).</summary>
-        </member>
-        <member name="M:VirtualTerminal.Rendering.TerminalSelection.#ctor(System.Int32,System.Int32,System.Int32,System.Int32)">
-            <summary>Initializes a new selection, normalizing the coordinates so start ≤ end.</summary>
-            <param name="x1">Column of the first point.</param>
-            <param name="y1">Row of the first point.</param>
-            <param name="x2">Column of the second point.</param>
-            <param name="y2">Row of the second point.</param>
-        </member>
-        <member name="M:VirtualTerminal.Rendering.TerminalSelection.Contains(System.Int32,System.Int32)">
-            <summary>Determines whether the specified cell is within the selection.</summary>
-            <param name="y">The row index of the cell.</param>
-            <param name="x">The column index of the cell.</param>
-            <returns><c>true</c> if the cell is inside the selection; otherwise, <c>false</c>.</returns>
-        </member>
         <member name="T:VirtualTerminal.Rendering.TerminalRenderer">
             <summary>
             Paints terminal rows using <see cref="T:Avalonia.Media.GlyphRun"/>: coalesces same-style cells into runs,
@@ -332,6 +339,9 @@
         <member name="M:VirtualTerminal.TerminalControl.#ctor">
             <summary>Initializes a new instance of the <see cref="T:VirtualTerminal.TerminalControl"/> class and creates render, blink, and resize timers.</summary>
         </member>
+        <member name="M:VirtualTerminal.TerminalControl.OnCreateAutomationPeer">
+            <inheritdoc/>
+        </member>
         <member name="M:VirtualTerminal.TerminalControl.Clear">
             <summary>Sends a clear-screen + home escape sequence to the active session.</summary>
         </member>
@@ -389,6 +399,11 @@
         </member>
         <member name="M:VirtualTerminal.TerminalControl.GetCellPosition(Avalonia.Input.PointerEventArgs)">
             <summary>Gets the cell position under the specified pointer event, or (-1,-1) if outside the terminal surface.</summary>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.GetAccessibleText">
+            <summary>
+            Returns the full accessible text (scrollback + visible screen) for UI Automation.
+            </summary>
         </member>
         <member name="M:VirtualTerminal.TerminalControl.Dispose">
             <summary>Stops timers, detaches from the decoder and releases rendering resources.</summary>

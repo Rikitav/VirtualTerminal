@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
 using System.Text;
 using VirtualTerminal.Buffer;
 using VirtualTerminal.Enums;
@@ -56,7 +55,7 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     public Action<ReadOnlySpan<byte>>? SendOutput { get; set; }
 
     /// <summary>Gets the current cursor position as a point.</summary>
-    public Point CursorPosition => new(State.CursorX, State.CursorY);
+    public TerminalPoint CursorPosition => new(State.CursorX, State.CursorY);
 
     /// <summary>Gets the encoding used by the underlying VT parser.</summary>
     public Encoding Encoding => _parser.Encoding;
@@ -1235,7 +1234,7 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
                 next = i + 5;
             }
 
-            AssignDirect(target, ref a, Color.FromArgb(ClampByte(r), ClampByte(g), ClampByte(b)));
+            AssignDirect(target, ref a, TerminalColor.FromArgb(ClampByte(r), ClampByte(g), ClampByte(b)));
             return next;
         }
 
@@ -1263,7 +1262,7 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         }
     }
 
-    private static void AssignDirect(ColorTarget target, ref CharAttributes a, Color color)
+    private static void AssignDirect(ColorTarget target, ref CharAttributes a, TerminalColor color)
     {
         switch (target)
         {
@@ -1344,7 +1343,7 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     {
         ColorSource source;
         int index;
-        Color rgb;
+        TerminalColor rgb;
 
         switch (target)
         {

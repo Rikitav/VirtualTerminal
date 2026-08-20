@@ -1,4 +1,3 @@
-using System.Drawing;
 using VirtualTerminal.Buffer;
 using VirtualTerminal.Model;
 
@@ -15,13 +14,13 @@ public sealed class TerminalOptions
     public TerminalPalette Palette { get; set; } = new();
 
     /// <summary>Default foreground color used when no SGR foreground is active.</summary>
-    public Color DefaultForeground { get; set; } = Color.White;
+    public TerminalColor DefaultForeground { get; set; } = TerminalColor.White;
 
     /// <summary>Default background color used when no SGR background is active.</summary>
-    public Color DefaultBackground { get; set; } = Color.Black;
+    public TerminalColor DefaultBackground { get; set; } = TerminalColor.Black;
 
     /// <summary>Default cursor color.</summary>
-    public Color DefaultCursorColor { get; set; } = Color.White;
+    public TerminalColor DefaultCursorColor { get; set; } = TerminalColor.White;
 
     /// <summary>Cursor shape (also settable via DECSCUSR).</summary>
     public CursorShape CursorShape { get; set; } = CursorShape.Block;

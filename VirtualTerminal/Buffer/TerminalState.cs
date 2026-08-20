@@ -1,4 +1,3 @@
-using System.Drawing;
 using VirtualTerminal.Enums;
 using VirtualTerminal.Model;
 
@@ -31,7 +30,7 @@ public struct CharAttributes
     public int ForegroundIndex;
 
     /// <summary>The direct RGB foreground color when <see cref="ForegroundSource"/> is <see cref="ColorSource.Direct"/>.</summary>
-    public Color ForegroundRgb;
+    public TerminalColor ForegroundRgb;
 
     /// <summary>How the background color was specified.</summary>
     public ColorSource BackgroundSource;
@@ -40,7 +39,7 @@ public struct CharAttributes
     public int BackgroundIndex;
 
     /// <summary>The direct RGB background color when <see cref="BackgroundSource"/> is <see cref="ColorSource.Direct"/>.</summary>
-    public Color BackgroundRgb;
+    public TerminalColor BackgroundRgb;
 
     /// <summary>How the underline color was specified.</summary>
     public ColorSource UnderlineSource;
@@ -49,7 +48,7 @@ public struct CharAttributes
     public int UnderlineIndex;
 
     /// <summary>The direct RGB underline color when <see cref="UnderlineSource"/> is <see cref="ColorSource.Direct"/>.</summary>
-    public Color UnderlineRgb;
+    public TerminalColor UnderlineRgb;
 
     /// <summary>SGR 1: bold (bright).</summary>
     public bool Bold;
@@ -119,12 +118,12 @@ public struct CharAttributes
     public readonly CellRenderStyle ToCellStyle(TerminalPalette palette, bool boldAsBright)
     {
         CellStyleFlags flags = 0;
-        Color fg, bg, ul;
+        TerminalColor fg, bg, ul;
 
         if (ForegroundSource == ColorSource.Default)
         {
             flags |= CellStyleFlags.ForegroundIsDefault;
-            fg = Color.White;
+            fg = TerminalColor.White;
         }
         else if (ForegroundSource == ColorSource.Indexed)
         {
@@ -139,7 +138,7 @@ public struct CharAttributes
         if (BackgroundSource == ColorSource.Default)
         {
             flags |= CellStyleFlags.BackgroundIsDefault;
-            bg = Color.Black;
+            bg = TerminalColor.Black;
         }
         else if (BackgroundSource == ColorSource.Indexed)
         {
@@ -153,7 +152,7 @@ public struct CharAttributes
         if (UnderlineSource == ColorSource.Default)
         {
             flags |= CellStyleFlags.UnderlineColorIsDefault;
-            ul = Color.White;
+            ul = TerminalColor.White;
         }
         else if (UnderlineSource == ColorSource.Indexed)
         {

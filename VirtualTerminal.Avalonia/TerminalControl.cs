@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
@@ -8,6 +9,7 @@ using Avalonia.Threading;
 using System.Diagnostics;
 using System.Text;
 using System.Windows.Input;
+using VirtualTerminal.Automation;
 using VirtualTerminal.Buffer;
 using VirtualTerminal.Extensions;
 using VirtualTerminal.Helpers;
@@ -18,7 +20,7 @@ using VirtualTerminal.Options;
 using VirtualTerminal.Rendering;
 using VirtualTerminal.Vt;
 using AvaloniaColor = Avalonia.Media.Color;
-using Color = System.Drawing.Color;
+using Color = VirtualTerminal.Model.TerminalColor;
 
 namespace VirtualTerminal;
 
@@ -202,6 +204,10 @@ public class TerminalControl : TemplatedControl, IDisposable
         Focusable = true;
     }
 
+    /// <inheritdoc/>
+    protected override AutomationPeer OnCreateAutomationPeer()
+        => new TerminalControlAutomationPeer(this);
+
     /// <summary>Sends a clear-screen + home escape sequence to the active session.</summary>
     public void Clear()
     {
@@ -236,17 +242,26 @@ public class TerminalControl : TemplatedControl, IDisposable
 
         if (change.Property == CurrentSessionProperty)
         {
-            if (change.OldValue is ITerminalSession oldSession && oldSession.Decoder is TerminalDecoder oldDec)
+            if (change.OldValue is ITerminalSession oldSession)
             {
-                oldDec.TitleChanged -= OnDecoderTitleChanged;
-                oldDec.Bell -= OnDecoderBell;
-                oldDec.NotificationReceived -= OnDecoderNotification;
-                oldDec.ShellIntegrationMark -= OnDecoderShellIntegrationMark;
-                oldDec.Iterm2Annotation -= OnDecoderIterm2Annotation;
-                oldDec.ClipboardRequested -= OnDecoderClipboardRequested;
+                oldSession.BufferUpdated -= OnSessionBufferUpdated;
+
+                if (oldSession.Decoder is TerminalDecoder oldDec)
+                {
+                    oldDec.TitleChanged -= OnDecoderTitleChanged;
+                    oldDec.Bell -= OnDecoderBell;
+                    oldDec.NotificationReceived -= OnDecoderNotification;
+                    oldDec.ShellIntegrationMark -= OnDecoderShellIntegrationMark;
+                    oldDec.Iterm2Annotation -= OnDecoderIterm2Annotation;
+                    oldDec.ClipboardRequested -= OnDecoderClipboardRequested;
+                }
             }
 
-            _decoder = (change.NewValue as ITerminalSession)?.Decoder as TerminalDecoder;
+            ITerminalSession? newSession = change.NewValue as ITerminalSession;
+            _decoder = newSession?.Decoder as TerminalDecoder;
+            if (newSession is not null)
+                newSession.BufferUpdated += OnSessionBufferUpdated;
+
             if (_decoder is { } dec)
             {
                 dec.Options = _options;
@@ -283,11 +298,11 @@ public class TerminalControl : TemplatedControl, IDisposable
     private void SyncOptionsToDecoder()
     {
         _options.CursorShape = CursorShape;
-        _options.DefaultCursorColor = CursorColor.ToDrawingColor();
+        _options.DefaultCursorColor = CursorColor.ToTerminalColor();
         _options.ScrollbackMaxLines = ScrollbackLines;
         _options.LineHeight = LineHeight;
-        _options.DefaultForeground = Foreground is SolidColorBrush fb ? fb.Color.ToDrawingColor() : Color.White;
-        _options.DefaultBackground = Background is SolidColorBrush bb ? bb.Color.ToDrawingColor() : Color.Black;
+        _options.DefaultForeground = Foreground is SolidColorBrush fb ? fb.Color.ToTerminalColor() : Color.White;
+        _options.DefaultBackground = Background is SolidColorBrush bb ? bb.Color.ToTerminalColor() : Color.Black;
 
         if (_decoder?.Buffer is { } buf)
             buf.SetScrollbackMax(_options.ScrollbackMaxLines);
@@ -1026,6 +1041,34 @@ public class TerminalControl : TemplatedControl, IDisposable
         CurrentSession.Append(KeyboardEncoder.WrapBracketedPaste(text, bracketed));
     }
 
+    // ---- Session events ----
+    private void OnSessionBufferUpdated(object? sender, EventArgs e)
+    {
+        if (DateTime.UtcNow < _suppressRenderUntil)
+            return;
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            InvalidateVisual();
+
+            if (ControlAutomationPeer.FromElement(this) is TerminalControlAutomationPeer peer)
+                peer.NotifyTextChanged();
+        }, DispatcherPriority.Render);
+    }
+
+    /// <summary>
+    /// Returns the full accessible text (scrollback + visible screen) for UI Automation.
+    /// </summary>
+    internal string GetAccessibleText()
+    {
+        if (_decoder is null)
+            return string.Empty;
+
+        TerminalScreenBuffer buf = _decoder.Buffer;
+        lock (buf.SyncRoot)
+            return buf.GetAllText();
+    }
+
     // ---- Dispose ----
     /// <summary>Stops timers, detaches from the decoder and releases rendering resources.</summary>
     public void Dispose()
@@ -1033,6 +1076,9 @@ public class TerminalControl : TemplatedControl, IDisposable
         _renderTimer.Stop();
         _blinkTimer.Stop();
         _resizeTimer.Stop();
+
+        if (CurrentSession is { } session)
+            session.BufferUpdated -= OnSessionBufferUpdated;
 
         if (_decoder is { } dec)
         {

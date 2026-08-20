@@ -388,6 +388,20 @@
         <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.GetScrollback">
             <summary>Snapshot of the scrollback rows (oldest first). Used by the renderer for history.</summary>
         </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.GetVisibleText">
+            <summary>
+            Returns the text of the active screen, one row per line. Continuation cells are skipped
+            and trailing blanks are trimmed. Call under <see cref="P:VirtualTerminal.Buffer.TerminalScreenBuffer.SyncRoot"/>.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.GetAllText">
+            <summary>
+            Returns the text of the scrollback history plus the active screen, one row per line.
+            When the alternate screen is active, only the visible screen is returned.
+            Continuation cells are skipped and trailing blanks are trimmed.
+            Call under <see cref="P:VirtualTerminal.Buffer.TerminalScreenBuffer.SyncRoot"/>.
+            </summary>
+        </member>
         <member name="M:VirtualTerminal.Buffer.TerminalScreenBuffer.Dispose">
             <summary>Releases resources used by the screen buffer.</summary>
         </member>
@@ -1284,6 +1298,88 @@
             <param name="right">The second cell to compare.</param>
             <returns>true if the cells are not equal; otherwise false.</returns>
         </member>
+        <member name="T:VirtualTerminal.Model.TerminalColor">
+            <summary>
+            A platform-independent 32-bit ARGB color. Replaces the previous <see cref="T:System.Drawing.Color"/>
+            usage in the core engine so <c>VirtualTerminal</c> can target <c>net10.0</c> without
+            Windows-only dependencies.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.TerminalColor.A">
+            <summary>Gets the alpha component.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.TerminalColor.R">
+            <summary>Gets the red component.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.TerminalColor.G">
+            <summary>Gets the green component.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.TerminalColor.B">
+            <summary>Gets the blue component.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalColor.#ctor(System.Byte,System.Byte,System.Byte,System.Byte)">
+            <summary>Initializes a new <see cref="T:VirtualTerminal.Model.TerminalColor"/>.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalColor.FromArgb(System.Byte,System.Byte,System.Byte,System.Byte)">
+            <summary>Creates a color from ARGB byte components.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalColor.FromArgb(System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>Creates a color from ARGB integer components, clamped to byte range.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalColor.FromArgb(System.Int32,System.Int32,System.Int32)">
+            <summary>Creates an opaque color from RGB integer components, clamped to byte range.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalColor.FromArgb(System.Int32)">
+            <summary>Creates a color from a packed 32-bit ARGB value.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalColor.ToArgb">
+            <summary>Gets the color as a packed 32-bit ARGB value.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.TerminalColor.Black">
+            <summary>Opaque black.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.TerminalColor.White">
+            <summary>Opaque white.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.TerminalColor.Red">
+            <summary>Opaque red.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.TerminalColor.Green">
+            <summary>Opaque green.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.TerminalColor.Blue">
+            <summary>Opaque blue.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.TerminalColor.HotPink">
+            <summary>Opaque hot pink.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.TerminalColor.Cyan">
+            <summary>Opaque cyan.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.TerminalColor.Yellow">
+            <summary>Opaque yellow.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.TerminalColor.Magenta">
+            <summary>Opaque magenta.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalColor.Equals(VirtualTerminal.Model.TerminalColor)">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalColor.Equals(System.Object)">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalColor.GetHashCode">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalColor.ToString">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalColor.op_Equality(VirtualTerminal.Model.TerminalColor,VirtualTerminal.Model.TerminalColor)">
+            <summary>Equality operator.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalColor.op_Inequality(VirtualTerminal.Model.TerminalColor,VirtualTerminal.Model.TerminalColor)">
+            <summary>Inequality operator.</summary>
+        </member>
         <member name="T:VirtualTerminal.Model.TerminalPalette">
             <summary>
             The 256-entry ANSI color palette (16 system + 216 cube + 24 grayscale). Mutable so
@@ -1301,9 +1397,9 @@
             <returns>A span over the 256-entry palette.</returns>
         </member>
         <member name="M:VirtualTerminal.Model.TerminalPalette.GetColor(System.Int32)">
-            <summary>Resolves an ANSI index to its <see cref="T:System.Drawing.Color"/> (clamped to 0–255).</summary>
+            <summary>Resolves an ANSI index to its <see cref="T:VirtualTerminal.Model.TerminalColor"/> (clamped to 0–255).</summary>
         </member>
-        <member name="M:VirtualTerminal.Model.TerminalPalette.SetAnsiColor(System.Int32,System.Drawing.Color)">
+        <member name="M:VirtualTerminal.Model.TerminalPalette.SetAnsiColor(System.Int32,VirtualTerminal.Model.TerminalColor)">
             <summary>Sets the color at the given ANSI index.</summary>
             <param name="index">The ANSI color index (0–255).</param>
             <param name="color">The color to assign.</param>
@@ -1311,12 +1407,85 @@
         <member name="M:VirtualTerminal.Model.TerminalPalette.LoadXtermDefaults">
             <summary>Loads the standard xterm palette: 16 system colors, 6×6×6 cube, 24 grays.</summary>
         </member>
+        <member name="T:VirtualTerminal.Model.TerminalPoint">
+            <summary>
+            A platform-independent integer point. Replaces the previous <see cref="T:System.Drawing.Point"/>
+            usage in the core engine.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.TerminalPoint.X">
+            <summary>Gets the X coordinate.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.TerminalPoint.Y">
+            <summary>Gets the Y coordinate.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalPoint.#ctor(System.Int32,System.Int32)">
+            <summary>Initializes a new <see cref="T:VirtualTerminal.Model.TerminalPoint"/>.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalPoint.Equals(VirtualTerminal.Model.TerminalPoint)">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalPoint.Equals(System.Object)">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalPoint.GetHashCode">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalPoint.ToString">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalPoint.op_Equality(VirtualTerminal.Model.TerminalPoint,VirtualTerminal.Model.TerminalPoint)">
+            <summary>Equality operator.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalPoint.op_Inequality(VirtualTerminal.Model.TerminalPoint,VirtualTerminal.Model.TerminalPoint)">
+            <summary>Inequality operator.</summary>
+        </member>
+        <member name="T:VirtualTerminal.Model.TerminalSize">
+            <summary>
+            A platform-independent integer size. Replaces the previous <see cref="T:System.Drawing.Size"/>
+            usage in the core engine.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.TerminalSize.Width">
+            <summary>Gets the width.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Model.TerminalSize.Height">
+            <summary>Gets the height.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalSize.#ctor(System.Int32,System.Int32)">
+            <summary>Initializes a new <see cref="T:VirtualTerminal.Model.TerminalSize"/>.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalSize.Equals(VirtualTerminal.Model.TerminalSize)">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalSize.Equals(System.Object)">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalSize.GetHashCode">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalSize.ToString">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalSize.op_Equality(VirtualTerminal.Model.TerminalSize,VirtualTerminal.Model.TerminalSize)">
+            <summary>Equality operator.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Model.TerminalSize.op_Inequality(VirtualTerminal.Model.TerminalSize,VirtualTerminal.Model.TerminalSize)">
+            <summary>Inequality operator.</summary>
+        </member>
         <member name="T:VirtualTerminal.Model.Wcwidth">
             <summary>
             Approximate Unicode character width for terminal grid layout (East Asian Width + emoji).
             Returns -1 for non-printable control/format codepoints, 0 for zero-width combining marks,
             1 for normal, 2 for wide/fullwidth (CJK, fullwidth punctuation, emoji). Tables are derived
-            from the public-domain Markus Kuhn <c>wcwidth</c> data, trimmed to the high-impact ranges.
+            from the public-domain Markus Kuhn <c>wcwidth</c> data and target approximately Unicode 15.1,
+            trimmed to the high-impact ranges.
+            <para>
+            Unicode evolves: new versions may add wide or zero-width codepoints (especially emoji and
+            scripts) that are not present in these hand-maintained ranges. When a character is
+            mis-measured, regenerate the tables from the latest <c>EastAsianWidth.txt</c> and the
+            Markus Kuhn <c>wcwidth</c> data rather than patching individual values.
+            </para>
             </summary>
         </member>
         <member name="F:VirtualTerminal.Model.Wcwidth.ZeroWidth">
@@ -1379,6 +1548,27 @@
         <member name="M:VirtualTerminal.Options.TerminalOptions.Clone">
             <summary>Creates a shallow copy of these options.</summary>
             <returns>A new options instance with the same values.</returns>
+        </member>
+        <member name="T:VirtualTerminal.Rendering.TerminalSelection">
+            <summary>Represents a rectangular selection between two buffer coordinates.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.TerminalSelection.StartX">
+            <summary>Starting column of the selection.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.TerminalSelection.StartY">
+            <summary>Starting row of the selection.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.TerminalSelection.EndX">
+            <summary>Ending column of the selection.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.TerminalSelection.EndY">
+            <summary>Ending row of the selection.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Rendering.TerminalSelection.#ctor(System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>Initializes a selection from two buffer coordinates and normalizes them.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Rendering.TerminalSelection.Contains(System.Int32,System.Int32)">
+            <summary>Determines whether the specified cell lies inside the selection.</summary>
         </member>
         <member name="T:VirtualTerminal.Session.CanonicalTerminalSession">
             <summary>

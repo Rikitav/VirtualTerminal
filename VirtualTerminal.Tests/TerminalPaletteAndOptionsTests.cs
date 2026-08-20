@@ -1,4 +1,3 @@
-using System.Drawing;
 using VirtualTerminal.Buffer;
 using VirtualTerminal.Model;
 using VirtualTerminal.Options;
@@ -14,20 +13,20 @@ public class TerminalPaletteAndOptionsTests
     {
         TerminalPalette palette = new();
 
-        Assert.Equal(Color.FromArgb(0x00, 0x00, 0x00), palette[0]);
-        Assert.Equal(Color.FromArgb(0xFF, 0xFF, 0xFF), palette[15]);
-        Assert.Equal(Color.FromArgb(0x00, 0x00, 0x00), palette[16]);
-        Assert.Equal(Color.FromArgb(0x00, 0x00, 0x5F), palette[17]);
-        Assert.Equal(Color.FromArgb(0xFF, 0xFF, 0xFF), palette[231]);
-        Assert.Equal(Color.FromArgb(0x08, 0x08, 0x08), palette[232]);
-        Assert.Equal(Color.FromArgb(0xEE, 0xEE, 0xEE), palette[255]);
+        Assert.Equal(TerminalColor.FromArgb(0x00, 0x00, 0x00), palette[0]);
+        Assert.Equal(TerminalColor.FromArgb(0xFF, 0xFF, 0xFF), palette[15]);
+        Assert.Equal(TerminalColor.FromArgb(0x00, 0x00, 0x00), palette[16]);
+        Assert.Equal(TerminalColor.FromArgb(0x00, 0x00, 0x5F), palette[17]);
+        Assert.Equal(TerminalColor.FromArgb(0xFF, 0xFF, 0xFF), palette[231]);
+        Assert.Equal(TerminalColor.FromArgb(0x08, 0x08, 0x08), palette[232]);
+        Assert.Equal(TerminalColor.FromArgb(0xEE, 0xEE, 0xEE), palette[255]);
     }
 
     [Fact]
     public void Palette_Indexer_GetAndSet_WithinRange()
     {
         TerminalPalette palette = new();
-        Color expected = Color.FromArgb(0x12, 0x34, 0x56);
+        TerminalColor expected = TerminalColor.FromArgb(0x12, 0x34, 0x56);
 
         palette[42] = expected;
 
@@ -55,7 +54,7 @@ public class TerminalPaletteAndOptionsTests
     {
         TerminalPalette palette = new();
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => palette[-1] = Color.Red);
+        Assert.Throws<ArgumentOutOfRangeException>(() => palette[-1] = TerminalColor.Red);
     }
 
     [Fact]
@@ -63,14 +62,14 @@ public class TerminalPaletteAndOptionsTests
     {
         TerminalPalette palette = new();
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => palette[256] = Color.Red);
+        Assert.Throws<ArgumentOutOfRangeException>(() => palette[256] = TerminalColor.Red);
     }
 
     [Fact]
     public void Palette_SetAnsiColor_UpdatesColor()
     {
         TerminalPalette palette = new();
-        Color expected = Color.FromArgb(0xAB, 0xCD, 0xEF);
+        TerminalColor expected = TerminalColor.FromArgb(0xAB, 0xCD, 0xEF);
 
         palette.SetAnsiColor(100, expected);
 
@@ -82,7 +81,7 @@ public class TerminalPaletteAndOptionsTests
     {
         TerminalPalette palette = new();
 
-        Color color = palette.GetColor(7);
+        TerminalColor color = palette.GetColor(7);
 
         Assert.Equal(palette[7], color);
     }
@@ -92,7 +91,7 @@ public class TerminalPaletteAndOptionsTests
     {
         TerminalPalette palette = new();
 
-        Color color = palette.GetColor(-5);
+        TerminalColor color = palette.GetColor(-5);
 
         Assert.Equal(palette[0], color);
     }
@@ -102,7 +101,7 @@ public class TerminalPaletteAndOptionsTests
     {
         TerminalPalette palette = new();
 
-        Color color = palette.GetColor(500);
+        TerminalColor color = palette.GetColor(500);
 
         Assert.Equal(palette[255], color);
     }
@@ -112,7 +111,7 @@ public class TerminalPaletteAndOptionsTests
     {
         TerminalPalette palette = new();
 
-        Span<Color> span = palette.AsSpan();
+        Span<TerminalColor> span = palette.AsSpan();
 
         Assert.Equal(256, span.Length);
         Assert.Equal(palette[0], span[0]);
@@ -123,9 +122,9 @@ public class TerminalPaletteAndOptionsTests
     public void Palette_LoadXtermDefaults_ResetsModifiedColors()
     {
         TerminalPalette palette = new();
-        Color original = palette[4];
+        TerminalColor original = palette[4];
 
-        palette[4] = Color.HotPink;
+        palette[4] = TerminalColor.HotPink;
         Assert.NotEqual(original, palette[4]);
 
         palette.LoadXtermDefaults();
@@ -143,9 +142,9 @@ public class TerminalPaletteAndOptionsTests
         TerminalOptions options = new();
 
         Assert.NotNull(options.Palette);
-        Assert.Equal(Color.White, options.DefaultForeground);
-        Assert.Equal(Color.Black, options.DefaultBackground);
-        Assert.Equal(Color.White, options.DefaultCursorColor);
+        Assert.Equal(TerminalColor.White, options.DefaultForeground);
+        Assert.Equal(TerminalColor.Black, options.DefaultBackground);
+        Assert.Equal(TerminalColor.White, options.DefaultCursorColor);
         Assert.Equal(CursorShape.Block, options.CursorShape);
         Assert.True(options.CursorBlink);
         Assert.Equal(530, options.CursorBlinkIntervalMs);
@@ -162,9 +161,9 @@ public class TerminalPaletteAndOptionsTests
     {
         TerminalOptions original = new()
         {
-            DefaultForeground = Color.Red,
-            DefaultBackground = Color.Blue,
-            DefaultCursorColor = Color.Green,
+            DefaultForeground = TerminalColor.Red,
+            DefaultBackground = TerminalColor.Blue,
+            DefaultCursorColor = TerminalColor.Green,
             CursorShape = CursorShape.Bar,
             CursorBlink = false,
             CursorBlinkIntervalMs = 250,
@@ -218,9 +217,9 @@ public class TerminalPaletteAndOptionsTests
         TerminalOptions options = new();
 
         options.Palette = palette;
-        options.DefaultForeground = Color.Red;
-        options.DefaultBackground = Color.Blue;
-        options.DefaultCursorColor = Color.Green;
+        options.DefaultForeground = TerminalColor.Red;
+        options.DefaultBackground = TerminalColor.Blue;
+        options.DefaultCursorColor = TerminalColor.Green;
         options.CursorShape = CursorShape.Underline;
         options.CursorBlink = false;
         options.CursorBlinkIntervalMs = 100;
@@ -232,9 +231,9 @@ public class TerminalPaletteAndOptionsTests
         options.AllowClipboard = false;
 
         Assert.Same(palette, options.Palette);
-        Assert.Equal(Color.Red, options.DefaultForeground);
-        Assert.Equal(Color.Blue, options.DefaultBackground);
-        Assert.Equal(Color.Green, options.DefaultCursorColor);
+        Assert.Equal(TerminalColor.Red, options.DefaultForeground);
+        Assert.Equal(TerminalColor.Blue, options.DefaultBackground);
+        Assert.Equal(TerminalColor.Green, options.DefaultCursorColor);
         Assert.Equal(CursorShape.Underline, options.CursorShape);
         Assert.False(options.CursorBlink);
         Assert.Equal(100, options.CursorBlinkIntervalMs);

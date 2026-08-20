@@ -4,21 +4,84 @@
         <name>VirtualTerminal.WPF</name>
     </assembly>
     <members>
+        <member name="T:VirtualTerminal.Automation.TerminalControlAutomationPeer">
+            <summary>
+            UI Automation peer for the WPF <see cref="P:VirtualTerminal.Automation.TerminalControlAutomationPeer.TerminalControl"/>. Exposes the terminal as a
+            document and implements <see cref="T:System.Windows.Automation.Provider.ITextProvider"/> so screen readers can access the full
+            scrollback + visible buffer text.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.GetAutomationControlTypeCore">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.GetClassNameCore">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.GetNameCore">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.GetPattern(System.Windows.Automation.Peers.PatternInterface)">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.GetAutomationIdCore">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.IsContentElementCore">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.IsControlElementCore">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.IsKeyboardFocusableCore">
+            <inheritdoc />
+        </member>
+        <member name="P:VirtualTerminal.Automation.TerminalControlAutomationPeer.DocumentRange">
+            <inheritdoc />
+        </member>
+        <member name="P:VirtualTerminal.Automation.TerminalControlAutomationPeer.SupportedTextSelection">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.GetSelection">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.GetVisibleRanges">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.RangeFromChild(System.Windows.Automation.Provider.IRawElementProviderSimple)">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.RangeFromPoint(System.Windows.Point)">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.UpdateText">
+            <summary>
+            Refreshes the cached accessible text from the control and raises the appropriate
+            automation events when it changes. Must be called on the UI thread.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Automation.TerminalControlAutomationPeer.GetRawProvider">
+            <summary>
+            Returns the raw UI Automation provider for this peer so text ranges can reference it.
+            </summary>
+        </member>
+        <member name="T:VirtualTerminal.Automation.TerminalTextRangeProvider">
+            <summary>
+            A UI Automation text range over a snapshot of the terminal's scrollback + visible buffer.
+            This is a read-only range: selection methods are no-ops.
+            </summary>
+        </member>
         <member name="T:VirtualTerminal.Helpers.ColorHelper">
             <summary>
-            Conversion helpers between Windows console color attributes and WPF <see cref="T:System.Drawing.Color"/>.
+            Conversion helpers between WPF <see cref="T:System.Windows.Media.Color"/> and the core <see cref="T:VirtualTerminal.Model.TerminalColor"/>.
             </summary>
         </member>
-        <member name="M:VirtualTerminal.Helpers.ColorHelper.ToWindowsMediaColor(System.Drawing.Color)">
-            <summary>Converts a <see cref="T:System.Drawing.Color"/> to a WPF <see cref="T:System.Windows.Media.Color"/>.</summary>
+        <member name="M:VirtualTerminal.Helpers.ColorHelper.ToWindowsMediaColor(VirtualTerminal.Model.TerminalColor)">
+            <summary>Converts a core <see cref="T:VirtualTerminal.Model.TerminalColor"/> to a WPF <see cref="T:System.Windows.Media.Color"/>.</summary>
         </member>
-        <member name="M:VirtualTerminal.Helpers.ColorHelper.ToDrawingColor(System.Windows.Media.Color)">
-            <summary>
-            ToDrawingColors the to drawing color.
-            </summary>
-            <summary>Converts a WPF <see cref="T:System.Windows.Media.Color"/> to a <see cref="T:System.Drawing.Color"/>.</summary>
+        <member name="M:VirtualTerminal.Helpers.ColorHelper.ToTerminalColor(System.Windows.Media.Color)">
+            <summary>Converts a WPF <see cref="T:System.Windows.Media.Color"/> to a core <see cref="T:VirtualTerminal.Model.TerminalColor"/>.</summary>
         </member>
-        <member name="M:VirtualTerminal.Helpers.ColorHelper.IsValidConsoleColor(System.Drawing.Color)">
+        <member name="M:VirtualTerminal.Helpers.ColorHelper.IsValidConsoleColor(VirtualTerminal.Model.TerminalColor)">
             <summary>
             Checks whether the specified color is representable in the standard Windows console palette
             (channels limited to 0/128/255).
@@ -277,27 +340,6 @@
         <member name="M:VirtualTerminal.Rendering.GlyphCache.Dispose">
             <summary>Releases the glyph cache resources.</summary>
         </member>
-        <member name="T:VirtualTerminal.Rendering.TerminalSelection">
-            <summary>Represents a rectangular selection between two buffer coordinates.</summary>
-        </member>
-        <member name="P:VirtualTerminal.Rendering.TerminalSelection.StartX">
-            <summary>Starting column of the selection.</summary>
-        </member>
-        <member name="P:VirtualTerminal.Rendering.TerminalSelection.StartY">
-            <summary>Starting row of the selection.</summary>
-        </member>
-        <member name="P:VirtualTerminal.Rendering.TerminalSelection.EndX">
-            <summary>Ending column of the selection.</summary>
-        </member>
-        <member name="P:VirtualTerminal.Rendering.TerminalSelection.EndY">
-            <summary>Ending row of the selection.</summary>
-        </member>
-        <member name="M:VirtualTerminal.Rendering.TerminalSelection.#ctor(System.Int32,System.Int32,System.Int32,System.Int32)">
-            <summary>Initializes a selection from two buffer coordinates and normalizes them.</summary>
-        </member>
-        <member name="M:VirtualTerminal.Rendering.TerminalSelection.Contains(System.Int32,System.Int32)">
-            <summary>Determines whether the specified cell lies inside the selection.</summary>
-        </member>
         <member name="T:VirtualTerminal.Rendering.TerminalRenderer">
             <summary>
             Paints terminal rows using <see cref="T:System.Windows.Media.GlyphRun"/>: coalesces same-style cells into runs,
@@ -426,6 +468,9 @@
             Initializes a new instance of the <see cref="T:VirtualTerminal.TerminalControl"/> control.
             </summary>
         </member>
+        <member name="M:VirtualTerminal.TerminalControl.OnCreateAutomationPeer">
+            <inheritdoc />
+        </member>
         <member name="M:VirtualTerminal.TerminalControl.OnPropertyChanged(System.Windows.DependencyPropertyChangedEventArgs)">
             <inheritdoc />
         </member>
@@ -479,6 +524,11 @@
             Returns the text of the visible screen (main or
             alternate buffer), one row per line, reading under the buffer lock. Used by
             the host to search for sentinels (e.g., the pending question marker).
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.TerminalControl.GetAccessibleText">
+            <summary>
+            Returns the full accessible text (scrollback + visible screen) for UI Automation.
             </summary>
         </member>
         <member name="M:VirtualTerminal.TerminalControl.Dispose">

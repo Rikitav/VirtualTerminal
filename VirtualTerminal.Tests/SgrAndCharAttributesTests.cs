@@ -1,6 +1,5 @@
 global using VirtualTerminal.Buffer;
 
-using System.Drawing;
 using System.Text;
 using VirtualTerminal.Enums;
 using VirtualTerminal.Model;
@@ -26,8 +25,8 @@ public class SgrAndCharAttributesTests
         Assert.True(style.ForegroundIsDefault);
         Assert.True(style.BackgroundIsDefault);
         Assert.True(style.UnderlineColorIsDefault);
-        Assert.Equal(Color.White, style.Foreground);
-        Assert.Equal(Color.Black, style.Background);
+        Assert.Equal(TerminalColor.White, style.Foreground);
+        Assert.Equal(TerminalColor.Black, style.Background);
         Assert.Equal(Underline.None, style.UnderlineStyle);
         Assert.Equal(Blink.None, style.Blink);
         Assert.False(style.Bold);
@@ -39,7 +38,7 @@ public class SgrAndCharAttributesTests
         TerminalDecoder decoder = CreateDecoder();
         decoder.State.Attributes.Bold = true;
         decoder.State.Attributes.ForegroundSource = ColorSource.Direct;
-        decoder.State.Attributes.ForegroundRgb = Color.Red;
+        decoder.State.Attributes.ForegroundRgb = TerminalColor.Red;
         decoder.State.Attributes.UnderlineStyle = Underline.Curly;
 
         decoder.State.Attributes.Reset();
@@ -59,7 +58,7 @@ public class SgrAndCharAttributesTests
 
         CellRenderStyle style = decoder.Buffer.GetCell(0, 0).Style;
         Assert.True(style.Bold);
-        Assert.Equal(Color.FromArgb(0x00, 0xFF, 0x00), style.Foreground);
+        Assert.Equal(TerminalColor.FromArgb(0x00, 0xFF, 0x00), style.Foreground);
     }
 
     [Fact]
@@ -72,7 +71,7 @@ public class SgrAndCharAttributesTests
 
         CellRenderStyle style = decoder.Buffer.GetCell(0, 0).Style;
         Assert.True(style.Bold);
-        Assert.Equal(Color.FromArgb(0x00, 0xCD, 0x00), style.Foreground);
+        Assert.Equal(TerminalColor.FromArgb(0x00, 0xCD, 0x00), style.Foreground);
     }
 
     [Fact]
@@ -148,12 +147,12 @@ public class SgrAndCharAttributesTests
         decoder.Write(Encoding.UTF8.GetBytes("\x1b[31;42mA\x1b[91;102mB"));
 
         CellRenderStyle normal = decoder.Buffer.GetCell(0, 0).Style;
-        Assert.Equal(Color.FromArgb(0xCD, 0x00, 0x00), normal.Foreground);
-        Assert.Equal(Color.FromArgb(0x00, 0xCD, 0x00), normal.Background);
+        Assert.Equal(TerminalColor.FromArgb(0xCD, 0x00, 0x00), normal.Foreground);
+        Assert.Equal(TerminalColor.FromArgb(0x00, 0xCD, 0x00), normal.Background);
 
         CellRenderStyle bright = decoder.Buffer.GetCell(0, 1).Style;
-        Assert.Equal(Color.FromArgb(0xFF, 0x00, 0x00), bright.Foreground);
-        Assert.Equal(Color.FromArgb(0x00, 0xFF, 0x00), bright.Background);
+        Assert.Equal(TerminalColor.FromArgb(0xFF, 0x00, 0x00), bright.Foreground);
+        Assert.Equal(TerminalColor.FromArgb(0x00, 0xFF, 0x00), bright.Background);
     }
 
     [Fact]
@@ -176,8 +175,8 @@ public class SgrAndCharAttributesTests
         decoder.Write(Encoding.UTF8.GetBytes("\x1b[38;5;196;48;5;21mA"));
 
         CellRenderStyle style = decoder.Buffer.GetCell(0, 0).Style;
-        Assert.Equal(Color.FromArgb(0xFF, 0x00, 0x00), style.Foreground);
-        Assert.Equal(Color.FromArgb(0x00, 0x00, 0xFF), style.Background);
+        Assert.Equal(TerminalColor.FromArgb(0xFF, 0x00, 0x00), style.Foreground);
+        Assert.Equal(TerminalColor.FromArgb(0x00, 0x00, 0xFF), style.Background);
     }
 
     [Fact]
@@ -188,9 +187,9 @@ public class SgrAndCharAttributesTests
         decoder.Write(Encoding.UTF8.GetBytes("\x1b[38;2;10;20;30;48;2;40;50;60;58;2;70;80;90mA"));
 
         CellRenderStyle style = decoder.Buffer.GetCell(0, 0).Style;
-        Assert.Equal(Color.FromArgb(10, 20, 30), style.Foreground);
-        Assert.Equal(Color.FromArgb(40, 50, 60), style.Background);
-        Assert.Equal(Color.FromArgb(70, 80, 90), style.UnderlineColor);
+        Assert.Equal(TerminalColor.FromArgb(10, 20, 30), style.Foreground);
+        Assert.Equal(TerminalColor.FromArgb(40, 50, 60), style.Background);
+        Assert.Equal(TerminalColor.FromArgb(70, 80, 90), style.UnderlineColor);
         Assert.False(style.UnderlineColorIsDefault);
     }
 
@@ -228,6 +227,6 @@ public class SgrAndCharAttributesTests
         Assert.True(style.Italic);
         Assert.Equal(Underline.Single, style.UnderlineStyle);
         Assert.True(style.Inverse);
-        Assert.Equal(Color.FromArgb(0xFF, 0x00, 0x00), style.Foreground);
+        Assert.Equal(TerminalColor.FromArgb(0xFF, 0x00, 0x00), style.Foreground);
     }
 }
