@@ -239,5 +239,20 @@
             <param name="pcHandle">ConPTY pseudo console handle, or -1 when not using a pseudo console.</param>
             <returns>A <see cref="T:VirtualTerminal.Interop.Win32Process"/> wrapping the process handle.</returns>
         </member>
+        <member name="T:VirtualTerminal.UnixPtySession">
+            <summary>Local shell session backed by a Unix pseudo-terminal (PTY).</summary>
+        </member>
+        <member name="M:VirtualTerminal.UnixPtySession.#ctor(System.String,System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.String})">
+            <summary>Starts a new Unix PTY session running the requested shell.</summary>
+            <param name="shellPath">Path to the shell executable, or null for the user's default shell.</param>
+            <param name="workingDirectory">Working directory for the shell, or null for the current directory.</param>
+            <param name="environment">Optional extra environment variables merged into the child environment.</param>
+        </member>
+        <member name="M:VirtualTerminal.UnixPtySession.Write(System.ReadOnlySpan{System.Byte})">
+            <inheritdoc />
+        </member>
+        <member name="M:VirtualTerminal.UnixPtySession.Dispose(System.Boolean)">
+            <inheritdoc />
+        </member>
     </members>
 </doc>
