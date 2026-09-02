@@ -379,11 +379,9 @@ public sealed class TerminalScreenBuffer : IDisposable
         if (n > len - x)
             n = len - x;
 
-        for (int i = len - 1; i >= x + n; i--)
-            cells[i] = cells[i - n];
-
-        for (int i = x; i < x + n; i++)
-            cells[i] = TerminalCellInfo.Blank;
+        Span<TerminalCellInfo> span = cells.AsSpan();
+        span.Slice(x, len - x - n).CopyTo(span.Slice(x + n));
+        span.Slice(x, n).Fill(TerminalCellInfo.Blank);
 
         _active[y].Dirty = true;
     }
@@ -405,11 +403,9 @@ public sealed class TerminalScreenBuffer : IDisposable
         if (n > len - x)
             n = len - x;
 
-        for (int i = x; i < len - n; i++)
-            cells[i] = cells[i + n];
-
-        for (int i = len - n; i < len; i++)
-            cells[i] = TerminalCellInfo.Blank;
+        Span<TerminalCellInfo> span = cells.AsSpan();
+        span.Slice(x + n, len - x - n).CopyTo(span.Slice(x));
+        span.Slice(len - n, n).Fill(TerminalCellInfo.Blank);
 
         _active[y].Dirty = true;
     }

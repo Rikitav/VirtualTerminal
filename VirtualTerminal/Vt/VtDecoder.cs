@@ -43,11 +43,11 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
     private readonly IVtHandler _handler = handler ?? throw new ArgumentNullException(nameof(handler));
 
     // UTF-8 accumulation (Ground prints decoded runes).
-    private readonly List<byte> _utf8 = [];
+    private readonly List<byte> _utf8 = new(16);
 
     // CSI / DCS parameter accumulation.
-    private int[] _paramValues = new int[8];
-    private bool[] _paramSub = new bool[8];
+    private int[] _paramValues = new int[16];
+    private bool[] _paramSub = new bool[16];
     private int _paramCount;
     private int _accumulator;
     private bool _hasParam;
@@ -55,14 +55,16 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
     private bool _trailingSep;    // last token before final was a separator (→ trailing empty param)
 
     // Intermediate bytes (0x20-0x2F).
-    private byte[] _intermediates = new byte[4];
+    private byte[] _intermediates = new byte[8];
     private int _interCount;
 
     // DEC private marker ('?', '>', '=', '<', '!') or '\0'.
     private char _privateMarker;
 
-    // String payloads (OSC / DCS / SOS-PM-APC).
-    private readonly List<byte> _stringBuf = [];
+    // String payloads (OSC / DCS / SOS-PM-APC) — rented from ArrayPool to avoid List<byte>.ToArray().
+    private byte[]? _stringBuf;
+    private int _stringLength;
+    private int _stringCapacity;
     private bool _stringSawEsc;   // for ESC \ (ST) termination inside a string state
 
     // DCS dispatch capture (final byte + private marker captured at hook time).
@@ -339,12 +341,12 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
             _stringSawEsc = false;
             if (b == Backslash)
             {
-                _handler.OscDispatch(_stringBuf.ToArray());
+                _handler.OscDispatch(StringSpan());
                 ResetToGround();
                 return;
             }
             // ESC was the start of a new sequence; terminate OSC and reprocess from Escape.
-            _handler.OscDispatch(_stringBuf.ToArray());
+            _handler.OscDispatch(StringSpan());
             ResetToGround();
             _state = State.Escape;
             ProcessEscape(b);
@@ -353,7 +355,7 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
 
         if (b == BEL)
         {
-            _handler.OscDispatch(_stringBuf.ToArray());
+            _handler.OscDispatch(StringSpan());
             ResetToGround();
             return;
         }
@@ -364,7 +366,7 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
             return;
         }
 
-        _stringBuf.Add(b);
+        AddStringByte(b);
     }
 
     // ---- DCS ----
@@ -460,8 +462,7 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
         PushTrailingParam();
         _dcsFinal = final;
         _handler.DcsHook(final, IntermediatesSpan(), new CsiParams(_paramValues, _paramSub, _paramCount), _privateMarker);
-        _stringBuf.Clear();
-        _stringSawEsc = false;
+        BeginString();
         _state = State.DcsPassthrough;
     }
 
@@ -494,6 +495,8 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
     }
 
     // ---- SOS / PM / APC ----
+
+    // ---- SOS / PM / APC ----
     private void ProcessSosPmApc(byte b)
     {
         if (_stringSawEsc)
@@ -501,11 +504,11 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
             _stringSawEsc = false;
             if (b == Backslash)
             {
-                _handler.SosPmApcDispatch(_dcsFinal, _stringBuf.ToArray());
+                _handler.SosPmApcDispatch(_dcsFinal, StringSpan());
                 ResetToGround();
                 return;
             }
-            _handler.SosPmApcDispatch(_dcsFinal, _stringBuf.ToArray());
+            _handler.SosPmApcDispatch(_dcsFinal, StringSpan());
             ResetToGround();
             _state = State.Escape;
             ProcessEscape(b);
@@ -514,7 +517,7 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
 
         if (b == BEL)
         {
-            _handler.SosPmApcDispatch(_dcsFinal, _stringBuf.ToArray());
+            _handler.SosPmApcDispatch(_dcsFinal, StringSpan());
             ResetToGround();
             return;
         }
@@ -525,7 +528,7 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
             return;
         }
 
-        _stringBuf.Add(b);
+        AddStringByte(b);
     }
 
     // ---- Accumulation helpers ----
@@ -594,8 +597,51 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
 
     private void BeginString()
     {
-        _stringBuf.Clear();
+        _stringLength = 0;
         _stringSawEsc = false;
+    }
+
+    private ReadOnlySpan<byte> StringSpan() =>
+        _stringLength > 0 ? _stringBuf!.AsSpan(0, _stringLength) : ReadOnlySpan<byte>.Empty;
+
+    private void AddStringByte(byte b)
+    {
+        if (_stringBuf is null || _stringLength >= _stringCapacity)
+            GrowStringBuffer();
+
+        _stringBuf![_stringLength++] = b;
+    }
+
+    private void GrowStringBuffer()
+    {
+        int newCapacity = Math.Max(64, _stringCapacity * 2);
+        byte[] newBuf = ArrayPool<byte>.Shared.Rent(newCapacity);
+
+        if (_stringBuf is not null && _stringLength > 0)
+            _stringBuf.AsSpan(0, _stringLength).CopyTo(newBuf);
+
+        if (_stringBuf is not null)
+            ArrayPool<byte>.Shared.Return(_stringBuf);
+
+        _stringBuf = newBuf;
+        _stringCapacity = newBuf.Length;
+    }
+
+    private void ResetStringBuffer()
+    {
+        _stringLength = 0;
+        _stringSawEsc = false;
+    }
+
+    private void FreeStringBuffer()
+    {
+        if (_stringBuf is not null)
+        {
+            ArrayPool<byte>.Shared.Return(_stringBuf);
+            _stringBuf = null;
+            _stringCapacity = 0;
+            _stringLength = 0;
+        }
     }
 
     private void ResetToGround()
@@ -608,8 +654,7 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
         _trailingSep = false;
         _interCount = 0;
         _privateMarker = '\0';
-        _stringBuf.Clear();
-        _stringSawEsc = false;
+        ResetStringBuffer();
     }
 
     // ---- UTF-8 decoding ----
@@ -684,6 +729,7 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
             return;
 
         Reset();
+        FreeStringBuffer();
         _disposed = true;
     }
 }

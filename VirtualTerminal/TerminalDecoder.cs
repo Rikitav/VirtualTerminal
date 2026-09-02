@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
@@ -149,8 +150,29 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         if (SendOutput is null)
             return;
 
-        byte[] bytes = Encoding.UTF8.GetBytes(response);
-        SendOutput(bytes);
+        int byteCount = Encoding.UTF8.GetByteCount(response);
+        if (byteCount == 0)
+            return;
+
+        const int StackAllocThreshold = 512;
+        if (byteCount <= StackAllocThreshold)
+        {
+            Span<byte> bytes = stackalloc byte[byteCount];
+            Encoding.UTF8.GetBytes(response, bytes);
+            SendOutput(bytes);
+            return;
+        }
+
+        byte[] rented = ArrayPool<byte>.Shared.Rent(byteCount);
+        try
+        {
+            Encoding.UTF8.GetBytes(response, rented);
+            SendOutput(rented.AsSpan(0, byteCount));
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(rented);
+        }
     }
 
     // ============== IVtHandler ==============

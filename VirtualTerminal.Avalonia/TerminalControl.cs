@@ -106,7 +106,9 @@ public class TerminalControl : TemplatedControl, IDisposable
         set => SetValue(TerminalFontFamilyProperty, value);
     }
 
-    /// <summary>Gets or sets a value indicating whether the cursor is visible.</summary>
+    /// <summary>
+    /// Gets or sets a value indicating whether the cursor is visible.
+    /// </summary>
     public bool CursorVisible
     {
         get => GetValue(CursorVisibleProperty);

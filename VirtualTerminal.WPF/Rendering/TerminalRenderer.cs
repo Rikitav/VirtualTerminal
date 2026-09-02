@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using System.Windows;
 using System.Windows.Markup;
@@ -116,6 +117,7 @@ public sealed class TerminalRenderer : IDisposable
         _glyphIndices.Clear();
         _advanceWidths.Clear();
         _clusterMap.Clear();
+        Span<char> text = stackalloc char[2];
         int segCellCount = 0;
         double segX = x;
 
@@ -177,12 +179,14 @@ public sealed class TerminalRenderer : IDisposable
 
             current = tf;
 
-            string text = rune.ToString();
+            bool encoded = rune.TryEncodeToUtf16(text, out int charsWritten);
+            Debug.Assert(encoded && charsWritten > 0);
+
             ushort glyphIndex = (ushort)_glyphIndices.Count;
 
-            foreach (char c in text)
+            for (int c = 0; c < charsWritten; c++)
             {
-                _chars.Add(c);
+                _chars.Add(text[c]);
                 _clusterMap.Add(glyphIndex);
             }
 

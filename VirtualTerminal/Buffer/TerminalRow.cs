@@ -37,11 +37,12 @@ public sealed class TerminalRow
     public void ClearRange(int start, int count)
     {
         int end = Math.Min(start + count, Cells.Length);
-        for (int i = start; i < end; i++)
-            Cells[i] = TerminalCellInfo.Blank;
+        int actual = end - start;
+        if (actual <= 0)
+            return;
 
-        if (end > start)
-            Dirty = true;
+        Cells.AsSpan(start, actual).Fill(TerminalCellInfo.Blank);
+        Dirty = true;
     }
 
     /// <summary>Returns the row cells as a span.</summary>
@@ -62,8 +63,8 @@ public sealed class TerminalRow
         int oldLength = Cells.Length;
         Array.Resize(ref Cells, newColumns);
 
-        for (int i = oldLength; i < newColumns; i++)
-            Cells[i] = TerminalCellInfo.Blank;
+        if (newColumns > oldLength)
+            Cells.AsSpan(oldLength, newColumns - oldLength).Fill(TerminalCellInfo.Blank);
 
         Dirty = true;
     }

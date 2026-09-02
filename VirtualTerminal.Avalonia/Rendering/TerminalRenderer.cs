@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Media;
+using System.Diagnostics;
 using System.Text;
 using VirtualTerminal.Buffer;
 using VirtualTerminal.Model;
@@ -126,6 +127,7 @@ public sealed class TerminalRenderer : IDisposable
         GlyphTypeface? current = null;
         _chars.Clear();
         _glyphList.Clear();
+        Span<char> text = stackalloc char[2];
         int segCellCount = 0;
         double segX = x;
 
@@ -167,7 +169,12 @@ public sealed class TerminalRenderer : IDisposable
                 Flush();
 
             current = tf;
-            _chars.Append(rune.ToString());
+            bool encoded = rune.TryEncodeToUtf16(text, out int charsWritten);
+            Debug.Assert(encoded && charsWritten > 0);
+
+            for (int c = 0; c < charsWritten; c++)
+                _chars.Append(text[c]);
+
             _glyphList.Add(glyph);
             segCellCount++;
         }
