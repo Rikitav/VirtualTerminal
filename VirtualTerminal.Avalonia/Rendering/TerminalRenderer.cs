@@ -59,25 +59,6 @@ public sealed class TerminalRenderer : IDisposable
     public void Dispose()
         => _glyphs.Dispose();
 
-    /// <summary>Renders the cursor shape at column <paramref name="col"/> (row-local y=0). The caller
-    /// decides visibility by clearing the cursor group when the cursor should be hidden.</summary>
-    public void RenderCursor(DrawingContext drawingContext, int col, CursorShape shape)
-    {
-        double cellW = _glyphs.CellWidth;
-        double cellH = _glyphs.CellHeight;
-        double x = col * cellW;
-
-        IBrush brush = Brush(_options.DefaultCursorColor);
-        Rect rect = shape switch
-        {
-            CursorShape.Bar => new Rect(x, 0, Math.Max(1, cellW * 0.2), cellH),
-            CursorShape.Underline => new Rect(x, cellH - Math.Max(2, cellH * 0.15), cellW, Math.Max(2, cellH * 0.15)),
-            _ => new Rect(x, 0, cellW, cellH),
-        };
-
-        drawingContext.DrawRectangle(brush, null, rect);
-    }
-
     /// <summary>Renders a single row into <paramref name="drawingContext"/> (local origin = row top-left).</summary>
     public void RenderRow(DrawingContext drawingContext, Span<TerminalCellInfo> row, TerminalSelection? selection, int rowIndex)
     {

@@ -45,12 +45,6 @@ public sealed class TerminalModes
     /// <summary>DEC private ?1006 — SGR mouse encoding.</summary>
     public bool SgrMouseEncoding;
 
-    /// <summary>DEC private ?1049 cursor-shape (DECSCUSR) last set value, for restore.</summary>
-    public CursorShape CursorShape = CursorShape.Block;
-
-    /// <summary>Whether the cursor blinks (DECSCUSR 1/2/3) vs steady (0/4).</summary>
-    public bool CursorBlinking;
-
     /// <summary>Creates a copy of the current mode state.</summary>
     /// <returns>A new <see cref="TerminalModes"/> instance with the same flag values.</returns>
     public TerminalModes Clone() => new()
@@ -69,8 +63,6 @@ public sealed class TerminalModes
         FocusReporting = FocusReporting,
         MouseTracking = MouseTracking,
         SgrMouseEncoding = SgrMouseEncoding,
-        CursorShape = CursorShape,
-        CursorBlinking = CursorBlinking,
     };
 }
 
@@ -90,15 +82,3 @@ public enum MouseTrackingMode
     AnyEvent,
 }
 
-/// <summary>Cursor shape (DECSCUSR).</summary>
-public enum CursorShape
-{
-    /// <summary>Solid block cursor.</summary>
-    Block,
-
-    /// <summary>Horizontal underline cursor.</summary>
-    Underline,
-
-    /// <summary>Vertical bar cursor.</summary>
-    Bar,
-}

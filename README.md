@@ -37,7 +37,6 @@ This repository contains:
         <vt:TerminalControl
             x:Name="Terminal"
             AllowDirectInput="True"
-            CursorBlinking="True"
             ScrollDownVisible="True"
             Background="Black"
             FontFamily="Cascadia Mono"
@@ -57,7 +56,6 @@ This repository contains:
     <vt:TerminalControl 
         CurrentSession="{Binding Session}"
         AllowDirectInput="True"
-        CursorBlinking="True"
         Background="Black"
         FontFamily="Cascadia Mono"
         TerminalFontSize="14" />
@@ -108,8 +106,19 @@ The WPF and Avalonia controls render the active `ITerminalSession.Buffer` and fo
   - The active `ITerminalSession`.
 - **`AllowDirectInput`** (default `true`)
   - If `true`, keyboard input is encoded as VT sequences and sent to the session.
-- **`CursorBlinking`**, **`CursorVisible`**, **`CursorColor`**, **`CursorShape`**
-  - Cursor appearance.
+- **`CursorVisible`** (default `true`)
+  - Master cursor visibility (the engine still honors DECTCEM `ESC[?25l/h`).
+- **`CursorRenderer`** (default `DefaultTerminalCursorRenderer`)
+  - Pluggable cursor visual. Derive from `TerminalCursorRenderer` (one per framework, in the
+    `VirtualTerminal.Cursors` namespace of `VirtualTerminal.WPF` / `VirtualTerminal.Avalonia`)
+    and override `MoveTo`/`Render`. The control drives the renderer: it calls `MoveTo` with the
+    target cell rect whenever the cursor position changes and `Render` on every render pass, with
+    the current state in `IsCursorVisible` (focus/DECTCEM/master switch) and `CursorBlinkMode`
+    (DEC ?12). Blinking and animation are the renderer's own business — the default draws a thin
+    bar that snaps to the target cell and blinks on its own private 530ms timer; a custom
+    renderer can run its own clock (start/stop it in `Attach`/`Detach`), drive interpolation
+    from `MoveTo`, or draw a steady cursor. DECSCUSR (`ESC[ Ps SP q`) and OSC 12 (cursor color)
+    are parsed but ignored by the engine — cursor appearance is entirely the renderer's job.
 - **`ScrollDownVisible`** (default `true`)
   - Shows a floating indicator when scrolled back in history.
 - **`Background`** / **`Foreground`**

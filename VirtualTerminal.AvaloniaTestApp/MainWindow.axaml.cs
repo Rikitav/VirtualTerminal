@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using VirtualTerminal.Cursors;
 
 namespace VirtualTerminal.AvaloniaTestApp;
 
@@ -14,6 +15,9 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        // Demo: animated cursor that glides between cells (cosine ease) instead of teleporting.
+        PART_Terminal_Left.CursorRenderer = new AnimatedTerminalCursorRenderer();
     }
 
     private void Button_Click_Start(object? sender, RoutedEventArgs e)
@@ -25,8 +29,8 @@ public partial class MainWindow : Window
         {
             PART_Terminal_Left.CurrentSession?.Dispose();
 
-            SimpleTuiDemoSession session = new();
-            //CommandLineSession session = new CommandLineSession(PART_CommandLineName.Text);
+            //SimpleTuiDemoSession session = new();
+            CommandLineSession session = new CommandLineSession(PART_CommandLineName.Text);
 
             PART_Terminal_Left.CurrentSession = session;
             PART_Prompt_Left.Session = session;

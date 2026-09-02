@@ -144,10 +144,6 @@ public class TerminalPaletteAndOptionsTests
         Assert.NotNull(options.Palette);
         Assert.Equal(TerminalColor.White, options.DefaultForeground);
         Assert.Equal(TerminalColor.Black, options.DefaultBackground);
-        Assert.Equal(TerminalColor.White, options.DefaultCursorColor);
-        Assert.Equal(CursorShape.Block, options.CursorShape);
-        Assert.True(options.CursorBlink);
-        Assert.Equal(530, options.CursorBlinkIntervalMs);
         Assert.Equal(10000, options.ScrollbackMaxLines);
         Assert.Equal(1.0, options.LineHeight);
         Assert.Null(options.FontFallback);
@@ -163,10 +159,6 @@ public class TerminalPaletteAndOptionsTests
         {
             DefaultForeground = TerminalColor.Red,
             DefaultBackground = TerminalColor.Blue,
-            DefaultCursorColor = TerminalColor.Green,
-            CursorShape = CursorShape.Bar,
-            CursorBlink = false,
-            CursorBlinkIntervalMs = 250,
             ScrollbackMaxLines = 5000,
             LineHeight = 1.25,
             FontFallback = ["Arial", "Consolas"],
@@ -179,10 +171,6 @@ public class TerminalPaletteAndOptionsTests
 
         Assert.Equal(original.DefaultForeground, clone.DefaultForeground);
         Assert.Equal(original.DefaultBackground, clone.DefaultBackground);
-        Assert.Equal(original.DefaultCursorColor, clone.DefaultCursorColor);
-        Assert.Equal(original.CursorShape, clone.CursorShape);
-        Assert.Equal(original.CursorBlink, clone.CursorBlink);
-        Assert.Equal(original.CursorBlinkIntervalMs, clone.CursorBlinkIntervalMs);
         Assert.Equal(original.ScrollbackMaxLines, clone.ScrollbackMaxLines);
         Assert.Equal(original.LineHeight, clone.LineHeight);
         Assert.Equal(original.FontFallback, clone.FontFallback);
@@ -219,10 +207,6 @@ public class TerminalPaletteAndOptionsTests
         options.Palette = palette;
         options.DefaultForeground = TerminalColor.Red;
         options.DefaultBackground = TerminalColor.Blue;
-        options.DefaultCursorColor = TerminalColor.Green;
-        options.CursorShape = CursorShape.Underline;
-        options.CursorBlink = false;
-        options.CursorBlinkIntervalMs = 100;
         options.ScrollbackMaxLines = 2500;
         options.LineHeight = 1.5;
         options.FontFallback = ["Segoe UI"];
@@ -233,10 +217,6 @@ public class TerminalPaletteAndOptionsTests
         Assert.Same(palette, options.Palette);
         Assert.Equal(TerminalColor.Red, options.DefaultForeground);
         Assert.Equal(TerminalColor.Blue, options.DefaultBackground);
-        Assert.Equal(TerminalColor.Green, options.DefaultCursorColor);
-        Assert.Equal(CursorShape.Underline, options.CursorShape);
-        Assert.False(options.CursorBlink);
-        Assert.Equal(100, options.CursorBlinkIntervalMs);
         Assert.Equal(2500, options.ScrollbackMaxLines);
         Assert.Equal(1.5, options.LineHeight);
         Assert.Equal(["Segoe UI"], options.FontFallback);

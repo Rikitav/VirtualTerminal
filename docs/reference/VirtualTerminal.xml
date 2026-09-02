@@ -122,12 +122,6 @@
         <member name="F:VirtualTerminal.Buffer.TerminalModes.SgrMouseEncoding">
             <summary>DEC private ?1006 — SGR mouse encoding.</summary>
         </member>
-        <member name="F:VirtualTerminal.Buffer.TerminalModes.CursorShape">
-            <summary>DEC private ?1049 cursor-shape (DECSCUSR) last set value, for restore.</summary>
-        </member>
-        <member name="F:VirtualTerminal.Buffer.TerminalModes.CursorBlinking">
-            <summary>Whether the cursor blinks (DECSCUSR 1/2/3) vs steady (0/4).</summary>
-        </member>
         <member name="M:VirtualTerminal.Buffer.TerminalModes.Clone">
             <summary>Creates a copy of the current mode state.</summary>
             <returns>A new <see cref="T:VirtualTerminal.Buffer.TerminalModes"/> instance with the same flag values.</returns>
@@ -146,18 +140,6 @@
         </member>
         <member name="F:VirtualTerminal.Buffer.MouseTrackingMode.AnyEvent">
             <summary>Any-event tracking: report press, release, and motion events.</summary>
-        </member>
-        <member name="T:VirtualTerminal.Buffer.CursorShape">
-            <summary>Cursor shape (DECSCUSR).</summary>
-        </member>
-        <member name="F:VirtualTerminal.Buffer.CursorShape.Block">
-            <summary>Solid block cursor.</summary>
-        </member>
-        <member name="F:VirtualTerminal.Buffer.CursorShape.Underline">
-            <summary>Horizontal underline cursor.</summary>
-        </member>
-        <member name="F:VirtualTerminal.Buffer.CursorShape.Bar">
-            <summary>Vertical bar cursor.</summary>
         </member>
         <member name="T:VirtualTerminal.Buffer.TerminalRow">
             <summary>A single grid line: a cell array plus wrap/dirty metadata.</summary>
@@ -1514,18 +1496,6 @@
         </member>
         <member name="P:VirtualTerminal.Options.TerminalOptions.DefaultBackground">
             <summary>Default background color used when no SGR background is active.</summary>
-        </member>
-        <member name="P:VirtualTerminal.Options.TerminalOptions.DefaultCursorColor">
-            <summary>Default cursor color.</summary>
-        </member>
-        <member name="P:VirtualTerminal.Options.TerminalOptions.CursorShape">
-            <summary>Cursor shape (also settable via DECSCUSR).</summary>
-        </member>
-        <member name="P:VirtualTerminal.Options.TerminalOptions.CursorBlink">
-            <summary>Whether the cursor blinks by default.</summary>
-        </member>
-        <member name="P:VirtualTerminal.Options.TerminalOptions.CursorBlinkIntervalMs">
-            <summary>Cursor blink interval in milliseconds.</summary>
         </member>
         <member name="P:VirtualTerminal.Options.TerminalOptions.ScrollbackMaxLines">
             <summary>Maximum scrollback lines retained in the ring buffer.</summary>

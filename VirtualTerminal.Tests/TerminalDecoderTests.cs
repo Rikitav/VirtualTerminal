@@ -99,18 +99,17 @@ public class TerminalDecoderTests
     }
 
     [Fact]
-    public void Decrqss_CursorStyle_RespondsWithDecscusrSequence()
+    public void Decrqss_CursorStyle_RespondsWithInvalid()
     {
+        // Cursor style is a renderer concern; the engine no longer tracks DECSCUSR state.
         TerminalDecoder decoder = CreateDecoder();
-        decoder.State.Modes.CursorShape = CursorShape.Underline;
-        decoder.State.Modes.CursorBlinking = false;
 
         string? response = null;
         decoder.SendOutput = bytes => response = Encoding.UTF8.GetString(bytes);
 
         decoder.Write(Encoding.UTF8.GetBytes("\x1b[?12$p"));
 
-        Assert.Equal("\x1bP1$r4 q\x1b\\", response);
+        Assert.Equal("\x1bP0$r\x1b\\", response);
     }
 
     [Fact]

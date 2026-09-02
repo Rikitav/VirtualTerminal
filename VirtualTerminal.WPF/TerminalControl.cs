@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using VirtualTerminal.Automation;
 using VirtualTerminal.Buffer;
+using VirtualTerminal.Cursors;
 using VirtualTerminal.Extensions;
 using VirtualTerminal.Helpers;
 using VirtualTerminal.Input;
@@ -30,14 +31,15 @@ public partial class TerminalControl : Control, IDisposable
 {
     private readonly TerminalRenderer _renderer = new();
     private readonly TerminalOptions _options = new();
+    private TerminalCursorRenderer _cursorRenderer = new DefaultTerminalCursorRenderer();
 
     private readonly object _invalidateLock = new object();
     private readonly DispatcherTimer _renderTimer;
-    private readonly DispatcherTimer _blinkTimer;
     private readonly DispatcherTimer _resizeTimer;
 
     private TerminalDecoder? _decoder;
-    private bool _cursorBlinkState = true;
+    private int _lastCursorX = -1;
+    private int _lastCursorY = -1;
     private bool _rendererConfigured;
     private bool _invalidatePending;
     private bool _disposed;
@@ -92,12 +94,26 @@ public partial class TerminalControl : Control, IDisposable
     }
 
     /// <summary>
-    /// Gets or sets whether cursor blinking should be enabled.
+    /// Gets or sets the renderer that draws the terminal cursor. Swap this to customize the
+    /// cursor visual or animate its movement; defaults to <see cref="DefaultTerminalCursorRenderer"/>.
     /// </summary>
-    public bool CursorBlinking
+    public TerminalCursorRenderer CursorRenderer
     {
-        get => (bool)GetValue(CursorBlinkingProperty);
-        set => SetValue(CursorBlinkingProperty, value);
+        get => _cursorRenderer;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            if (ReferenceEquals(_cursorRenderer, value))
+                return;
+
+            bool attached = _cursorRenderer.TerminalControl is not null;
+            _cursorRenderer.Detach();
+            _cursorRenderer = value;
+            if (attached)
+                _cursorRenderer.Attach(this);
+
+            InvalidateVisual();
+        }
     }
 
     /// <summary>
@@ -143,24 +159,6 @@ public partial class TerminalControl : Control, IDisposable
     {
         get => (bool)GetValue(CursorVisibleProperty);
         set => SetValue(CursorVisibleProperty, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the cursor color.
-    /// </summary>
-    public WindowsColor CursorColor
-    {
-        get => (WindowsColor)GetValue(CursorColorProperty);
-        set => SetValue(CursorColorProperty, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the shape of the cursor.
-    /// </summary>
-    public CursorShape CursorShape
-    {
-        get => (CursorShape)GetValue(CursorShapeProperty);
-        set => SetValue(CursorShapeProperty, value);
     }
 
     /// <summary>
@@ -214,7 +212,6 @@ public partial class TerminalControl : Control, IDisposable
     {
         Debug.WriteLine($"[{GetType().Name}] Constructor");
         _renderTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Background, DispatcherRenderHandler, Dispatcher);
-        _blinkTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(530), DispatcherPriority.Background, DispatcherBlinkHandler, Dispatcher);
         _resizeTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(150), DispatcherPriority.Background, (s, e) => { _resizeTimer!.Stop(); ResizeSessionToBounds(); }, Dispatcher);
 
         Focusable = true;
@@ -235,7 +232,6 @@ public partial class TerminalControl : Control, IDisposable
             (s, e) => { e.CanExecute = _decoder is not null; e.Handled = true; }));
 
         _renderTimer.Start();
-        _blinkTimer.Start();
     }
 
     /// <inheritdoc />
@@ -293,7 +289,7 @@ public partial class TerminalControl : Control, IDisposable
             UpdateBrushes();
             InvalidateVisual();
         }
-        else if (e.Property == CursorColorProperty || e.Property == CursorShapeProperty || e.Property == ScrollbackLinesProperty)
+        else if (e.Property == ScrollbackLinesProperty)
         {
             SyncOptionsToDecoder();
             InvalidateVisual();
@@ -336,8 +332,6 @@ public partial class TerminalControl : Control, IDisposable
 
     private void SyncOptionsToDecoder()
     {
-        _options.CursorShape = CursorShape;
-        _options.DefaultCursorColor = CursorColor.ToTerminalColor();
         _options.ScrollbackMaxLines = ScrollbackLines;
         _options.LineHeight = LineHeight;
         _options.DefaultForeground = ScreenForeground.ToTerminalColor();
@@ -349,8 +343,6 @@ public partial class TerminalControl : Control, IDisposable
             buf.SetScrollbackMax(_options.ScrollbackMaxLines);
             Debug.WriteLine($"[{GetType().Name}] SyncOptionsToDecoder: buffer ScrollbackMax={buf.ScrollbackMax}, ScrollbackCount={buf.ScrollbackCount}");
         }
-
-        _blinkTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(50, _options.CursorBlinkIntervalMs));
     }
 
     private void OnDecoderTitleChanged(object? sender, string title)
@@ -415,15 +407,15 @@ public partial class TerminalControl : Control, IDisposable
             return;
 
         _renderTimer.Start();
-        _blinkTimer.Start();
+        _cursorRenderer.Attach(this);
     }
 
     private void OnControlUnloaded(object sender, RoutedEventArgs e)
     {
         Debug.WriteLine($"[{GetType().Name}] Unloaded: disposed={_disposed}");
         _renderTimer.Stop();
-        _blinkTimer.Stop();
         _resizeTimer.Stop();
+        _cursorRenderer.Detach();
     }
 
     /// <inheritdoc />
@@ -490,7 +482,7 @@ public partial class TerminalControl : Control, IDisposable
             drawingContext.Pop();
         }
 
-        RenderCursor(drawingContext);
+        RenderCursorVisual(drawingContext);
         for (int i = 0; i < buf.Rows; i++)
             buf.MarkRowClean(i);
     }
@@ -510,7 +502,7 @@ public partial class TerminalControl : Control, IDisposable
         return idx < scrollback.Count ? scrollback[idx].AsSpan() : buf.GetRow(idx - scrollback.Count);
     }
 
-    private void RenderCursor(DrawingContext drawingContext)
+    private void RenderCursorVisual(DrawingContext drawingContext)
     {
         if (_decoder is null)
             return;
@@ -518,17 +510,21 @@ public partial class TerminalControl : Control, IDisposable
         TerminalState state = _decoder.State;
         Size cell = _renderer.CellSize;
 
-        bool shouldBlink = state.Modes.CursorBlinking || _options.CursorBlink;
-        bool visible = IsFocused && _scrollOffset == 0 && state.Modes.CursorVisible && CursorVisible && (!shouldBlink || _cursorBlinkState);
+        if (state.CursorX != _lastCursorX || state.CursorY != _lastCursorY)
+        {
+            _lastCursorX = state.CursorX;
+            _lastCursorY = state.CursorY;
+            _cursorRenderer.MoveTo(new Rect(
+                state.CursorX * cell.Width,
+                state.CursorY * cell.Height,
+                cell.Width,
+                cell.Height));
+        }
 
-        if (!visible)
-            return;
-
-        // Apply only the vertical translation; RenderCursor positions the cursor
-        // horizontally from the supplied column.
-        drawingContext.PushTransform(new TranslateTransform(0, state.CursorY * cell.Height));
-        _renderer.RenderCursor(drawingContext, state.CursorX, state.Modes.CursorShape);
-        drawingContext.Pop();
+        _cursorRenderer.IsCursorVisible = IsFocused && _scrollOffset == 0 && state.Modes.CursorVisible && CursorVisible;
+        _cursorRenderer.CursorBlinkMode = state.Modes.CursorBlink;
+        _cursorRenderer.BackgroundColor = ScreenBackground;
+        _cursorRenderer.Render(drawingContext);
     }
 
     private void DispatcherRenderHandler(object? sender, EventArgs e)
@@ -547,20 +543,6 @@ public partial class TerminalControl : Control, IDisposable
 
         if (dirty || _selection is not null || _scrollOffset > 0)
             InvalidateVisual();
-    }
-
-    private void DispatcherBlinkHandler(object? sender, EventArgs e)
-    {
-        TerminalDecoder? dec = _decoder;
-        if (dec is null)
-            return;
-
-        bool shouldBlink = dec.State.Modes.CursorBlinking || _options.CursorBlink;
-        if (!shouldBlink || !IsFocused || !dec.State.Modes.CursorVisible || !CursorVisible)
-            return;
-
-        _cursorBlinkState = !_cursorBlinkState;
-        InvalidateVisual();
     }
 
     // ---- Renderer configuration ----
@@ -649,7 +631,6 @@ public partial class TerminalControl : Control, IDisposable
     protected override void OnGotKeyboardFocus(KeyboardFocusChangedEventArgs e)
     {
         base.OnGotKeyboardFocus(e);
-        _cursorBlinkState = true;
         if (_decoder?.State.Modes.FocusReporting == true)
             Session?.Append("\x1b[I");
         InvalidateVisual();
@@ -1222,8 +1203,8 @@ public partial class TerminalControl : Control, IDisposable
         _rendererConfigured = false;
 
         _renderTimer.Stop();
-        _blinkTimer.Stop();
         _resizeTimer.Stop();
+        _cursorRenderer.Detach();
 
         if (Session is { } session)
         {
@@ -1275,11 +1256,6 @@ public partial class TerminalControl : Control, IDisposable
         nameof(AllowDirectInput), typeof(bool), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: true));
 
-    /// <summary>Defines the <see cref="CursorBlinking"/> dependency property.</summary>
-    public static readonly DependencyProperty CursorBlinkingProperty = DependencyProperty.Register(
-        nameof(CursorBlinking), typeof(bool), typeof(TerminalControl),
-        new PropertyMetadata(defaultValue: true));
-
     /// <summary>Defines the <see cref="ScrollDownVisible"/> dependency property.</summary>
     public static readonly DependencyProperty ScrollDownVisibleProperty = DependencyProperty.Register(
         nameof(ScrollDownVisible), typeof(bool), typeof(TerminalControl),
@@ -1299,16 +1275,6 @@ public partial class TerminalControl : Control, IDisposable
     public static readonly DependencyProperty CursorVisibleProperty = DependencyProperty.Register(
         nameof(CursorVisible), typeof(bool), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: true));
-
-    /// <summary>Defines the <see cref="CursorColor"/> dependency property.</summary>
-    public static readonly DependencyProperty CursorColorProperty = DependencyProperty.Register(
-        nameof(CursorColor), typeof(WindowsColor), typeof(TerminalControl),
-        new PropertyMetadata(defaultValue: Colors.White));
-
-    /// <summary>Defines the <see cref="CursorShape"/> dependency property.</summary>
-    public static readonly DependencyProperty CursorShapeProperty = DependencyProperty.Register(
-        nameof(CursorShape), typeof(CursorShape), typeof(TerminalControl),
-        new PropertyMetadata(defaultValue: CursorShape.Block));
 
     /// <summary>Defines the <see cref="ScrollbackLines"/> dependency property.</summary>
     public static readonly DependencyProperty ScrollbackLinesProperty = DependencyProperty.Register(

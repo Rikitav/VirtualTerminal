@@ -1,4 +1,5 @@
-﻿using System.Windows;
+using System.Windows;
+using VirtualTerminal.Cursors;
 
 namespace VirtualTerminal.TestApp;
 
@@ -10,6 +11,9 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        // Demo: animated cursor that glides between cells (cosine ease) instead of teleporting.
+        PART_Terminal_Left.CursorRenderer = new AnimatedTerminalCursorRenderer();
     }
 
     private void Button_Click_Start(object sender, RoutedEventArgs e)

@@ -49,6 +49,61 @@
             Notifies assistive technologies that the terminal text has changed.
             </summary>
         </member>
+        <member name="T:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer">
+            <summary>
+            Cursor visual that glides from its previous cell to the new one. On <see cref="M:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer.MoveTo(Avalonia.Rect)"/> the
+            bar is drawn at both the previous cell (A) and the target cell (B), connected by a transition
+            quadrilateral; A then interpolates toward B with a cosine ease-in-out over
+            <see cref="F:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer.AnimationDuration"/>, so rapid cursor jumps read as a short smooth slide instead of
+            a teleport. The cursor is drawn in the color inverse of <see cref="P:VirtualTerminal.Rendering.TerminalCursorRenderer.BackgroundColor"/>
+            (difference-style; per-pixel invert blending is not available on <see cref="T:Avalonia.Media.DrawingContext"/>).
+            Steady (no blink); combine with a private blink timer if wanted — see
+            <see cref="T:VirtualTerminal.Cursors.DefaultTerminalCursorRenderer"/>.
+            </summary>
+        </member>
+        <member name="F:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer.AnimationDuration">
+            <summary>How long the glide from A to B takes.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer.#ctor">
+            <summary>Initializes a new instance of the <see cref="T:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer"/> class.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer.Attach(VirtualTerminal.TerminalControl)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer.Detach">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer.MoveTo(Avalonia.Rect)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer.Render(Avalonia.Media.DrawingContext)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer.DrawQuadrilateral(Avalonia.Media.DrawingContext,Avalonia.Rect,Avalonia.Rect,Avalonia.Media.IBrush)">
+            <summary>Fills the quadrilateral swept between the A and B bar rectangles.</summary>
+        </member>
+        <member name="T:VirtualTerminal.Cursors.DefaultTerminalCursorRenderer">
+            <summary>
+            Default cursor visual: a thin vertical bar (15% of the cell width, at least 2 device units)
+            that snaps instantly to the target cell and blinks on a private 530ms timer. Replaceable via
+            <see cref="P:VirtualTerminal.TerminalControl.CursorRenderer"/>.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Cursors.DefaultTerminalCursorRenderer.#ctor">
+            <summary>Initializes a new instance of the <see cref="T:VirtualTerminal.Cursors.DefaultTerminalCursorRenderer"/> class.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Cursors.DefaultTerminalCursorRenderer.Attach(VirtualTerminal.TerminalControl)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Cursors.DefaultTerminalCursorRenderer.Detach">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Cursors.DefaultTerminalCursorRenderer.MoveTo(Avalonia.Rect)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Cursors.DefaultTerminalCursorRenderer.Render(Avalonia.Media.DrawingContext)">
+            <inheritdoc/>
+        </member>
         <member name="T:VirtualTerminal.Helpers.ColorHelper">
             <summary>Provides extension methods for converting between Avalonia and core <see cref="T:VirtualTerminal.Model.TerminalColor"/> types.</summary>
         </member>
@@ -213,6 +268,57 @@
         <member name="M:VirtualTerminal.Rendering.GlyphCache.Dispose">
             <summary>Releases the primary and fallback typefaces and clears the glyph cache.</summary>
         </member>
+        <member name="T:VirtualTerminal.Rendering.TerminalCursorRenderer">
+            <summary>
+            Pluggable cursor visual for <see cref="P:VirtualTerminal.Rendering.TerminalCursorRenderer.TerminalControl"/>. The control drives the renderer:
+            it notifies the target cell rectangle via <see cref="M:VirtualTerminal.Rendering.TerminalCursorRenderer.MoveTo(Avalonia.Rect)"/> whenever the cursor position
+            changes, and calls <see cref="M:VirtualTerminal.Rendering.TerminalCursorRenderer.Render(Avalonia.Media.DrawingContext)"/> once per render pass with the current state in
+            <see cref="P:VirtualTerminal.Rendering.TerminalCursorRenderer.IsCursorVisible"/>/<see cref="P:VirtualTerminal.Rendering.TerminalCursorRenderer.CursorBlinkMode"/>. The renderer owns its own visual
+            behavior — blinking, animation, transition effects. The default implementation blinks on a
+            private timer; custom implementations can run composition-driven interpolation from
+            <see cref="M:VirtualTerminal.Rendering.TerminalCursorRenderer.MoveTo(Avalonia.Rect)"/>, ignore <see cref="P:VirtualTerminal.Rendering.TerminalCursorRenderer.CursorBlinkMode"/>, or anything else.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.TerminalCursorRenderer.TerminalControl">
+            <summary>Gets the control this renderer is attached to, or <c>null</c> when detached.</summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.TerminalCursorRenderer.IsCursorVisible">
+            <summary>
+            Gets or sets whether the cursor would be visible this frame (control focused, scrolled to
+            the bottom, DECTCEM on, master <c>CursorVisible</c> on). Set by the owning control
+            immediately before each <see cref="M:VirtualTerminal.Rendering.TerminalCursorRenderer.Render(Avalonia.Media.DrawingContext)"/> call.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.TerminalCursorRenderer.CursorBlinkMode">
+            <summary>
+            Gets or sets whether the application enabled the DEC ?12 (att610) cursor-blink mode.
+            Set by the owning control immediately before each <see cref="M:VirtualTerminal.Rendering.TerminalCursorRenderer.Render(Avalonia.Media.DrawingContext)"/> call. The renderer
+            decides whether and how to honor it (the default renderer blinks regardless, matching
+            conventional terminal behavior).
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Rendering.TerminalCursorRenderer.BackgroundColor">
+            <summary>
+            Gets or sets the control's current background color. Set by the owning control immediately
+            before each <see cref="M:VirtualTerminal.Rendering.TerminalCursorRenderer.Render(Avalonia.Media.DrawingContext)"/> call; renderers that draw a difference-style cursor use it
+            to pick a contrasting (inverted) color.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Rendering.TerminalCursorRenderer.Attach(VirtualTerminal.TerminalControl)">
+            <summary>Called when the renderer is attached to a control (control attached to the visual tree).</summary>
+            <param name="control">The owning terminal control.</param>
+        </member>
+        <member name="M:VirtualTerminal.Rendering.TerminalCursorRenderer.Detach">
+            <summary>Called when the renderer is detached from its control (control detached from the visual tree).</summary>
+        </member>
+        <member name="M:VirtualTerminal.Rendering.TerminalCursorRenderer.MoveTo(Avalonia.Rect)">
+            <summary>Notifies the renderer that the cursor target cell changed to <paramref name="cellRect"/>.</summary>
+            <param name="cellRect">The cursor cell rectangle in control coordinates (padding included).</param>
+        </member>
+        <member name="M:VirtualTerminal.Rendering.TerminalCursorRenderer.Render(Avalonia.Media.DrawingContext)">
+            <summary>Draws the cursor into <paramref name="context"/> for the current state.</summary>
+            <param name="context">The drawing context, in un-transformed control coordinates.</param>
+        </member>
         <member name="T:VirtualTerminal.Rendering.TerminalRenderer">
             <summary>
             Paints terminal rows using <see cref="T:Avalonia.Media.GlyphRun"/>: coalesces same-style cells into runs,
@@ -250,10 +356,6 @@
         <member name="M:VirtualTerminal.Rendering.TerminalRenderer.Dispose">
             <summary>Releases the glyph cache and rendering resources.</summary>
         </member>
-        <member name="M:VirtualTerminal.Rendering.TerminalRenderer.RenderCursor(Avalonia.Media.DrawingContext,System.Int32,VirtualTerminal.Buffer.CursorShape)">
-            <summary>Renders the cursor shape at column <paramref name="col"/> (row-local y=0). The caller
-            decides visibility by clearing the cursor group when the cursor should be hidden.</summary>
-        </member>
         <member name="M:VirtualTerminal.Rendering.TerminalRenderer.RenderRow(Avalonia.Media.DrawingContext,System.Span{VirtualTerminal.Model.TerminalCellInfo},System.Nullable{VirtualTerminal.Rendering.TerminalSelection},System.Int32)">
             <summary>Renders a single row into <paramref name="drawingContext"/> (local origin = row top-left).</summary>
         </member>
@@ -289,11 +391,18 @@
             <summary>Gets or sets the terminal font family name.</summary>
         </member>
         <member name="P:VirtualTerminal.TerminalControl.CursorVisible">
-            <summary>Gets or sets a value indicating whether the cursor is visible.</summary>
+            <summary>
+            Gets or sets a value indicating whether the cursor is visible.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.TerminalControl.CursorRenderer">
+            <summary>
+            Gets or sets the renderer that draws the terminal cursor. Swap this to customize the
+            cursor visual or animate its movement; defaults to <see cref="T:VirtualTerminal.Cursors.DefaultTerminalCursorRenderer"/>.
+            </summary>
         </member>
         <member name="P:VirtualTerminal.TerminalControl.AllowDirectInput">
-            <summary>
-            Gets or sets a value indicating whether keyboard input is forwarded directly to the session.
+            <summary>Gets or sets a value indicating whether keyboard input is forwarded directly to the session.
             When <c>false</c>, key presses and text input are not sent to <see cref="P:VirtualTerminal.TerminalControl.CurrentSession"/>.
             </summary>
         </member>
@@ -302,12 +411,6 @@
             Gets or sets a value indicating whether the floating "scroll to bottom" indicator is shown
             when the viewport is scrolled back into history.
             </summary>
-        </member>
-        <member name="P:VirtualTerminal.TerminalControl.CursorShape">
-            <summary>Gets or sets the shape of the cursor.</summary>
-        </member>
-        <member name="P:VirtualTerminal.TerminalControl.CursorColor">
-            <summary>Gets or sets the cursor color.</summary>
         </member>
         <member name="P:VirtualTerminal.TerminalControl.ScrollbackLines">
             <summary>Gets or sets the maximum number of scrollback lines retained.</summary>
@@ -337,7 +440,7 @@
             <summary>Clears the terminal screen and scrollback.</summary>
         </member>
         <member name="M:VirtualTerminal.TerminalControl.#ctor">
-            <summary>Initializes a new instance of the <see cref="T:VirtualTerminal.TerminalControl"/> class and creates render, blink, and resize timers.</summary>
+            <summary>Initializes a new instance of the <see cref="T:VirtualTerminal.TerminalControl"/> class and creates render and resize timers.</summary>
         </member>
         <member name="M:VirtualTerminal.TerminalControl.OnCreateAutomationPeer">
             <inheritdoc/>
@@ -449,12 +552,6 @@
         </member>
         <member name="F:VirtualTerminal.TerminalControl.TerminalFontFamilyProperty">
             <summary>Defines the <see cref="P:VirtualTerminal.TerminalControl.TerminalFontFamily"/> styled property.</summary>
-        </member>
-        <member name="F:VirtualTerminal.TerminalControl.CursorShapeProperty">
-            <summary>Defines the <see cref="P:VirtualTerminal.TerminalControl.CursorShape"/> styled property.</summary>
-        </member>
-        <member name="F:VirtualTerminal.TerminalControl.CursorColorProperty">
-            <summary>Defines the <see cref="P:VirtualTerminal.TerminalControl.CursorColor"/> styled property.</summary>
         </member>
         <member name="F:VirtualTerminal.TerminalControl.ScrollbackLinesProperty">
             <summary>Defines the <see cref="P:VirtualTerminal.TerminalControl.ScrollbackLines"/> styled property.</summary>

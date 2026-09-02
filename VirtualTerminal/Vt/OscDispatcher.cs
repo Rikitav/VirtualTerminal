@@ -52,7 +52,7 @@ internal static class OscDispatcher
 
             case 10:
             case 11:
-            case 12: // default fg / bg / cursor
+            case 12: // default fg / bg / cursor (cursor color is a renderer concern; accepted but ignored)
                 {
                     string spec = DecodeUtf8(rest);
                     if (spec == "?")
@@ -62,7 +62,6 @@ internal static class OscDispatcher
                         break;
                     if (command == 10) d.Options.DefaultForeground = col.Value;
                     else if (command == 11) d.Options.DefaultBackground = col.Value;
-                    else d.Options.DefaultCursorColor = col.Value;
                     break;
                 }
 

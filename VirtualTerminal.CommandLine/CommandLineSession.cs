@@ -51,10 +51,13 @@ public sealed class CommandLineSession : TerminalSession
         Title = Path.GetFileNameWithoutExtension(application).ToLower();
 
         readLoopToken = new CancellationTokenSource();
+        string? directory = Path.GetDirectoryName(application);
         pseudoConsole = PseudoConsoleFactory.Start(Buffer, new ProcessCreationInfo()
         {
             CommandLine = application,
-            CurrentDirectory = Path.GetDirectoryName(application)
+            // An empty string is not a valid cwd for CreateProcess (ERROR_INVALID_FILENAME);
+            // pass null so the child inherits the parent's working directory.
+            CurrentDirectory = string.IsNullOrEmpty(directory) ? null : directory
         });
 
         _ = Task.Factory.StartNew(ReadOutputLoop, TaskCreationOptions.LongRunning);

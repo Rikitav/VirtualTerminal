@@ -335,12 +335,9 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         char fc = (char)final;
         try
         {
-            // DECSCUSR: CSI Ps SP q
+            // DECSCUSR: CSI Ps SP q — cursor style is a renderer concern; parse and ignore.
             if (fc == 'q' && intermediates.Length == 1 && intermediates[0] == ' ')
-            {
-                SetCursorShape(parameters.At(0, 0));
                 return;
-            }
 
             // DECRQSS: CSI ? Ps $ p
             if (fc == 'p' && intermediates.Length == 1 && intermediates[0] == '$' && privateMarker == '?')
@@ -831,46 +828,6 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         }
     }
 
-    private void SetCursorShape(int code)
-    {
-        switch (code)
-        {
-            case 0:
-            case 1:
-                State.Modes.CursorShape = CursorShape.Block;
-                State.Modes.CursorBlinking = true;
-                break;
-
-            case 2:
-                State.Modes.CursorShape = CursorShape.Block;
-                State.Modes.CursorBlinking = false;
-                break;
-
-            case 3:
-                State.Modes.CursorShape = CursorShape.Underline;
-                State.Modes.CursorBlinking = true;
-                break;
-
-            case 4:
-                State.Modes.CursorShape = CursorShape.Underline;
-                State.Modes.CursorBlinking = false;
-                break;
-
-            case 5:
-                State.Modes.CursorShape = CursorShape.Bar;
-                State.Modes.CursorBlinking = true;
-                break;
-
-            case 6:
-                State.Modes.CursorShape = CursorShape.Bar;
-                State.Modes.CursorBlinking = false;
-                break;
-
-            default:
-                break;
-        }
-    }
-
     private void SetScrollRegion(int top, int bottom)
     {
         if (top == 1 && bottom == Buffer.Rows)
@@ -923,17 +880,6 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         {
             case 1: // SGR
                 Respond($"\x1bP1$r{EncodeSgr()}\x1b\\");
-                break;
-
-            case 12: // DECSCUSR (cursor style)
-                int code = State.Modes.CursorShape switch
-                {
-                    CursorShape.Block => State.Modes.CursorBlinking ? 1 : 2,
-                    CursorShape.Underline => State.Modes.CursorBlinking ? 3 : 4,
-                    CursorShape.Bar => State.Modes.CursorBlinking ? 5 : 6,
-                    _ => 1,
-                };
-                Respond($"\x1bP1$r{code} q\x1b\\");
                 break;
 
             default:

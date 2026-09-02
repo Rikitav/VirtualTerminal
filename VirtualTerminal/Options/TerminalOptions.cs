@@ -19,18 +19,6 @@ public sealed class TerminalOptions
     /// <summary>Default background color used when no SGR background is active.</summary>
     public TerminalColor DefaultBackground { get; set; } = TerminalColor.Black;
 
-    /// <summary>Default cursor color.</summary>
-    public TerminalColor DefaultCursorColor { get; set; } = TerminalColor.White;
-
-    /// <summary>Cursor shape (also settable via DECSCUSR).</summary>
-    public CursorShape CursorShape { get; set; } = CursorShape.Block;
-
-    /// <summary>Whether the cursor blinks by default.</summary>
-    public bool CursorBlink { get; set; } = true;
-
-    /// <summary>Cursor blink interval in milliseconds.</summary>
-    public int CursorBlinkIntervalMs { get; set; } = 530;
-
     /// <summary>Maximum scrollback lines retained in the ring buffer.</summary>
     public int ScrollbackMaxLines { get; set; } = 10000;
 
@@ -56,10 +44,6 @@ public sealed class TerminalOptions
         Palette = Palette,
         DefaultForeground = DefaultForeground,
         DefaultBackground = DefaultBackground,
-        DefaultCursorColor = DefaultCursorColor,
-        CursorShape = CursorShape,
-        CursorBlink = CursorBlink,
-        CursorBlinkIntervalMs = CursorBlinkIntervalMs,
         ScrollbackMaxLines = ScrollbackMaxLines,
         LineHeight = LineHeight,
         FontFallback = FontFallback,

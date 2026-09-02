@@ -11,6 +11,7 @@ using System.Text;
 using System.Windows.Input;
 using VirtualTerminal.Automation;
 using VirtualTerminal.Buffer;
+using VirtualTerminal.Cursors;
 using VirtualTerminal.Extensions;
 using VirtualTerminal.Helpers;
 using VirtualTerminal.Input;
@@ -33,13 +34,14 @@ public class TerminalControl : TemplatedControl, IDisposable
 {
     private readonly TerminalRenderer _renderer = new TerminalRenderer();
     private readonly TerminalOptions _options = new TerminalOptions();
+    private TerminalCursorRenderer _cursorRenderer = new DefaultTerminalCursorRenderer();
 
     private readonly DispatcherTimer _renderTimer;
-    private readonly DispatcherTimer _blinkTimer;
     private readonly DispatcherTimer _resizeTimer;
 
     private TerminalDecoder? _decoder;
-    private bool _cursorBlinkState = true;
+    private int _lastCursorX = -1;
+    private int _lastCursorY = -1;
     private bool _rendererConfigured;
 
     // Text selection (mouse drag).
@@ -116,7 +118,29 @@ public class TerminalControl : TemplatedControl, IDisposable
     }
 
     /// <summary>
-    /// Gets or sets a value indicating whether keyboard input is forwarded directly to the session.
+    /// Gets or sets the renderer that draws the terminal cursor. Swap this to customize the
+    /// cursor visual or animate its movement; defaults to <see cref="DefaultTerminalCursorRenderer"/>.
+    /// </summary>
+    public TerminalCursorRenderer CursorRenderer
+    {
+        get => _cursorRenderer;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            if (ReferenceEquals(_cursorRenderer, value))
+                return;
+
+            bool attached = _cursorRenderer.TerminalControl is not null;
+            _cursorRenderer.Detach();
+            _cursorRenderer = value;
+            if (attached)
+                _cursorRenderer.Attach(this);
+
+            InvalidateVisual();
+        }
+    }
+
+    /// <summary>Gets or sets a value indicating whether keyboard input is forwarded directly to the session.
     /// When <c>false</c>, key presses and text input are not sent to <see cref="CurrentSession"/>.
     /// </summary>
     public bool AllowDirectInput
@@ -133,20 +157,6 @@ public class TerminalControl : TemplatedControl, IDisposable
     {
         get => GetValue(ScrollDownVisibleProperty);
         set => SetValue(ScrollDownVisibleProperty, value);
-    }
-
-    /// <summary>Gets or sets the shape of the cursor.</summary>
-    public CursorShape CursorShape
-    {
-        get => GetValue(CursorShapeProperty);
-        set => SetValue(CursorShapeProperty, value);
-    }
-
-    /// <summary>Gets or sets the cursor color.</summary>
-    public AvaloniaColor CursorColor
-    {
-        get => GetValue(CursorColorProperty);
-        set => SetValue(CursorColorProperty, value);
     }
 
     /// <summary>Gets or sets the maximum number of scrollback lines retained.</summary>
@@ -196,11 +206,10 @@ public class TerminalControl : TemplatedControl, IDisposable
         static c => c.Clear(),
         static c => c._decoder is not null);
 
-    /// <summary>Initializes a new instance of the <see cref="TerminalControl"/> class and creates render, blink, and resize timers.</summary>
+    /// <summary>Initializes a new instance of the <see cref="TerminalControl"/> class and creates render and resize timers.</summary>
     public TerminalControl()
     {
         _renderTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Background, Dispatcher.CurrentDispatcher, DispatcherRenderHandler);
-        _blinkTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(530), DispatcherPriority.Background, Dispatcher.CurrentDispatcher, DispatcherBlinkHandler);
         _resizeTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(150), DispatcherPriority.Background, Dispatcher.CurrentDispatcher, (s, e) => { _resizeTimer!.Stop(); ResizeSessionToBounds(); });
 
         Focusable = true;
@@ -283,8 +292,6 @@ public class TerminalControl : TemplatedControl, IDisposable
         if (change.Property == TerminalFontSizeProperty
             || change.Property == TerminalFontFamilyProperty
             || change.Property == LineHeightProperty
-            || change.Property == CursorColorProperty
-            || change.Property == CursorShapeProperty
             || change.Property == ScrollbackLinesProperty)
         {
             SyncOptionsToDecoder();
@@ -299,8 +306,6 @@ public class TerminalControl : TemplatedControl, IDisposable
 
     private void SyncOptionsToDecoder()
     {
-        _options.CursorShape = CursorShape;
-        _options.DefaultCursorColor = CursorColor.ToTerminalColor();
         _options.ScrollbackMaxLines = ScrollbackLines;
         _options.LineHeight = LineHeight;
         _options.DefaultForeground = Foreground is SolidColorBrush fb ? fb.Color.ToTerminalColor() : Color.White;
@@ -308,8 +313,6 @@ public class TerminalControl : TemplatedControl, IDisposable
 
         if (_decoder?.Buffer is { } buf)
             buf.SetScrollbackMax(_options.ScrollbackMaxLines);
-
-        _blinkTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(50, _options.CursorBlinkIntervalMs));
     }
 
     private void OnDecoderTitleChanged(object? sender, string title)
@@ -364,7 +367,7 @@ public class TerminalControl : TemplatedControl, IDisposable
         base.OnAttachedToVisualTree(e);
         ReconfigureRenderer();
         _renderTimer.Start();
-        _blinkTimer.Start();
+        _cursorRenderer.Attach(this);
     }
 
     /// <inheritdoc/>
@@ -372,7 +375,7 @@ public class TerminalControl : TemplatedControl, IDisposable
     {
         base.OnDetachedFromVisualTree(e);
         _renderTimer.Stop();
-        _blinkTimer.Stop();
+        _cursorRenderer.Detach();
     }
 
     private void ReconfigureRenderer()
@@ -480,7 +483,7 @@ public class TerminalControl : TemplatedControl, IDisposable
                 }
             }
 
-            RenderCursor(context);
+            RenderCursorVisual(context);
 
             for (int i = 0; i < buf.Rows; i++)
                 buf.MarkRowClean(i);
@@ -533,21 +536,7 @@ public class TerminalControl : TemplatedControl, IDisposable
             Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
     }
 
-    private void DispatcherBlinkHandler(object? sender, EventArgs e)
-    {
-        TerminalDecoder? dec = _decoder;
-        if (dec is null)
-            return;
-
-        bool shouldBlink = dec.State.Modes.CursorBlinking || _options.CursorBlink;
-        if (!shouldBlink || !IsFocused || !dec.State.Modes.CursorVisible || !CursorVisible)
-            return;
-
-        _cursorBlinkState = !_cursorBlinkState;
-        Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
-    }
-
-    private void RenderCursor(DrawingContext context)
+    private void RenderCursorVisual(DrawingContext context)
     {
         if (_decoder is null)
             return;
@@ -555,17 +544,25 @@ public class TerminalControl : TemplatedControl, IDisposable
         try
         {
             TerminalState state = _decoder.State;
-            if (!ShouldRenderCursor(state))
-                return;
-
             Size cell = _renderer.CellSize;
-            double x = Padding.Left + state.CursorX * cell.Width;
-            double y = Padding.Top + state.CursorY * cell.Height;
 
-            using (context.PushTransform(Matrix.CreateTranslation(x, y)))
+            if (state.CursorX != _lastCursorX || state.CursorY != _lastCursorY)
             {
-                _renderer.RenderCursor(context, 0, state.Modes.CursorShape);
+                _lastCursorX = state.CursorX;
+                _lastCursorY = state.CursorY;
+                _cursorRenderer.MoveTo(new Rect(
+                    Padding.Left + state.CursorX * cell.Width,
+                    Padding.Top + state.CursorY * cell.Height,
+                    cell.Width,
+                    cell.Height));
             }
+
+            _cursorRenderer.IsCursorVisible = IsFocused && _scrollOffset == 0
+                && state.Modes.CursorVisible && CursorVisible;
+
+            _cursorRenderer.CursorBlinkMode = state.Modes.CursorBlink;
+            _cursorRenderer.BackgroundColor = Background is SolidColorBrush scb ? scb.Color : Colors.Black;
+            _cursorRenderer.Render(context);
         }
         catch
         {
@@ -573,22 +570,14 @@ public class TerminalControl : TemplatedControl, IDisposable
         }
     }
 
-    private bool ShouldRenderCursor(TerminalState state)
-    {
-        bool shouldBlink = state.Modes.CursorBlinking || _options.CursorBlink;
-        return IsFocused && _scrollOffset == 0
-            && state.Modes.CursorVisible && CursorVisible
-            && (!shouldBlink || _cursorBlinkState);
-    }
-
     // ---- Focus ----
     /// <inheritdoc/>
     protected override void OnGotFocus(FocusChangedEventArgs e)
     {
         base.OnGotFocus(e);
-        _cursorBlinkState = true;
         if (_decoder?.State.Modes.FocusReporting == true)
             CurrentSession?.Append("\x1b[I");
+
         InvalidateVisual();
     }
 
@@ -598,6 +587,7 @@ public class TerminalControl : TemplatedControl, IDisposable
         base.OnLostFocus(e);
         if (_decoder?.State.Modes.FocusReporting == true)
             CurrentSession?.Append("\x1b[O");
+
         InvalidateVisual();
     }
 
@@ -1076,8 +1066,8 @@ public class TerminalControl : TemplatedControl, IDisposable
     public void Dispose()
     {
         _renderTimer.Stop();
-        _blinkTimer.Stop();
         _resizeTimer.Stop();
+        _cursorRenderer.Detach();
 
         if (CurrentSession is { } session)
             session.BufferUpdated -= OnSessionBufferUpdated;
@@ -1159,14 +1149,6 @@ public class TerminalControl : TemplatedControl, IDisposable
     /// <summary>Defines the <see cref="TerminalFontFamily"/> styled property.</summary>
     public static readonly StyledProperty<string> TerminalFontFamilyProperty =
         AvaloniaProperty.Register<TerminalControl, string>(nameof(TerminalFontFamily), "Cascadia Code");
-
-    /// <summary>Defines the <see cref="CursorShape"/> styled property.</summary>
-    public static readonly StyledProperty<CursorShape> CursorShapeProperty =
-        AvaloniaProperty.Register<TerminalControl, CursorShape>(nameof(CursorShape), CursorShape.Block);
-
-    /// <summary>Defines the <see cref="CursorColor"/> styled property.</summary>
-    public static readonly StyledProperty<AvaloniaColor> CursorColorProperty =
-        AvaloniaProperty.Register<TerminalControl, AvaloniaColor>(nameof(CursorColor), Colors.White);
 
     /// <summary>Defines the <see cref="ScrollbackLines"/> styled property.</summary>
     public static readonly StyledProperty<int> ScrollbackLinesProperty =
