@@ -9,6 +9,12 @@
             Avalonia application entry point for the test application.
             </summary>
         </member>
+        <member name="P:VirtualTerminal.AvaloniaTestApp.App.AutoStartCommand">
+            <summary>
+            Gets the command passed on the command line (via the first application argument) that should be
+            auto-started by the main window, or <see langword="null"/> when no auto-start command was given.
+            </summary>
+        </member>
         <member name="M:VirtualTerminal.AvaloniaTestApp.App.Initialize">
             <summary>
             Initializes the Avalonia application by loading XAML resources.

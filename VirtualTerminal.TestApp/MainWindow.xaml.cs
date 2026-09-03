@@ -13,7 +13,7 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         // Demo: animated cursor that glides between cells (cosine ease) instead of teleporting.
-        PART_Terminal_Left.CursorRenderer = new AnimatedTerminalCursorRenderer();
+        PART_Terminal_Left.CursorRenderer = new AnimatedTerminalCursorRenderer() { MaxGlideCells = 9999999 };
     }
 
     private void Button_Click_Start(object sender, RoutedEventArgs e)

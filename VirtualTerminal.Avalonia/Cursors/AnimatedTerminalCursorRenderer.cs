@@ -6,28 +6,43 @@ using VirtualTerminal.Rendering;
 namespace VirtualTerminal.Cursors;
 
 /// <summary>
-/// Cursor visual that glides from its previous cell to the new one. On <see cref="MoveTo"/> the
-/// bar is drawn at both the previous cell (A) and the target cell (B), connected by a transition
-/// quadrilateral; A then interpolates toward B with a cosine ease-in-out over
-/// <see cref="AnimationDuration"/>, so rapid cursor jumps read as a short smooth slide instead of
-/// a teleport. The cursor is drawn in the color inverse of <see cref="TerminalCursorRenderer.BackgroundColor"/>
+/// Cursor visual that glides from its previous cell to the new one. Near moves (typing, arrow
+/// keys) animate: the bar is drawn at both the previous cell (A) and the target cell (B),
+/// connected by a transition quadrilateral, and A interpolates toward B with a cosine ease-in-out
+/// over <see cref="AnimationDuration"/>. Far jumps (newline, prompt redraws, absolute cursor
+/// positioning) teleport, so the cursor never sweeps through transient positions. The cursor is
+/// drawn in the color inverse of <see cref="TerminalCursorRenderer.BackgroundColor"/>
 /// (difference-style; per-pixel invert blending is not available on <see cref="DrawingContext"/>).
 /// Steady (no blink); combine with a private blink timer if wanted — see
 /// <see cref="DefaultTerminalCursorRenderer"/>.
 /// </summary>
 public sealed class AnimatedTerminalCursorRenderer : TerminalCursorRenderer
 {
-    /// <summary>How long the glide from A to B takes.</summary>
-    public static readonly TimeSpan AnimationDuration = TimeSpan.FromMilliseconds(120);
-
-    private static readonly TimeSpan FrameInterval = TimeSpan.FromMilliseconds(16);
-
     private readonly DispatcherTimer _timer;
+
     private Rect _start;          // A: where the glide started (or current position while chaining)
     private Rect _target;         // B: destination cell
     private DateTime _animationStartUtc;
     private bool _hasTarget;
     private bool _animating;
+
+    /// <summary>
+    /// How long the glide from A to B takes.
+    /// </summary>
+    public TimeSpan AnimationDuration { get; set; } = TimeSpan.FromMilliseconds(120);
+
+    /// <summary>
+    /// How often does timer kicks the renderer.
+    /// </summary>
+    public TimeSpan FrameInterval { get; set; } = TimeSpan.FromMilliseconds(32);
+
+    /// <summary>
+    /// Maximum cell distance that still glides. Moves farther than this (in cells, Manhattan
+    /// metric) teleport instead: newline + prompt redraws arrive as separate decode chunks and
+    /// would otherwise make the cursor sweep through transient positions (line start) on its way
+    /// to the new prompt end. Typing stays a stream of small glides. No timer involved.
+    /// </summary>
+    public double MaxGlideCells { get; set; } = -1;
 
     // Inverse-of-background brush, rebuilt only when the reported background changes.
     private Color _brushSource;
@@ -63,6 +78,24 @@ public sealed class AnimatedTerminalCursorRenderer : TerminalCursorRenderer
             _start = _target = cellRect;
             _hasTarget = true;
             return;
+        }
+
+        if (MaxGlideCells > 0)
+        {
+            // Far jump (newline, prompt redraw, absolute cursor positioning): teleport straight to
+            // the destination instead of sweeping through transient intermediate positions.
+            double cellW = _target.Width;
+            double cellH = _target.Height;
+            double dxCells = cellW > 0 ? Math.Abs(cellRect.X - _target.X) / cellW : double.MaxValue;
+            double dyCells = cellH > 0 ? Math.Abs(cellRect.Y - _target.Y) / cellH : double.MaxValue;
+            if (dxCells + dyCells > MaxGlideCells)
+            {
+                _timer.Stop();
+                _start = _target = cellRect;
+                _animating = false;
+                TerminalControl?.InvalidateVisual();
+                return;
+            }
         }
 
         // Chained move mid-glide: start the new animation from the current interpolated

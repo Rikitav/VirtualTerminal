@@ -18,6 +18,14 @@ public partial class MainWindow : Window
 
         // Demo: animated cursor that glides between cells (cosine ease) instead of teleporting.
         PART_Terminal_Left.CursorRenderer = new AnimatedTerminalCursorRenderer();
+
+        // Test harness hook: a command passed on the command line pre-fills the command box and auto-starts the session.
+        string? autoCmd = App.AutoStartCommand;
+        if (!string.IsNullOrEmpty(autoCmd))
+        {
+            PART_CommandLineName.Text = autoCmd;
+            Button_Click_Start(this, new RoutedEventArgs());
+        }
     }
 
     private void Button_Click_Start(object? sender, RoutedEventArgs e)

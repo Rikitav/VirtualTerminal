@@ -12,6 +12,12 @@ namespace VirtualTerminal.AvaloniaTestApp;
 public partial class App : Application
 {
     /// <summary>
+    /// Gets the command passed on the command line (via the first application argument) that should be
+    /// auto-started by the main window, or <see langword="null"/> when no auto-start command was given.
+    /// </summary>
+    public static string? AutoStartCommand { get; private set; }
+
+    /// <summary>
     /// Initializes the Avalonia application by loading XAML resources.
     /// </summary>
     public override void Initialize()
@@ -30,6 +36,9 @@ public partial class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            if (desktop.Args is { Length: > 0 } args && !string.IsNullOrEmpty(args[0]))
+                AutoStartCommand = args[0];
+
             desktop.MainWindow = new MainWindow();
         }
 

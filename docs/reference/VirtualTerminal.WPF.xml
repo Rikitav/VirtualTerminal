@@ -72,18 +72,34 @@
         </member>
         <member name="T:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer">
             <summary>
-            Cursor visual that glides from its previous cell to the new one. On <see cref="M:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer.MoveTo(System.Windows.Rect)"/> the
-            bar is drawn at both the previous cell (A) and the target cell (B), connected by a transition
-            quadrilateral; A then interpolates toward B with a cosine ease-in-out over
-            <see cref="F:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer.AnimationDuration"/>, so rapid cursor jumps read as a short smooth slide instead of
-            a teleport. The cursor is drawn in the color inverse of <see cref="P:VirtualTerminal.Rendering.TerminalCursorRenderer.BackgroundColor"/>
+            Cursor visual that glides from its previous cell to the new one. Near moves (typing, arrow
+            keys) animate: the bar is drawn at both the previous cell (A) and the target cell (B),
+            connected by a transition quadrilateral, and A interpolates toward B with a cosine ease-in-out
+            over <see cref="P:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer.AnimationDuration"/>. Far jumps (newline, prompt redraws, absolute cursor
+            positioning) teleport, so the cursor never sweeps through transient positions. The cursor is
+            drawn in the color inverse of <see cref="P:VirtualTerminal.Rendering.TerminalCursorRenderer.BackgroundColor"/>
             (difference-style; per-pixel invert blending is not available on <see cref="T:System.Windows.Media.DrawingContext"/>).
             Steady (no blink); combine with a private blink timer if wanted — see
             <see cref="T:VirtualTerminal.Cursors.DefaultTerminalCursorRenderer"/>.
             </summary>
         </member>
-        <member name="F:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer.AnimationDuration">
-            <summary>How long the glide from A to B takes.</summary>
+        <member name="P:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer.AnimationDuration">
+            <summary>
+            How long the glide from A to B takes.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer.FrameInterval">
+            <summary>
+            How often does timer kicks the renderer.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer.MaxGlideCells">
+            <summary>
+            Maximum cell distance that still glides. Moves farther than this (in cells, Manhattan
+            metric) teleport instead: newline + prompt redraws arrive as separate decode chunks and
+            would otherwise make the cursor sweep through transient positions (line start) on its way
+            to the new prompt end. Typing stays a stream of small glides. No timer involved.
+            </summary>
         </member>
         <member name="M:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer.#ctor">
             <summary>Initializes a new instance of the <see cref="T:VirtualTerminal.Cursors.AnimatedTerminalCursorRenderer"/> class.</summary>

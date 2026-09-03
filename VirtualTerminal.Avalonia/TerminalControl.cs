@@ -257,14 +257,20 @@ public class TerminalControl : TemplatedControl, IDisposable
             {
                 oldSession.BufferUpdated -= OnSessionBufferUpdated;
 
-                if (oldSession.Decoder is TerminalDecoder oldDec)
+                try
                 {
-                    oldDec.TitleChanged -= OnDecoderTitleChanged;
-                    oldDec.Bell -= OnDecoderBell;
-                    oldDec.NotificationReceived -= OnDecoderNotification;
-                    oldDec.ShellIntegrationMark -= OnDecoderShellIntegrationMark;
-                    oldDec.Iterm2Annotation -= OnDecoderIterm2Annotation;
-                    oldDec.ClipboardRequested -= OnDecoderClipboardRequested;
+                    if (oldSession.Decoder is TerminalDecoder oldDec)
+                    {
+                        oldDec.TitleChanged -= OnDecoderTitleChanged;
+                        oldDec.Bell -= OnDecoderBell;
+                        oldDec.NotificationReceived -= OnDecoderNotification;
+                        oldDec.ShellIntegrationMark -= OnDecoderShellIntegrationMark;
+                        oldDec.Iterm2Annotation -= OnDecoderIterm2Annotation;
+                        oldDec.ClipboardRequested -= OnDecoderClipboardRequested;
+                    }
+                }
+                catch (ObjectDisposedException)
+                {
                 }
             }
 
