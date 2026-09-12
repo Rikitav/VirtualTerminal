@@ -1782,12 +1782,21 @@
             <summary>Leaves the alternate screen buffer and shows the cursor again.</summary>
         </member>
         <member name="T:VirtualTerminal.TerminalDecoder">
-            <summary>
-            The terminal state machine's handler: receives parsed VT/ANSI events from <see cref="T:VirtualTerminal.Vt.VtDecoder"/>
-            and applies them to the <see cref="T:VirtualTerminal.Buffer.TerminalScreenBuffer"/> and <see cref="T:VirtualTerminal.Buffer.TerminalState"/>.
-            Implements <see cref="T:VirtualTerminal.Interfaces.ITerminalDecoder"/> for the session layer and keeps the historical class
-            name so existing casts (<c>is TerminalDecoder</c>) keep working.
-            </summary>
+             <summary>
+             The terminal state machine's handler: receives parsed VT/ANSI events from <see cref="T:VirtualTerminal.Vt.VtDecoder"/>
+             and applies them to the <see cref="T:VirtualTerminal.Buffer.TerminalScreenBuffer"/> and <see cref="T:VirtualTerminal.Buffer.TerminalState"/>.
+             Implements <see cref="T:VirtualTerminal.Interfaces.ITerminalDecoder"/> for the session layer and keeps the historical class
+             name so existing casts (<c>is TerminalDecoder</c>) keep working.
+            
+             <para>
+             Cursor debounce: CR/LF bytes that end a <see cref="M:VirtualTerminal.TerminalDecoder.Write(System.ReadOnlySpan{System.Byte})"/> chunk are not applied to
+             <see cref="P:VirtualTerminal.TerminalDecoder.State"/> immediately. They are parked internally and applied only when any further
+             bytes arrive, so consumers rendering after each write never observe the transient cursor
+             position at the start of a fresh line before the bytes following the newline have been
+             processed. Any non-newline event (text, escape/CSI/OSC/DCS sequences, BEL/BS/TAB, resize)
+             flushes the parked bytes first.
+             </para>
+             </summary>
         </member>
         <member name="P:VirtualTerminal.TerminalDecoder.Buffer">
             <summary>Gets the terminal screen buffer being modified by this decoder.</summary>
@@ -1854,8 +1863,17 @@
         <member name="M:VirtualTerminal.TerminalDecoder.Print(System.Text.Rune)">
             <inheritdoc/>
         </member>
+        <member name="M:VirtualTerminal.TerminalDecoder.Print(System.ReadOnlySpan{System.Text.Rune})">
+            <inheritdoc/>
+        </member>
         <member name="M:VirtualTerminal.TerminalDecoder.Execute(System.Byte)">
             <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.TerminalDecoder.FlushPendingNewline">
+            <summary>
+            Applies parked trailing CR/LF bytes, if any. See the note on <see cref="M:VirtualTerminal.TerminalDecoder.Execute(System.Byte)"/> for
+            why newline bytes are held back until further input arrives.
+            </summary>
         </member>
         <member name="M:VirtualTerminal.TerminalDecoder.EscDispatch(System.Byte,System.ReadOnlySpan{System.Byte})">
             <inheritdoc/>
@@ -1925,6 +1943,13 @@
         </member>
         <member name="M:VirtualTerminal.Vt.IVtHandler.Print(System.Text.Rune)">
             <summary>A printable codepoint was received.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Vt.IVtHandler.Print(System.ReadOnlySpan{System.Text.Rune})">
+            <summary>
+            A run of printable codepoints was received. Implementations should override this to process
+            the whole run in one pass; the default falls back to per-rune dispatch. The span is only
+            valid for the duration of the call.
+            </summary>
         </member>
         <member name="M:VirtualTerminal.Vt.IVtHandler.Execute(System.Byte)">
             <summary>A C0 control character (0x00–0x1F) was received in an executable context.</summary>
@@ -2016,6 +2041,20 @@
         </member>
         <member name="M:VirtualTerminal.Vt.VtDecoder.Write(System.ReadOnlySpan{System.Byte})">
             <summary>Feeds a raw byte stream through the state machine.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Vt.VtDecoder.ProcessPrintRun(System.ReadOnlySpan{System.Byte})">
+            <summary>
+            Handles a run of printable bytes seen in Ground state: appends them to the UTF-8 carry
+            buffer, decodes every complete rune in a single pass, and dispatches them as one batched
+            <see cref="M:VirtualTerminal.Vt.IVtHandler.Print(System.ReadOnlySpan{System.Text.Rune})"/> call.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Vt.VtDecoder.DecodeUtf8ToHandler(System.Boolean)">
+            <summary>
+            Decodes the UTF-8 carry buffer once and hands all complete runes to the handler as a single
+            batched span. With <paramref name="flush"/>, any truncated trailing sequence is decoded too;
+            otherwise it stays in the buffer for the next chunk.
+            </summary>
         </member>
         <member name="M:VirtualTerminal.Vt.VtDecoder.Reset">
             <summary>Resets the parser to <see cref="F:VirtualTerminal.Vt.VtDecoder.State.Ground"/> and discards any in-flight sequence.</summary>

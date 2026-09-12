@@ -285,8 +285,11 @@ public class SessionKeyboardIntegrationTests
         string? seq = Encode(TerminalKey.Enter, TerminalModifier.None);
 
         session.Write(Encoding.UTF8.GetBytes(seq!));
+        // A trailing newline is debounced until further bytes arrive; any subsequent output
+        // applies it (here the space lands at the start of the next line).
+        session.Write(" "u8);
 
-        Assert.Equal(0, StateOf(session).CursorX);
+        Assert.Equal(1, StateOf(session).CursorX);
         Assert.Equal(1, StateOf(session).CursorY);
     }
 

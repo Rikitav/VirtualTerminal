@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using VirtualTerminal.Buffer;
 using VirtualTerminal.Enums;
@@ -16,11 +17,26 @@ namespace VirtualTerminal;
 /// and applies them to the <see cref="TerminalScreenBuffer"/> and <see cref="TerminalState"/>.
 /// Implements <see cref="ITerminalDecoder"/> for the session layer and keeps the historical class
 /// name so existing casts (<c>is TerminalDecoder</c>) keep working.
+///
+/// <para>
+/// Cursor debounce: CR/LF bytes that end a <see cref="Write"/> chunk are not applied to
+/// <see cref="State"/> immediately. They are parked internally and applied only when any further
+/// bytes arrive, so consumers rendering after each write never observe the transient cursor
+/// position at the start of a fresh line before the bytes following the newline have been
+/// processed. Any non-newline event (text, escape/CSI/OSC/DCS sequences, BEL/BS/TAB, resize)
+/// flushes the parked bytes first.
+/// </para>
 /// </summary>
 public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
 {
     private readonly VtDecoder _parser;
     private readonly List<string> _hyperlinks = [];
+
+    // Trailing-newline debounce: CR/LF bytes that end a Write chunk are parked here and only
+    // applied when further bytes arrive, so the UI never renders the transient cursor position
+    // at the start of a fresh line before the bytes following the newline land.
+    private bool _pendingReturn;
+    private int _pendingLineFeeds;
 
     /// <summary>Gets the terminal screen buffer being modified by this decoder.</summary>
     public TerminalScreenBuffer Buffer { get; }
@@ -96,7 +112,10 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     public void Resize(ushort columns, ushort rows, bool pushScrollback)
     {
         lock (Buffer.SyncRoot)
+        {
+            FlushPendingNewline();
             Buffer.Resize(columns, rows, State, pushScrollback);
+        }
     }
 
     /// <summary>Releases the underlying VT parser resources.</summary>
@@ -180,79 +199,99 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     /// <inheritdoc/>
     public void Print(Rune rune)
     {
+        Rune single = rune;
+        Print(MemoryMarshal.CreateReadOnlySpan(in single, 1));
+    }
+
+    /// <inheritdoc/>
+    public void Print(scoped ReadOnlySpan<Rune> runes)
+    {
+        if (runes.IsEmpty)
+            return;
+
         try
         {
-            int width = Wcwidth.Of(rune);
-            if (width < 0)
-                return;  // non-printable; should not reach here
-
-            if (width == 0)
-                width = 1;  // combining mark: Phase 1 treats as width-1
+            FlushPendingNewline();
 
             int cols = Buffer.Columns;
+            CellRenderStyle style = State.Attributes.ToCellStyle(Options.Palette, Options.BoldAsBright);
+            bool insertMode = State.Modes.InsertMode;
+            int lastDirtyRow = -1;
 
-            // Deferred wrap from a previous print that ended on the last column.
-            if (State.WrapPending)
+            foreach (Rune rune in runes)
             {
-                State.CursorX = 0;
-                Index();
-                State.WrapPending = false;
-            }
+                int width = Wcwidth.Of(rune);
+                if (width < 0)
+                    continue;  // non-printable; should not reach here
 
-            int cx = State.CursorX;
-            int cy = State.CursorY;
+                if (width == 0)
+                    width = 1;  // combining mark: Phase 1 treats as width-1
 
-            // A wide glyph that does not fit wraps first (when autowrap is on).
-            if (cx + width > cols)
-            {
-                if (State.Modes.AutoWrap && width <= cols)
+                // Deferred wrap from a previous print that ended on the last column.
+                if (State.WrapPending)
                 {
                     State.CursorX = 0;
                     Index();
-                    cx = 0;
-                    cy = State.CursorY;
+                    State.WrapPending = false;
+                }
+
+                int cx = State.CursorX;
+                int cy = State.CursorY;
+
+                // A wide glyph that does not fit wraps first (when autowrap is on).
+                if (cx + width > cols)
+                {
+                    if (State.Modes.AutoWrap && width <= cols)
+                    {
+                        State.CursorX = 0;
+                        Index();
+                        cx = 0;
+                        cy = State.CursorY;
+                    }
+                    else
+                    {
+                        width = Math.Max(1, cols - cx);
+                    }
+                }
+
+                if (insertMode)
+                    Buffer.InsertChars(cy, cx, width);
+
+                ref TerminalCellInfo cell = ref Buffer.GetCell(cy, cx);
+                CellStyleFlags flags = style.Flags;
+                if (width == 2)
+                    flags |= CellStyleFlags.Wide;
+
+                cell = new TerminalCellInfo(rune, style with { Flags = flags });
+
+                if (width == 2 && cx + 1 < cols)
+                {
+                    ref TerminalCellInfo cont = ref Buffer.GetCell(cy, cx + 1);
+                    cont = new TerminalCellInfo(new Rune(' '), style with { Flags = style.Flags | CellStyleFlags.Continuation });
+                }
+
+                if (cy != lastDirtyRow)
+                {
+                    Buffer.MarkRowDirty(cy);
+                    lastDirtyRow = cy;
+                }
+
+                // Advance cursor: stay on the last column and arm pending-wrap when autowrap is on.
+                if (cx + width < cols)
+                {
+                    State.CursorX = cx + width;
+                    State.WrapPending = false;
                 }
                 else
                 {
-                    width = Math.Max(1, cols - cx);
+                    State.CursorX = cols - 1;
+                    State.WrapPending = State.Modes.AutoWrap;
                 }
-            }
-
-            CellRenderStyle style = State.Attributes.ToCellStyle(Options.Palette, Options.BoldAsBright);
-
-            if (State.Modes.InsertMode)
-                Buffer.InsertChars(cy, cx, width);
-
-            ref TerminalCellInfo cell = ref Buffer.GetCell(cy, cx);
-            CellStyleFlags flags = style.Flags;
-            if (width == 2)
-                flags |= CellStyleFlags.Wide;
-
-            cell = new TerminalCellInfo(rune, style with { Flags = flags });
-
-            if (width == 2 && cx + 1 < cols)
-            {
-                ref TerminalCellInfo cont = ref Buffer.GetCell(cy, cx + 1);
-                cont = new TerminalCellInfo(new Rune(' '), style with { Flags = style.Flags | CellStyleFlags.Continuation });
-            }
-
-            Buffer.MarkRowDirty(cy);
-
-            // Advance cursor: stay on the last column and arm pending-wrap when autowrap is on.
-            if (cx + width < cols)
-            {
-                State.CursorX = cx + width;
-                State.WrapPending = false;
-            }
-            else
-            {
-                State.CursorX = cols - 1;
-                State.WrapPending = State.Modes.AutoWrap;
             }
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"TerminalDecoder.Print failed for rune {rune.Value}.\n{ex}");
+            Debug.WriteLine($"TerminalDecoder.Print failed for a run of {runes.Length} runes.\n{ex}");
         }
     }
 
@@ -261,31 +300,59 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     {
         switch (control)
         {
-            case 0x07:
-                RaiseBell();
-                break;
-            case 0x08:
-                CursorLeft();
-                break;
-            case 0x09:
-                Tab();
-                break;
             case 0x0A:
             case 0x0B:
             case 0x0C:
-                LineFeed();
+                // Trailing-newline debounce: park the line feed; FlushPendingNewline applies it
+                // when any further bytes arrive.
+                _pendingLineFeeds++;
                 break;
             case 0x0D:
-                CarriageReturn();
+                _pendingReturn = true;
+                break;
+            case 0x07:
+                FlushPendingNewline();
+                RaiseBell();
+                break;
+            case 0x08:
+                FlushPendingNewline();
+                CursorLeft();
+                break;
+            case 0x09:
+                FlushPendingNewline();
+                Tab();
                 break;
             default:
                 break;  // other C0 ignored
         }
     }
 
+    /// <summary>
+    /// Applies parked trailing CR/LF bytes, if any. See the note on <see cref="Execute"/> for
+    /// why newline bytes are held back until further input arrives.
+    /// </summary>
+    private void FlushPendingNewline()
+    {
+        if (!_pendingReturn && _pendingLineFeeds == 0)
+            return;
+
+        bool cr = _pendingReturn;
+        int lfs = _pendingLineFeeds;
+        _pendingReturn = false;
+        _pendingLineFeeds = 0;
+
+        if (cr)
+            CarriageReturn();
+
+        for (int i = 0; i < lfs; i++)
+            LineFeed();
+    }
+
     /// <inheritdoc/>
     public void EscDispatch(byte final, ReadOnlySpan<byte> intermediates)
     {
+        FlushPendingNewline();
+
         switch ((char)final)
         {
             case '7':
@@ -332,6 +399,8 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     /// <inheritdoc/>
     public void CsiDispatch(byte final, ReadOnlySpan<byte> intermediates, in CsiParams parameters, char privateMarker)
     {
+        FlushPendingNewline();
+
         char fc = (char)final;
         try
         {
@@ -475,11 +544,16 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     }
 
     /// <inheritdoc/>
-    public void OscDispatch(ReadOnlySpan<byte> data) => OscDispatcher.ProcessOsc(this, data);
+    public void OscDispatch(ReadOnlySpan<byte> data)
+    {
+        FlushPendingNewline();
+        OscDispatcher.ProcessOsc(this, data);
+    }
 
     /// <inheritdoc/>
     public void DcsHook(byte final, ReadOnlySpan<byte> intermediates, in CsiParams parameters, char privateMarker)
     {
+        FlushPendingNewline();
         // Phase 1: DCS payload is consumed by the parser but not interpreted (Sixel/DECRQSS = Phase 3).
     }
 
@@ -491,11 +565,13 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     /// <inheritdoc/>
     public void DcsUnhook()
     {
+        FlushPendingNewline();
     }
 
     /// <inheritdoc/>
     public void SosPmApcDispatch(byte kind, ReadOnlySpan<byte> data)
     {
+        FlushPendingNewline();
     }
 
     // ============== Movement primitives ==============
@@ -893,6 +969,10 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
 
     private void FullReset()
     {
+        // A full reset repositions the cursor anyway: discard any parked newline instead of applying it.
+        _pendingReturn = false;
+        _pendingLineFeeds = 0;
+
         Buffer.ClearAll();
         Buffer.ResetScrollRegion();
         State.Attributes = CharAttributes.Default;

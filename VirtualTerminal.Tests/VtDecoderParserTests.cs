@@ -253,9 +253,25 @@ public class VtDecoderParserTests
         Assert.Equal('A', handler.Prints[0].Value);
     }
 
+    [Fact]
+    public void Print_BatchesTextRunsBetweenControls()
+    {
+        using VtDecoder decoder = CreateDecoder(out CollectingHandler handler);
+
+        decoder.Write(Bytes("hello\x07world"));
+
+        Assert.Equal(2, handler.PrintRuns.Count);
+        Assert.Equal("hello", handler.PrintRuns[0]);
+        Assert.Equal("world", handler.PrintRuns[1]);
+        Assert.Equal('h', handler.Prints[0].Value);
+        Assert.Equal(10, handler.Prints.Count);
+        Assert.Equal([0x07], handler.Executes);
+    }
+
     private sealed class CollectingHandler : IVtHandler
     {
         public List<Rune> Prints { get; } = [];
+        public List<string> PrintRuns { get; } = [];
         public List<byte> Executes { get; } = [];
         public List<(byte Final, byte[] Intermediates)> Escapes { get; } = [];
         public List<(byte Final, byte[] Intermediates, ParsedCsi Parameters, char PrivateMarker)> Csis { get; } = [];
@@ -266,6 +282,13 @@ public class VtDecoderParserTests
         public List<(byte Kind, byte[] Data)> SosPmApcs { get; } = [];
 
         public void Print(Rune rune) => Prints.Add(rune);
+
+        public void Print(scoped ReadOnlySpan<Rune> runes)
+        {
+            PrintRuns.Add(string.Join<Rune>(string.Empty, runes.ToArray()));
+            foreach (Rune rune in runes)
+                Prints.Add(rune);
+        }
 
         public void Execute(byte control) => Executes.Add(control);
 

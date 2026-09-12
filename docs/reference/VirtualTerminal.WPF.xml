@@ -141,6 +141,59 @@
         <member name="M:VirtualTerminal.Cursors.DefaultTerminalCursorRenderer.Render(System.Windows.Media.DrawingContext)">
             <inheritdoc/>
         </member>
+        <member name="T:VirtualTerminal.Cursors.LandingTerminalCursorRenderer">
+            <summary>
+            Cursor visual with a takeoff-landing transition on every move. The cursor at the source cell
+            expands in width and height while fading to transparency (the "takeoff" — the cursor appears
+            to fly up and away), while at the target cell an oversized transparent cursor shrinks back to
+            its normal size and color (the "landing"). Both phases run concurrently over
+            <see cref="P:VirtualTerminal.Cursors.LandingTerminalCursorRenderer.AnimationDuration"/> with a cosine ease; there is no sweep between cells, so the
+            effect works equally well for far jumps (newline, prompt redraws) and single-cell typing.
+            The cursor is drawn in the color inverse of <see cref="P:VirtualTerminal.Rendering.TerminalCursorRenderer.BackgroundColor"/>
+            (difference-style; per-pixel invert blending is not available on <see cref="T:System.Windows.Media.DrawingContext"/>).
+            Steady (no blink); combine with a private blink timer if wanted — see
+            <see cref="T:VirtualTerminal.Cursors.DefaultTerminalCursorRenderer"/>.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Cursors.LandingTerminalCursorRenderer.AnimationDuration">
+            <summary>
+            How long the takeoff-landing effect takes.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Cursors.LandingTerminalCursorRenderer.FrameInterval">
+            <summary>
+            How often the timer kicks the renderer.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Cursors.LandingTerminalCursorRenderer.ExpandFactor">
+            <summary>
+            Size multiplier of the cursor at the peak of the effect: the takeoff grows toward this
+            factor while fading out, and the landing starts at this factor while transparent and
+            shrinks back to the normal cell size.
+            </summary>
+        </member>
+        <member name="P:VirtualTerminal.Cursors.LandingTerminalCursorRenderer.MaxInstantCells">
+            <summary>
+            Maximum cell distance (Manhattan metric) that still moves instantly. Single-cell moves —
+            typing, arrow keys — snap straight to the new cell; only longer jumps play the
+            takeoff-landing effect. Set to 0 to animate every move.
+            </summary>
+        </member>
+        <member name="M:VirtualTerminal.Cursors.LandingTerminalCursorRenderer.#ctor">
+            <summary>Initializes a new instance of the <see cref="T:VirtualTerminal.Cursors.LandingTerminalCursorRenderer"/> class.</summary>
+        </member>
+        <member name="M:VirtualTerminal.Cursors.LandingTerminalCursorRenderer.Attach(VirtualTerminal.TerminalControl)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Cursors.LandingTerminalCursorRenderer.Detach">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Cursors.LandingTerminalCursorRenderer.MoveTo(System.Windows.Rect)">
+            <inheritdoc/>
+        </member>
+        <member name="M:VirtualTerminal.Cursors.LandingTerminalCursorRenderer.Render(System.Windows.Media.DrawingContext)">
+            <inheritdoc/>
+        </member>
         <member name="T:VirtualTerminal.Helpers.ColorHelper">
             <summary>
             Conversion helpers between WPF <see cref="T:System.Windows.Media.Color"/> and the core <see cref="T:VirtualTerminal.Model.TerminalColor"/>.

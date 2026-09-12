@@ -14,6 +14,17 @@ public interface IVtHandler
     /// <summary>A printable codepoint was received.</summary>
     void Print(Rune rune);
 
+    /// <summary>
+    /// A run of printable codepoints was received. Implementations should override this to process
+    /// the whole run in one pass; the default falls back to per-rune dispatch. The span is only
+    /// valid for the duration of the call.
+    /// </summary>
+    void Print(scoped ReadOnlySpan<Rune> runes)
+    {
+        foreach (Rune rune in runes)
+            Print(rune);
+    }
+
     /// <summary>A C0 control character (0x00–0x1F) was received in an executable context.</summary>
     void Execute(byte control);
 

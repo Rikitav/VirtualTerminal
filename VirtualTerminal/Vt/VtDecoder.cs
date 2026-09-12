@@ -82,8 +82,37 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
     /// <summary>Feeds a raw byte stream through the state machine.</summary>
     public void Write(ReadOnlySpan<byte> data)
     {
-        foreach (byte b in data)
+        int i = 0;
+        while (i < data.Length)
         {
+            byte b = data[i];
+
+            // Ground-state fast path: consume the maximal run of printable bytes in one shot
+            // instead of dispatching the state machine per byte.
+            if (_state == State.Ground && b != ESC && b >= 0x20 && b != 0x7F)
+            {
+                int runStart = i;
+                do
+                {
+                    i++;
+                }
+                while (i < data.Length && data[i] != ESC && data[i] >= 0x20 && data[i] != 0x7F);
+
+                try
+                {
+                    ProcessPrintRun(data[runStart..i]);
+                }
+                catch (Exception ex)
+                {
+                    // Safety net only: the machine must survive any input.
+                    Debug.WriteLine($"VtDecoder recovered from an unexpected error processing a text run: {ex}");
+                    _utf8.Clear();
+                    ResetToGround();
+                }
+
+                continue;
+            }
+
             try
             {
                 ProcessByte(b);
@@ -94,6 +123,8 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
                 Debug.WriteLine($"VtDecoder recovered from an unexpected error processing byte {b:X2}: {ex}");
                 ResetToGround();
             }
+
+            i++;
         }
     }
 
@@ -158,9 +189,10 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
             return;
         }
 
-        // Printable or multibyte continuation: accumulate and decode.
+        // Printable or multibyte continuation: accumulate and decode. (Unreachable through
+        // Write's Ground fast path; kept correct for direct ProcessByte calls.)
         _utf8.Add(b);
-        DecodeUtf8();
+        DecodeUtf8ToHandler(flush: false);
     }
 
     // ---- Escape ----
@@ -658,57 +690,67 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
     }
 
     // ---- UTF-8 decoding ----
-    private void DecodeUtf8()
+    /// <summary>
+    /// Handles a run of printable bytes seen in Ground state: appends them to the UTF-8 carry
+    /// buffer, decodes every complete rune in a single pass, and dispatches them as one batched
+    /// <see cref="IVtHandler.Print(ReadOnlySpan{Rune})"/> call.
+    /// </summary>
+    private void ProcessPrintRun(ReadOnlySpan<byte> run)
+    {
+        _utf8.AddRange(run);
+        DecodeUtf8ToHandler(flush: false);
+    }
+
+    /// <summary>
+    /// Decodes the UTF-8 carry buffer once and hands all complete runes to the handler as a single
+    /// batched span. With <paramref name="flush"/>, any truncated trailing sequence is decoded too;
+    /// otherwise it stays in the buffer for the next chunk.
+    /// </summary>
+    private void DecodeUtf8ToHandler(bool flush)
     {
         if (_utf8.Count == 0)
             return;
 
-        int totalConsumed = 0;
-        ReadOnlySpan<byte> buffer = CollectionsMarshal.AsSpan(_utf8);
-
-        while (!buffer.IsEmpty)
+        Rune[] rented = ArrayPool<Rune>.Shared.Rent(_utf8.Count);
+        try
         {
-            OperationStatus status = Rune.DecodeFromUtf8(buffer, out Rune rune, out int consumed);
-            if (status == OperationStatus.NeedMoreData)
-                break;
+            int runeCount = 0;
+            int consumed = 0;
+            ReadOnlySpan<byte> buffer = CollectionsMarshal.AsSpan(_utf8);
 
-            if (consumed <= 0)
+            while (!buffer.IsEmpty)
             {
-                consumed = 1;
-                rune = new Rune(0xFFFD);
+                OperationStatus status = Rune.DecodeFromUtf8(buffer, out Rune rune, out int n);
+                if (status == OperationStatus.NeedMoreData && !flush)
+                    break;
+
+                if (n <= 0)
+                {
+                    n = 1;
+                    rune = new Rune(0xFFFD);
+                }
+
+                // Rune.DecodeFromUtf8 already substitutes U+FFFD for InvalidData.
+                rented[runeCount++] = rune;
+                buffer = buffer[n..];
+                consumed += n;
             }
 
-            // Rune.DecodeFromUtf8 already substitutes U+FFFD for InvalidData.
-            _handler.Print(rune);
-            buffer = buffer[consumed..];
-            totalConsumed += consumed;
-        }
+            if (runeCount > 0)
+                _handler.Print(rented.AsSpan(0, runeCount));
 
-        if (totalConsumed > 0)
-            _utf8.RemoveRange(0, totalConsumed);
+            if (consumed > 0)
+                _utf8.RemoveRange(0, consumed);
+        }
+        finally
+        {
+            ArrayPool<Rune>.Shared.Return(rented);
+        }
     }
 
     private void FlushUtf8()
     {
-        if (_utf8.Count == 0)
-            return;
-
-        ReadOnlySpan<byte> buffer = CollectionsMarshal.AsSpan(_utf8);
-        while (!buffer.IsEmpty)
-        {
-            // Discard the status: Rune.DecodeFromUtf8 substitutes U+FFFD for InvalidData and
-            // returns Done otherwise, so the rune is always safe to print.
-            _ = Rune.DecodeFromUtf8(buffer, out Rune rune, out int consumed);
-            if (consumed <= 0)
-            {
-                consumed = 1;
-                rune = new Rune(0xFFFD);
-            }
-
-            _handler.Print(rune);
-            buffer = buffer[consumed..];
-        }
-
+        DecodeUtf8ToHandler(flush: true);
         _utf8.Clear();
     }
 
