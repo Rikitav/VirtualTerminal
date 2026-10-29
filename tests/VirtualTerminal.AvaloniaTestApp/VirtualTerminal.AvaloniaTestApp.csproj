@@ -1,5 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-	
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
@@ -25,7 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\VirtualTerminal.Avalonia\VirtualTerminal.Avalonia.csproj" />
-    <ProjectReference Include="..\VirtualTerminal.CommandLine\VirtualTerminal.CommandLine.csproj" />
+    <ProjectReference Include="..\..\src\VirtualTerminal.Avalonia\VirtualTerminal.Avalonia.csproj" />
+    <ProjectReference Include="..\..\src\VirtualTerminal.CommandLine\VirtualTerminal.CommandLine.csproj" />
   </ItemGroup>
 </Project>

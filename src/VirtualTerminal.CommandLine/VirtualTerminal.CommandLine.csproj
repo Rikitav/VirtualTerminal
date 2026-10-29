@@ -5,7 +5,8 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <RootNamespace>VirtualTerminal</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <IsAotCompatible>True</IsAotCompatible>
 
     <BaseOutputPath>..\bin</BaseOutputPath>
@@ -19,28 +20,25 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <SignAssembly>False</SignAssembly>
 
-    <Title>VirtualTerminal</Title>
+    <Title>VirtualTerminal.CommandLine</Title>
     <Version>1.10.5</Version>
     <Authors>Rikitav Tim4ik</Authors>
     <Company>Rikitav Tim4ik</Company>
     <RepositoryUrl>https://github.com/Rikitav/VirtualTerminal</RepositoryUrl>
     <PackageProjectUrl>https://github.com/Rikitav/VirtualTerminal</PackageProjectUrl>
-    <PackageTags>terminal;vt;ansi;virtual;console;xterm;emulator</PackageTags>
+    <PackageTags>terminal;vt;ansi;virtual;console;xterm;emulator;commandline;cli</PackageTags>
 
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="..\README.md" Pack="True" PackagePath="\" />
-    <None Include="..\LICENSE.txt" Pack="True" PackagePath="\" />
+    <None Include="README.md" Pack="True" PackagePath="\" />
+    <None Include="..\..\LICENSE.txt" Pack="True" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="PolySharp" Version="1.16.0">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
+    <ProjectReference Include="..\VirtualTerminal\VirtualTerminal.csproj" />
   </ItemGroup>
 
 </Project>

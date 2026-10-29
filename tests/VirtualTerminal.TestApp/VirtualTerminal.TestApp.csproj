@@ -19,10 +19,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\VirtualTerminal.CommandLine\VirtualTerminal.CommandLine.csproj" />
-    <ProjectReference Include="..\VirtualTerminal.SecureShell\VirtualTerminal.SecureShell.csproj" />
-    <ProjectReference Include="..\VirtualTerminal.WPF\VirtualTerminal.WPF.csproj" />
-    <ProjectReference Include="..\VirtualTerminal\VirtualTerminal.csproj" />
+    <ProjectReference Include="..\..\src\VirtualTerminal.CommandLine\VirtualTerminal.CommandLine.csproj" />
+    <ProjectReference Include="..\..\src\VirtualTerminal.SecureShell\VirtualTerminal.SecureShell.csproj" />
+    <ProjectReference Include="..\..\src\VirtualTerminal.WPF\VirtualTerminal.WPF.csproj" />
+    <ProjectReference Include="..\..\src\VirtualTerminal\VirtualTerminal.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\VirtualTerminal\VirtualTerminal.csproj" />
+    <ProjectReference Include="..\..\src\VirtualTerminal\VirtualTerminal.csproj" />
   </ItemGroup>
 
 </Project>
