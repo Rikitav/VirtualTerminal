@@ -100,6 +100,10 @@ public sealed class CommandLineSession : TerminalSession
                     ReadOnlySpan<byte> readed = data.Slice(0, bytesRead);
                     Decoder.WriteFromEncoding(InputEncoding, readed);
                     NotifyBufferUpdated();
+
+                    // Settle parked trailing newlines (and any other pending state) now that the
+                    // pump iteration is done, so the buffer/cursor never go stale between reads.
+                    Decoder.Flush();
                 }
                 catch (Exception exc)
                 {
@@ -138,6 +142,9 @@ public sealed class CommandLineSession : TerminalSession
     {
         if (!disposing)
             return;
+
+        // Settle any pending decoder state while the buffer is still alive.
+        Decoder.Flush();
 
         readLoopToken?.Cancel();
         readLoopToken?.Dispose();

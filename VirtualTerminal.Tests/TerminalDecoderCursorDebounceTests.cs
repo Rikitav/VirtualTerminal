@@ -154,4 +154,31 @@ public class TerminalDecoderCursorDebounceTests
         Assert.Equal(1, decoder.State.CursorY);
         Assert.Equal('b', decoder.Buffer.GetCell(1, 0).Character.Value);
     }
+
+    [Fact]
+    public void AutoFlush_AppliesNewlineImmediately()
+    {
+        using TerminalDecoder decoder = CreateDecoder();
+        decoder.AutoFlush = true;
+
+        decoder.Write("ab\r\n"u8);
+
+        Assert.Equal(0, decoder.State.CursorX);
+        Assert.Equal(1, decoder.State.CursorY);
+    }
+
+    [Fact]
+    public void Flush_AppliesParkedNewline()
+    {
+        using TerminalDecoder decoder = CreateDecoder();
+
+        decoder.Write("ab\r\n"u8);
+        Assert.Equal(2, decoder.State.CursorX);
+        Assert.Equal(0, decoder.State.CursorY);
+
+        decoder.Flush();
+
+        Assert.Equal(0, decoder.State.CursorX);
+        Assert.Equal(1, decoder.State.CursorY);
+    }
 }

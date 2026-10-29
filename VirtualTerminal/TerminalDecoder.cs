@@ -47,6 +47,9 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     /// <summary>Gets or sets options that control rendering and behavior.</summary>
     public TerminalOptions Options { get; set; }
 
+    /// <inheritdoc />
+    public bool AutoFlush { get; set; }
+
     /// <summary>Current window title (OSC 0/1/2).</summary>
     public string Title { get; private set; } = string.Empty;
 
@@ -99,6 +102,13 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
 
         lock (Buffer.SyncRoot)
             _parser.Write(data);
+    }
+
+    /// <inheritdoc />
+    public void Flush()
+    {
+        lock (Buffer.SyncRoot)
+            FlushPendingNewline();
     }
 
     /// <summary>Resizes the underlying screen buffer and clamps the cursor into the new bounds.</summary>
@@ -303,12 +313,28 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
             case 0x0A:
             case 0x0B:
             case 0x0C:
-                // Trailing-newline debounce: park the line feed; FlushPendingNewline applies it
-                // when any further bytes arrive.
-                _pendingLineFeeds++;
+                if (AutoFlush)
+                {
+                    LineFeed();
+                }
+                else
+                {
+                    // Trailing-newline debounce: park the line feed; FlushPendingNewline applies it
+                    // when any further bytes arrive.
+                    _pendingLineFeeds++;
+                }
+
                 break;
             case 0x0D:
-                _pendingReturn = true;
+                if (AutoFlush)
+                {
+                    CarriageReturn();
+                }
+                else
+                {
+                    _pendingReturn = true;
+                }
+
                 break;
             case 0x07:
                 FlushPendingNewline();
