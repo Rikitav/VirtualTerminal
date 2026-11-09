@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Text;
+using System.Threading;
 using VirtualTerminal.Buffer;
 using VirtualTerminal.Interfaces;
 
@@ -13,7 +13,12 @@ public abstract class TerminalSession : ITerminalSession
 {
     private readonly TerminalDecoder _decoder;
     private readonly TerminalScreenBuffer _buffer;
-    private readonly ConcurrentQueue<byte> _inputQueue = [];
+
+    private readonly Lock _queueLock = new();
+    private byte[] _inputBuffer = new byte[1024];
+    private int _inputHead;
+    private int _inputTail;
+    private int _inputCount;
 
     private string _title;
     private bool _disposed;
@@ -70,7 +75,14 @@ public abstract class TerminalSession : ITerminalSession
     }
 
     /// <inheritdoc />
-    public int AvailableDataLength => _inputQueue.Count;
+    public int AvailableDataLength
+    {
+        get
+        {
+            lock (_queueLock)
+                return _inputCount;
+        }
+    }
 
     /// <summary>
     /// Gets the underlying <see cref="TerminalDecoder"/> used to parse VT input for this session.
@@ -110,34 +122,45 @@ public abstract class TerminalSession : ITerminalSession
         if (buffer.IsEmpty)
             return 0;
 
-        int bytesRead = 0;
-        lock (_inputQueue)
+        lock (_queueLock)
         {
-            while (!_inputQueue.IsEmpty && bytesRead < buffer.Length)
+            if (_inputCount == 0)
+                return 0;
+
+            int bytesToRead = Math.Min(buffer.Length, _inputCount);
+            int firstPart = Math.Min(bytesToRead, _inputBuffer.Length - _inputHead);
+            _inputBuffer.AsSpan(_inputHead, firstPart).CopyTo(buffer);
+            int remaining = bytesToRead - firstPart;
+            if (remaining > 0)
             {
-                if (!_inputQueue.TryDequeue(out byte resultByte))
-                    continue;
-
-                buffer[bytesRead] = resultByte;
-                bytesRead++;
+                _inputBuffer.AsSpan(0, remaining).CopyTo(buffer[firstPart..]);
             }
-        }
 
-        return bytesRead;
+            _inputHead = (_inputHead + bytesToRead) % _inputBuffer.Length;
+            _inputCount -= bytesToRead;
+
+            if (_inputCount == 0)
+            {
+                _inputHead = 0;
+                _inputTail = 0;
+            }
+
+            return bytesToRead;
+        }
     }
 
     /// <inheritdoc />
     public virtual byte[] ReadAll()
     {
         ThrowIfDisposed();
-        lock (_inputQueue)
+        lock (_queueLock)
         {
-            if (_inputQueue.IsEmpty)
+            if (_inputCount == 0)
                 return [];
 
-            byte[] data = _inputQueue.ToArray();
-            _inputQueue.Clear();
-            return data;
+            byte[] result = new byte[_inputCount];
+            Read(result);
+            return result;
         }
     }
 
@@ -151,19 +174,50 @@ public abstract class TerminalSession : ITerminalSession
             return;
 
         bool wasEmpty;
-        lock (_inputQueue)
+        lock (_queueLock)
         {
-            wasEmpty = _inputQueue.Count == 0;
-            foreach (byte b in data)
+            wasEmpty = _inputCount == 0;
+            EnsureInputCapacity(_inputCount + data.Length);
+
+            int firstPart = Math.Min(data.Length, _inputBuffer.Length - _inputTail);
+            data[..firstPart].CopyTo(_inputBuffer.AsSpan(_inputTail));
+            int remaining = data.Length - firstPart;
+            if (remaining > 0)
             {
-                _inputQueue.Enqueue(b);
+                data.Slice(firstPart, remaining).CopyTo(_inputBuffer.AsSpan(0));
             }
+
+            _inputTail = (_inputTail + data.Length) % _inputBuffer.Length;
+            _inputCount += data.Length;
         }
 
         if (wasEmpty)
         {
             NotifyInputAvailable();
         }
+    }
+
+    private void EnsureInputCapacity(int required)
+    {
+        if (required <= _inputBuffer.Length)
+            return;
+
+        int newCapacity = Math.Max(_inputBuffer.Length * 2, required);
+        byte[] newBuffer = new byte[newCapacity];
+        if (_inputCount > 0)
+        {
+            int firstPart = Math.Min(_inputCount, _inputBuffer.Length - _inputHead);
+            Array.Copy(_inputBuffer, _inputHead, newBuffer, 0, firstPart);
+            int remaining = _inputCount - firstPart;
+            if (remaining > 0)
+            {
+                Array.Copy(_inputBuffer, 0, newBuffer, firstPart, remaining);
+            }
+        }
+
+        _inputBuffer = newBuffer;
+        _inputHead = 0;
+        _inputTail = _inputCount;
     }
 
     /// <summary>
@@ -217,9 +271,11 @@ public abstract class TerminalSession : ITerminalSession
         _decoder.Dispose();
         Dispose(true);
 
-        lock (_inputQueue)
+        lock (_queueLock)
         {
-            _inputQueue.Clear();
+            _inputCount = 0;
+            _inputHead = 0;
+            _inputTail = 0;
         }
 
         GC.SuppressFinalize(this);
