@@ -5,8 +5,10 @@
     <Project Path="src/VirtualTerminal.SecureShell/VirtualTerminal.SecureShell.csproj" Id="fec70be4-fcf2-41b4-aaa1-db2de5421502" />
     <Project Path="src/VirtualTerminal.WPF/VirtualTerminal.WPF.csproj" />
     <Project Path="src/VirtualTerminal/VirtualTerminal.csproj" />
+    <Project Path="src/VirtualTerminal.Qt/VirtualTerminal.Qt.csproj" Id="6803c067-ac9e-49b5-b812-1a3f1b9b9f1c" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/VirtualTerminal.Benchmarks/VirtualTerminal.Benchmarks.csproj" />
     <Project Path="tests/VirtualTerminal.TestApp/VirtualTerminal.TestApp.csproj" />
     <Project Path="tests/VirtualTerminal.Tests/VirtualTerminal.Tests.csproj" />
     <Project Path="tests/VirtualTerminal.AvaloniaTestApp/VirtualTerminal.AvaloniaTestApp.csproj" />
