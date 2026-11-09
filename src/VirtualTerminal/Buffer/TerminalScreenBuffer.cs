@@ -1,3 +1,5 @@
+using System.Buffers;
+using System.Collections;
 using System.Text;
 using VirtualTerminal.Model;
 
@@ -26,9 +28,7 @@ public sealed class TerminalScreenBuffer : IDisposable
     private int _scrollTop;
     private int _scrollBottom;
 
-    private readonly Queue<TerminalRow> _scrollback = new();
-    private int _scrollbackMax = DefaultScrollbackMax;
-    private TerminalRow[]? _scrollbackSnapshot;
+    private readonly ScrollbackRingBuffer _scrollback;
 
     private bool[] _tabStops;
 
@@ -53,7 +53,7 @@ public sealed class TerminalScreenBuffer : IDisposable
     public int ScrollbackCount => _scrollback.Count;
 
     /// <summary>Gets the maximum number of rows to retain in scrollback.</summary>
-    public int ScrollbackMax => _scrollbackMax;
+    public int ScrollbackMax => _scrollback.Capacity;
 
     /// <summary>Convenience size (columns, rows) for consumers expecting the legacy shape.</summary>
     public TerminalSize GridSize => new TerminalSize(_columns, _rows);
@@ -66,7 +66,7 @@ public sealed class TerminalScreenBuffer : IDisposable
     {
         _columns = Math.Max(1, columns);
         _rows = Math.Max(1, rows);
-        _scrollbackMax = Math.Max(0, scrollbackMax);
+        _scrollback = new ScrollbackRingBuffer(Math.Max(0, scrollbackMax));
         _primary = new TerminalRow[_rows];
 
         for (int i = 0; i < _rows; i++)
@@ -83,11 +83,7 @@ public sealed class TerminalScreenBuffer : IDisposable
     /// <param name="max">The new maximum number of scrollback rows.</param>
     public void SetScrollbackMax(int max)
     {
-        _scrollbackMax = Math.Max(0, max);
-        while (_scrollback.Count > _scrollbackMax)
-            _scrollback.Dequeue();
-
-        InvalidateScrollbackSnapshot();
+        _scrollback.SetCapacity(max);
     }
 
     // ---- Row / cell access ----
@@ -287,36 +283,70 @@ public sealed class TerminalScreenBuffer : IDisposable
         if (n > region)
             n = region;
 
-        TerminalRow[] leaving = new TerminalRow[n];
-        for (int i = 0; i < n; i++)
-            leaving[i] = _active[top + i];
-
-        Array.Copy(_active, top + n, _active, top, region - n);
-        for (int i = 0; i < n; i++)
+        if (n == 1)
         {
-            if (!_isAlt && top == 0 && _scrollbackMax > 0)
+            TerminalRow leaving = _active[top];
+            Array.Copy(_active, top + 1, _active, top, region - 1);
+
+            if (!_isAlt && top == 0 && _scrollback.Capacity > 0)
             {
-                _scrollback.Enqueue(leaving[i]);
-                if (_scrollback.Count > _scrollbackMax)
+                TerminalRow? recycled = _scrollback.Push(leaving);
+                if (recycled != null)
                 {
-                    TerminalRow recycled = _scrollback.Dequeue();
                     recycled.Clear();
-                    _active[bottom - n + 1 + i] = recycled;
+                    _active[bottom] = recycled;
                 }
                 else
                 {
-                    _active[bottom - n + 1 + i] = new TerminalRow(_columns);
+                    _active[bottom] = new TerminalRow(_columns);
                 }
             }
             else
             {
-                leaving[i].Clear();
-                _active[bottom - n + 1 + i] = leaving[i];
+                leaving.Clear();
+                _active[bottom] = leaving;
             }
+
+            MarkAllDirty();
+            return;
         }
 
-        InvalidateScrollbackSnapshot();
-        MarkAllDirty();
+        TerminalRow[] rented = ArrayPool<TerminalRow>.Shared.Rent(n);
+        try
+        {
+            for (int i = 0; i < n; i++)
+                rented[i] = _active[top + i];
+
+            Array.Copy(_active, top + n, _active, top, region - n);
+            for (int i = 0; i < n; i++)
+            {
+                if (!_isAlt && top == 0 && _scrollback.Capacity > 0)
+                {
+                    TerminalRow? recycled = _scrollback.Push(rented[i]);
+                    if (recycled != null)
+                    {
+                        recycled.Clear();
+                        _active[bottom - n + 1 + i] = recycled;
+                    }
+                    else
+                    {
+                        _active[bottom - n + 1 + i] = new TerminalRow(_columns);
+                    }
+                }
+                else
+                {
+                    rented[i].Clear();
+                    _active[bottom - n + 1 + i] = rented[i];
+                }
+            }
+
+            MarkAllDirty();
+        }
+        finally
+        {
+            Array.Clear(rented, 0, n);
+            ArrayPool<TerminalRow>.Shared.Return(rented);
+        }
     }
 
     /// <summary>Scrolls the current scroll region down by <paramref name="n"/> (content moves down).</summary>
@@ -336,21 +366,42 @@ public sealed class TerminalScreenBuffer : IDisposable
         if (n > region)
             n = region;
 
-        TerminalRow[] leaving = new TerminalRow[n];
-        for (int i = 0; i < n; i++)
-            leaving[i] = _active[bottom - i];
-
-        Array.Copy(_active, top, _active, top + n, region - n);
-        for (int i = 0; i < n; i++)
+        if (n == 1)
         {
-            leaving[i].Clear();
-            _active[top + i] = leaving[i];
+            TerminalRow leaving = _active[bottom];
+            Array.Copy(_active, top, _active, top + 1, region - 1);
+            leaving.Clear();
+            _active[top] = leaving;
+            for (int i = top; i <= bottom; i++)
+                _active[i].Dirty = true;
+
+            MarkAllDirty();
+            return;
         }
 
-        for (int i = top; i <= bottom; i++)
-            _active[i].Dirty = true;
+        TerminalRow[] rented = ArrayPool<TerminalRow>.Shared.Rent(n);
+        try
+        {
+            for (int i = 0; i < n; i++)
+                rented[i] = _active[bottom - i];
 
-        MarkAllDirty();
+            Array.Copy(_active, top, _active, top + n, region - n);
+            for (int i = 0; i < n; i++)
+            {
+                rented[i].Clear();
+                _active[top + i] = rented[i];
+            }
+
+            for (int i = top; i <= bottom; i++)
+                _active[i].Dirty = true;
+
+            MarkAllDirty();
+        }
+        finally
+        {
+            Array.Clear(rented, 0, n);
+            ArrayPool<TerminalRow>.Shared.Return(rented);
+        }
     }
 
     /// <summary>Inserts <paramref name="n"/> blank lines at row <paramref name="y"/>, scrolling within [<paramref name="y"/>, <paramref name="bottom"/>].</summary>
@@ -528,14 +579,10 @@ public sealed class TerminalScreenBuffer : IDisposable
         {
             // Shrink: keep the bottom rows visible and push the top rows into scrollback.
             int lost = grid.Length - rows;
-            if (pushScrollback && !_isAlt && _scrollbackMax > 0)
+            if (pushScrollback && !_isAlt && _scrollback.Capacity > 0)
             {
                 for (int i = 0; i < lost; i++)
-                {
-                    _scrollback.Enqueue(grid[i]);
-                    while (_scrollback.Count > _scrollbackMax)
-                        _scrollback.Dequeue();
-                }
+                    _scrollback.Push(grid[i]);
             }
 
             if (lost > 0)
@@ -551,16 +598,11 @@ public sealed class TerminalScreenBuffer : IDisposable
             for (int i = old; i < rows; i++)
                 grid[i] = new TerminalRow(columns);
         }
-
-        InvalidateScrollbackSnapshot();
     }
 
     /// <summary>Snapshot of the scrollback rows (oldest first). Used by the renderer for history.</summary>
     public IReadOnlyList<TerminalRow> GetScrollback()
-        => Array.AsReadOnly(_scrollbackSnapshot ??= _scrollback.ToArray());
-
-    private void InvalidateScrollbackSnapshot()
-        => _scrollbackSnapshot = null;
+        => _scrollback;
 
     /// <summary>
     /// Returns the text of the active screen, one row per line. Continuation cells are skipped
@@ -639,7 +681,104 @@ public sealed class TerminalScreenBuffer : IDisposable
             return;
 
         _scrollback.Clear();
-        InvalidateScrollbackSnapshot();
         _disposed = true;
     }
+}
+
+/// <summary>
+/// A zero-allocation circular ring buffer for scrollback history.
+/// </summary>
+internal sealed class ScrollbackRingBuffer : IReadOnlyList<TerminalRow>
+{
+    private TerminalRow[] _buffer;
+    private int _head;
+    private int _count;
+    private int _capacity;
+
+    public ScrollbackRingBuffer(int capacity)
+    {
+        _capacity = Math.Max(0, capacity);
+        _buffer = _capacity > 0 ? new TerminalRow[_capacity] : [];
+    }
+
+    public int Count => _count;
+
+    public int Capacity => _capacity;
+
+    public TerminalRow this[int index]
+    {
+        get
+        {
+            if ((uint)index >= (uint)_count)
+                throw new ArgumentOutOfRangeException(nameof(index));
+
+            return _buffer[(_head + index) % _buffer.Length];
+        }
+    }
+
+    public TerminalRow? Push(TerminalRow row)
+    {
+        if (_capacity <= 0)
+            return null;
+
+        TerminalRow? recycled = null;
+        if (_count == _capacity)
+        {
+            recycled = _buffer[_head];
+            _buffer[_head] = row;
+            _head = (_head + 1) % _buffer.Length;
+        }
+        else
+        {
+            _buffer[(_head + _count) % _buffer.Length] = row;
+            _count++;
+        }
+
+        return recycled;
+    }
+
+    public void SetCapacity(int newCapacity)
+    {
+        newCapacity = Math.Max(0, newCapacity);
+        if (newCapacity == _capacity)
+            return;
+
+        if (newCapacity == 0)
+        {
+            _buffer = [];
+            _head = 0;
+            _count = 0;
+            _capacity = 0;
+            return;
+        }
+
+        TerminalRow[] newBuffer = new TerminalRow[newCapacity];
+        int keep = Math.Min(_count, newCapacity);
+        int discard = _count - keep;
+
+        for (int i = 0; i < keep; i++)
+        {
+            newBuffer[i] = _buffer[(_head + discard + i) % _buffer.Length];
+        }
+
+        _buffer = newBuffer;
+        _head = 0;
+        _count = keep;
+        _capacity = newCapacity;
+    }
+
+    public void Clear()
+    {
+        Array.Clear(_buffer, 0, _buffer.Length);
+        _head = 0;
+        _count = 0;
+    }
+
+    public IEnumerator<TerminalRow> GetEnumerator()
+    {
+        for (int i = 0; i < _count; i++)
+            yield return this[i];
+    }
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
