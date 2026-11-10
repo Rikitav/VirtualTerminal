@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.IO;
 using System.Text;
 using VirtualTerminal.Extensions;
@@ -15,7 +16,9 @@ public class BufferStreamReader : TextReader
     private readonly ITerminalSession _session;
     private readonly Decoder _decoder;
 
-    private readonly StringBuilder _charBuffer = new();
+    private char[] _charBuffer = new char[256];
+    private int _readIndex;
+    private int _writeIndex;
 
     /// <summary>
     /// Initializes a new reader for the specified <paramref name="session"/>.
@@ -29,26 +32,22 @@ public class BufferStreamReader : TextReader
     /// <inheritdoc />
     public override int Peek()
     {
-        if (_charBuffer.Length == 0)
+        if (_writeIndex - _readIndex == 0)
             FetchFromSession();
 
-        return _charBuffer.Length > 0 ? _charBuffer[0] : -1;
+        return _writeIndex - _readIndex > 0 ? _charBuffer[_readIndex] : -1;
     }
 
     /// <inheritdoc />
     public override int Read()
     {
-        if (_charBuffer.Length == 0)
-        {
+        if (_writeIndex - _readIndex == 0)
             FetchFromSession();
-        }
 
-        if (_charBuffer.Length == 0)
+        if (_writeIndex - _readIndex == 0)
             return -1;
 
-        char c = _charBuffer[0];
-        _charBuffer.Remove(0, 1);
-        return c;
+        return _charBuffer[_readIndex++];
     }
 
     /// <inheritdoc />
@@ -70,17 +69,16 @@ public class BufferStreamReader : TextReader
         if (buffer.IsEmpty)
             return 0;
 
-        if (_charBuffer.Length < buffer.Length)
+        if (_writeIndex - _readIndex < buffer.Length)
             FetchFromSession();
 
-        if (_charBuffer.Length == 0)
+        int available = _writeIndex - _readIndex;
+        if (available == 0)
             return 0;
 
-        int charsToCopy = Math.Min(buffer.Length, _charBuffer.Length);
-        for (int i = 0; i < charsToCopy; i++)
-            buffer[i] = _charBuffer[i];
-
-        _charBuffer.Remove(0, charsToCopy);
+        int charsToCopy = Math.Min(buffer.Length, available);
+        _charBuffer.AsSpan(_readIndex, charsToCopy).CopyTo(buffer);
+        _readIndex += charsToCopy;
         return charsToCopy;
     }
 
@@ -89,28 +87,30 @@ public class BufferStreamReader : TextReader
     {
         FetchFromSession();
 
-        if (_charBuffer.Length == 0)
+        int available = _writeIndex - _readIndex;
+        if (available == 0)
             return null;
 
-        for (int i = 0; i < _charBuffer.Length; i++)
+        Span<char> remaining = _charBuffer.AsSpan(_readIndex, available);
+        for (int i = 0; i < remaining.Length; i++)
         {
-            char c = _charBuffer[i];
+            char c = remaining[i];
             if (c == '\r' || c == '\n')
             {
-                string line = _charBuffer.ToString(0, i);
+                string line = new string(remaining[..i]);
                 int charsToRemove = i + 1;
 
-                if (c == '\r' && i + 1 < _charBuffer.Length && _charBuffer[i + 1] == '\n')
+                if (c == '\r' && i + 1 < remaining.Length && remaining[i + 1] == '\n')
                     charsToRemove++;
 
-                _charBuffer.Remove(0, charsToRemove);
+                _readIndex += charsToRemove;
                 return line;
             }
         }
 
-        string remaining = _charBuffer.ToString();
-        _charBuffer.Clear();
-        return remaining;
+        string allRemaining = new string(remaining);
+        _readIndex = _writeIndex;
+        return allRemaining;
     }
 
     private void FetchFromSession()
@@ -122,12 +122,12 @@ public class BufferStreamReader : TextReader
         byte[]? rentedBytes = null;
         Span<byte> byteBuffer = availableBytes <= 1024
             ? stackalloc byte[availableBytes]
-            : (rentedBytes = System.Buffers.ArrayPool<byte>.Shared.Rent(availableBytes));
+            : (rentedBytes = ArrayPool<byte>.Shared.Rent(availableBytes));
 
         char[]? rentedChars = null;
         Span<char> charBuffer = availableBytes <= 1024
             ? stackalloc char[availableBytes]
-            : (rentedChars = System.Buffers.ArrayPool<char>.Shared.Rent(availableBytes));
+            : (rentedChars = ArrayPool<char>.Shared.Rent(availableBytes));
 
         try
         {
@@ -136,18 +136,46 @@ public class BufferStreamReader : TextReader
                 return;
 
             int charsDecoded = _decoder.GetChars(byteBuffer[..bytesRead], charBuffer, flush: false);
-
             if (charsDecoded > 0)
             {
-                _charBuffer.Append(charBuffer[..charsDecoded]);
+                AppendChars(charBuffer[..charsDecoded]);
             }
         }
         finally
         {
             if (rentedBytes != null)
-                System.Buffers.ArrayPool<byte>.Shared.Return(rentedBytes);
+                ArrayPool<byte>.Shared.Return(rentedBytes);
             if (rentedChars != null)
-                System.Buffers.ArrayPool<char>.Shared.Return(rentedChars);
+                ArrayPool<char>.Shared.Return(rentedChars);
         }
+    }
+
+    private void AppendChars(ReadOnlySpan<char> chars)
+    {
+        if (chars.IsEmpty)
+            return;
+
+        if (_readIndex == _writeIndex)
+        {
+            _readIndex = 0;
+            _writeIndex = 0;
+        }
+        else if (_readIndex > 0 && _charBuffer.Length - _writeIndex < chars.Length)
+        {
+            int remaining = _writeIndex - _readIndex;
+            Array.Copy(_charBuffer, _readIndex, _charBuffer, 0, remaining);
+            _readIndex = 0;
+            _writeIndex = remaining;
+        }
+
+        int required = _writeIndex + chars.Length;
+        if (required > _charBuffer.Length)
+        {
+            int newCap = Math.Max(_charBuffer.Length * 2, required);
+            Array.Resize(ref _charBuffer, newCap);
+        }
+
+        chars.CopyTo(_charBuffer.AsSpan(_writeIndex));
+        _writeIndex += chars.Length;
     }
 }

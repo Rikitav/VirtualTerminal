@@ -9,25 +9,29 @@ namespace VirtualTerminal.Model;
 /// </summary>
 public readonly struct TerminalColor : IEquatable<TerminalColor>
 {
+    private readonly uint _value;
+
     /// <summary>Gets the alpha component.</summary>
-    public byte A { get; }
+    public byte A => (byte)(_value >> 24);
 
     /// <summary>Gets the red component.</summary>
-    public byte R { get; }
+    public byte R => (byte)(_value >> 16);
 
     /// <summary>Gets the green component.</summary>
-    public byte G { get; }
+    public byte G => (byte)(_value >> 8);
 
     /// <summary>Gets the blue component.</summary>
-    public byte B { get; }
+    public byte B => (byte)_value;
 
     /// <summary>Initializes a new <see cref="TerminalColor"/>.</summary>
     public TerminalColor(byte a, byte r, byte g, byte b)
     {
-        A = a;
-        R = r;
-        G = g;
-        B = b;
+        _value = ((uint)a << 24) | ((uint)r << 16) | ((uint)g << 8) | (uint)b;
+    }
+
+    private TerminalColor(uint value)
+    {
+        _value = value;
     }
 
     /// <summary>Creates a color from ARGB byte components.</summary>
@@ -44,49 +48,42 @@ public readonly struct TerminalColor : IEquatable<TerminalColor>
 
     /// <summary>Creates a color from a packed 32-bit ARGB value.</summary>
     public static TerminalColor FromArgb(int argb)
-    {
-        uint value = unchecked((uint)argb);
-        return new(
-            (byte)(value >> 24),
-            (byte)(value >> 16),
-            (byte)(value >> 8),
-            (byte)value);
-    }
+        => new(unchecked((uint)argb));
 
     /// <summary>Gets the color as a packed 32-bit ARGB value.</summary>
     public uint ToArgb()
-        => (uint)((A << 24) | (R << 16) | (G << 8) | B);
+        => _value;
 
     /// <summary>Opaque black.</summary>
-    public static TerminalColor Black { get; } = new(255, 0, 0, 0);
+    public static TerminalColor Black { get; } = new(0xFF000000);
 
     /// <summary>Opaque white.</summary>
-    public static TerminalColor White { get; } = new(255, 255, 255, 255);
+    public static TerminalColor White { get; } = new(0xFFFFFFFF);
 
     /// <summary>Opaque red.</summary>
-    public static TerminalColor Red { get; } = new(255, 255, 0, 0);
+    public static TerminalColor Red { get; } = new(0xFFFF0000);
 
     /// <summary>Opaque green.</summary>
-    public static TerminalColor Green { get; } = new(255, 0, 128, 0);
+    public static TerminalColor Green { get; } = new(0xFF008000);
 
     /// <summary>Opaque blue.</summary>
-    public static TerminalColor Blue { get; } = new(255, 0, 0, 255);
+    public static TerminalColor Blue { get; } = new(0xFF0000FF);
 
     /// <summary>Opaque hot pink.</summary>
-    public static TerminalColor HotPink { get; } = new(255, 255, 105, 180);
+    public static TerminalColor HotPink { get; } = new(0xFFFF69B4);
 
     /// <summary>Opaque cyan.</summary>
-    public static TerminalColor Cyan { get; } = new(255, 0, 255, 255);
+    public static TerminalColor Cyan { get; } = new(0xFF00FFFF);
 
     /// <summary>Opaque yellow.</summary>
-    public static TerminalColor Yellow { get; } = new(255, 255, 255, 0);
+    public static TerminalColor Yellow { get; } = new(0xFFFFFF00);
 
     /// <summary>Opaque magenta.</summary>
-    public static TerminalColor Magenta { get; } = new(255, 255, 0, 255);
+    public static TerminalColor Magenta { get; } = new(0xFFFF00FF);
 
     /// <inheritdoc />
     public bool Equals(TerminalColor other)
-        => A == other.A && R == other.R && G == other.G && B == other.B;
+        => _value == other._value;
 
     /// <inheritdoc />
     public override bool Equals([NotNullWhen(true)] object? obj)
@@ -94,19 +91,19 @@ public readonly struct TerminalColor : IEquatable<TerminalColor>
 
     /// <inheritdoc />
     public override int GetHashCode()
-        => HashCode.Combine(A, R, G, B);
+        => unchecked((int)_value);
 
     /// <inheritdoc />
     public override string ToString()
-        => $"#{ToArgb():X8}";
+        => $"#{_value:X8}";
 
     /// <summary>Equality operator.</summary>
     public static bool operator ==(TerminalColor left, TerminalColor right)
-        => left.Equals(right);
+        => left._value == right._value;
 
     /// <summary>Inequality operator.</summary>
     public static bool operator !=(TerminalColor left, TerminalColor right)
-        => !left.Equals(right);
+        => left._value != right._value;
 
     private static byte Clamp(int value)
         => (byte)Math.Clamp(value, 0, 255);

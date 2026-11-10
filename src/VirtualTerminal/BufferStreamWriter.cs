@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Buffers;
+using System.Text;
 using VirtualTerminal.Buffer;
 using VirtualTerminal.Extensions;
 using VirtualTerminal.Interfaces;
@@ -31,63 +32,46 @@ public class BufferStreamWriter(TerminalScreenBuffer buffer, ITerminalDecoder de
     /// <inheritdoc />
     public override void Write(char[] buffer, int index, int count)
     {
-        Span<char> charData = buffer.AsSpan(index, count);
-        Span<byte> writeData = stackalloc byte[charData.Length * 2];
-        int charCount = Encoding.GetBytes(charData, writeData);
+        ArgumentNullException.ThrowIfNull(buffer);
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
 
-        if (charCount == 0)
-            return;
+        if (buffer.Length - index < count)
+            throw new ArgumentException("Invalid offset and length.");
 
-        _decoder.Write(writeData);
+        WriteChars(buffer.AsSpan(index, count));
     }
 
     /// <inheritdoc />
     public override void Write(ReadOnlySpan<char> buffer)
     {
-        Span<byte> writeData = stackalloc byte[buffer.Length * 2];
-        int charCount = Encoding.GetBytes(buffer, writeData);
-
-        if (charCount == 0)
-            return;
-
-        _decoder.Write(writeData);
+        WriteChars(buffer);
     }
 
     /// <inheritdoc />
     public override void Write(string? value)
     {
         if (!string.IsNullOrEmpty(value))
-            Write(value.AsSpan());
+            WriteChars(value.AsSpan());
     }
 
     /// <inheritdoc />
     public override void Write(char value)
     {
-        Span<byte> writeData = stackalloc byte[2];
-        int charCount = Encoding.GetBytes([value], writeData);
-
-        if (charCount == 0)
-            return;
-
-        _decoder.Write(writeData);
+        Span<char> charSpan = [value];
+        WriteChars(charSpan);
     }
 
     /// <inheritdoc />
     public override void WriteLine()
     {
-        Write(NewLine);
+        WriteChars(NewLine.AsSpan());
     }
 
     /// <inheritdoc />
     public override void WriteLine(ReadOnlySpan<char> buffer)
     {
-        Span<byte> writeData = stackalloc byte[buffer.Length * 2];
-        int charCount = Encoding.GetBytes(buffer, writeData);
-
-        if (charCount == 0)
-            return;
-
-        _decoder.Write(writeData);
+        WriteChars(buffer);
         WriteLine();
     }
 
@@ -95,8 +79,38 @@ public class BufferStreamWriter(TerminalScreenBuffer buffer, ITerminalDecoder de
     public override void WriteLine(string? value)
     {
         if (!string.IsNullOrEmpty(value))
-            Write(value);
+            WriteChars(value.AsSpan());
 
         WriteLine();
+    }
+
+    private void WriteChars(ReadOnlySpan<char> chars)
+    {
+        if (chars.IsEmpty)
+            return;
+
+        int maxByteCount = Encoding.GetMaxByteCount(chars.Length);
+        const int StackAllocLimit = 512;
+
+        if (maxByteCount <= StackAllocLimit)
+        {
+            Span<byte> writeData = stackalloc byte[maxByteCount];
+            int bytesWritten = Encoding.GetBytes(chars, writeData);
+            if (bytesWritten > 0)
+                _decoder.Write(writeData[..bytesWritten]);
+            return;
+        }
+
+        byte[] rented = ArrayPool<byte>.Shared.Rent(maxByteCount);
+        try
+        {
+            int bytesWritten = Encoding.GetBytes(chars, rented);
+            if (bytesWritten > 0)
+                _decoder.Write(rented.AsSpan(0, bytesWritten));
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(rented);
+        }
     }
 }

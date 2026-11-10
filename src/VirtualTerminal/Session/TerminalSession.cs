@@ -1,7 +1,10 @@
-using System.Collections.Concurrent;
+using System.Buffers;
+using System.IO.Pipelines;
 using System.Text;
+using System.Threading;
 using VirtualTerminal.Buffer;
 using VirtualTerminal.Interfaces;
+using VirtualTerminal.Serialization;
 
 namespace VirtualTerminal.Session;
 
@@ -13,7 +16,17 @@ public abstract class TerminalSession : ITerminalSession
 {
     private readonly TerminalDecoder _decoder;
     private readonly TerminalScreenBuffer _buffer;
-    private readonly ConcurrentQueue<byte> _inputQueue = [];
+
+    private readonly Lock _queueLock = new();
+    private byte[] _inputBuffer = new byte[1024];
+    private int _inputHead;
+    private int _inputTail;
+    private int _inputCount;
+
+    private ITerminalTransport? _transport;
+    private CancellationTokenSource? _pumpCts;
+    private Task? _pumpTask;
+    private readonly bool _leaveTransportOpen;
 
     private string _title;
     private bool _disposed;
@@ -51,6 +64,9 @@ public abstract class TerminalSession : ITerminalSession
     }
 
     /// <inheritdoc />
+    public ITerminalTransport? Transport => _transport;
+
+    /// <inheritdoc />
     public Encoding InputEncoding
     {
         get => Encoding.UTF8;
@@ -70,7 +86,14 @@ public abstract class TerminalSession : ITerminalSession
     }
 
     /// <inheritdoc />
-    public int AvailableDataLength => _inputQueue.Count;
+    public int AvailableDataLength
+    {
+        get
+        {
+            lock (_queueLock)
+                return _inputCount;
+        }
+    }
 
     /// <summary>
     /// Gets the underlying <see cref="TerminalDecoder"/> used to parse VT input for this session.
@@ -81,13 +104,148 @@ public abstract class TerminalSession : ITerminalSession
     /// Initializes a new session with a fresh <see cref="TerminalScreenBuffer"/> and default input encoding.
     /// </summary>
     protected TerminalSession()
+        : this(transport: null, leaveTransportOpen: false)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new session attached to the specified <see cref="ITerminalTransport"/>.
+    /// </summary>
+    /// <param name="transport">The transport to attach, or <c>null</c> for unattached execution.</param>
+    /// <param name="leaveTransportOpen">Whether to leave the transport undisposed when the session is disposed.</param>
+    protected TerminalSession(ITerminalTransport? transport, bool leaveTransportOpen = false)
     {
         _buffer = new TerminalScreenBuffer(128, 20);
         _decoder = new TerminalDecoder(_buffer);
+        _leaveTransportOpen = leaveTransportOpen;
 
         _title = GetType().Name;
         _decoder.TitleChanged += (_, title) => _title = title;
-        _decoder.SendOutput = AddToInputQueue;  // report responses (DSR/DA/…) reach Read()
+        _decoder.SendOutput = OnSendOutput;
+
+        if (transport != null)
+        {
+            _transport = transport;
+            StartTransportPump();
+        }
+    }
+
+    /// <summary>
+    /// Attaches an <see cref="ITerminalTransport"/> to this session, starting the input pipeline pump.
+    /// Any previously attached transport will be detached first.
+    /// </summary>
+    public async Task AttachTransportAsync(ITerminalTransport transport, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(transport);
+
+        await DetachTransportAsync().ConfigureAwait(false);
+
+        if (!transport.IsConnected)
+        {
+            await transport.ConnectAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        _transport = transport;
+        StartTransportPump();
+    }
+
+    /// <summary>
+    /// Detaches the currently attached <see cref="ITerminalTransport"/>, stopping the input pipeline pump.
+    /// </summary>
+    public async Task DetachTransportAsync()
+    {
+        ThrowIfDisposed();
+        if (_pumpCts != null)
+        {
+            _pumpCts.Cancel();
+            if (_pumpTask != null)
+            {
+                try
+                {
+                    await _pumpTask.ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) { }
+            }
+            _pumpCts.Dispose();
+            _pumpCts = null;
+            _pumpTask = null;
+        }
+
+        _transport = null;
+    }
+
+    private void StartTransportPump()
+    {
+        if (_transport == null)
+            return;
+
+        _pumpCts = new CancellationTokenSource();
+        _pumpTask = Task.Run(() => ProcessTransportInputAsync(_transport.Input, _pumpCts.Token));
+    }
+
+    /// <summary>
+    /// Ingests input from an <see cref="ITerminalTransport"/>'s <see cref="PipeReader"/> into the terminal decoder.
+    /// </summary>
+    private async Task ProcessTransportInputAsync(PipeReader reader, CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                ReadResult result;
+                try
+                {
+                    result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+
+                ReadOnlySequence<byte> buffer = result.Buffer;
+                if (!buffer.IsEmpty)
+                {
+                    foreach (ReadOnlyMemory<byte> segment in buffer)
+                    {
+                        _decoder.Write(segment.Span);
+                    }
+                    _decoder.Flush();
+                    NotifyBufferUpdated();
+                }
+
+                reader.AdvanceTo(buffer.End);
+
+                if (result.IsCompleted)
+                    break;
+            }
+        }
+        catch (Exception)
+        {
+            // Pipeline read failure or disconnect
+        }
+        finally
+        {
+            NotifyDisconnected();
+        }
+    }
+
+    private void OnSendOutput(ReadOnlySpan<byte> data)
+    {
+        AddToInputQueue(data);
+
+        if (_transport != null && _transport.IsConnected)
+        {
+            try
+            {
+                _transport.Output.Write(data);
+                _ = _transport.Output.FlushAsync();
+            }
+            catch
+            {
+                // Output pipe may have faulted
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -99,7 +257,68 @@ public abstract class TerminalSession : ITerminalSession
     /// <inheritdoc />
     public virtual void Write(ReadOnlySpan<byte> data)
     {
+        if (_transport != null && _transport.IsConnected)
+        {
+            _transport.Output.Write(data);
+            _ = _transport.Output.FlushAsync();
+            return;
+        }
+
         _decoder.Write(data);
+        NotifyBufferUpdated();
+    }
+
+    /// <summary>
+    /// Asynchronously writes input bytes into the session backend (or transport if attached).
+    /// </summary>
+    public virtual async ValueTask WriteAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken = default)
+    {
+        if (_transport != null && _transport.IsConnected)
+        {
+            await _transport.Output.WriteAsync(data, cancellationToken).ConfigureAwait(false);
+            await _transport.Output.FlushAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        _decoder.Write(data.Span);
+        NotifyBufferUpdated();
+    }
+
+    /// <summary>
+    /// Creates a binary snapshot representing the current screen buffer and decoder state.
+    /// </summary>
+    public byte[] CreateSnapshot()
+    {
+        ThrowIfDisposed();
+        return TerminalSnapshotSerializer.SerializeBinary(Buffer, InternalDecoder.State);
+    }
+
+    /// <summary>
+    /// Restores the session's screen buffer and decoder state from a binary snapshot.
+    /// </summary>
+    public void RestoreSnapshot(ReadOnlySpan<byte> snapshot)
+    {
+        ThrowIfDisposed();
+        TerminalSnapshotSerializer.RestoreBinary(snapshot, Buffer, InternalDecoder.State);
+        NotifyBufferUpdated();
+    }
+
+    /// <summary>
+    /// Creates a JSON snapshot representing the current screen buffer and decoder state.
+    /// </summary>
+    public string CreateSnapshotJson(bool indented = false)
+    {
+        ThrowIfDisposed();
+        return TerminalSnapshotSerializer.SerializeJson(Buffer, InternalDecoder.State, indented);
+    }
+
+    /// <summary>
+    /// Restores the session's screen buffer and decoder state from a JSON snapshot.
+    /// </summary>
+    public void RestoreSnapshotJson(string json)
+    {
+        ThrowIfDisposed();
+        TerminalSnapshotSerializer.RestoreJson(json, Buffer, InternalDecoder.State);
         NotifyBufferUpdated();
     }
 
@@ -110,34 +329,45 @@ public abstract class TerminalSession : ITerminalSession
         if (buffer.IsEmpty)
             return 0;
 
-        int bytesRead = 0;
-        lock (_inputQueue)
+        lock (_queueLock)
         {
-            while (!_inputQueue.IsEmpty && bytesRead < buffer.Length)
+            if (_inputCount == 0)
+                return 0;
+
+            int bytesToRead = Math.Min(buffer.Length, _inputCount);
+            int firstPart = Math.Min(bytesToRead, _inputBuffer.Length - _inputHead);
+            _inputBuffer.AsSpan(_inputHead, firstPart).CopyTo(buffer);
+            int remaining = bytesToRead - firstPart;
+            if (remaining > 0)
             {
-                if (!_inputQueue.TryDequeue(out byte resultByte))
-                    continue;
-
-                buffer[bytesRead] = resultByte;
-                bytesRead++;
+                _inputBuffer.AsSpan(0, remaining).CopyTo(buffer[firstPart..]);
             }
-        }
 
-        return bytesRead;
+            _inputHead = (_inputHead + bytesToRead) % _inputBuffer.Length;
+            _inputCount -= bytesToRead;
+
+            if (_inputCount == 0)
+            {
+                _inputHead = 0;
+                _inputTail = 0;
+            }
+
+            return bytesToRead;
+        }
     }
 
     /// <inheritdoc />
     public virtual byte[] ReadAll()
     {
         ThrowIfDisposed();
-        lock (_inputQueue)
+        lock (_queueLock)
         {
-            if (_inputQueue.IsEmpty)
+            if (_inputCount == 0)
                 return [];
 
-            byte[] data = _inputQueue.ToArray();
-            _inputQueue.Clear();
-            return data;
+            byte[] result = new byte[_inputCount];
+            Read(result);
+            return result;
         }
     }
 
@@ -151,19 +381,50 @@ public abstract class TerminalSession : ITerminalSession
             return;
 
         bool wasEmpty;
-        lock (_inputQueue)
+        lock (_queueLock)
         {
-            wasEmpty = _inputQueue.Count == 0;
-            foreach (byte b in data)
+            wasEmpty = _inputCount == 0;
+            EnsureInputCapacity(_inputCount + data.Length);
+
+            int firstPart = Math.Min(data.Length, _inputBuffer.Length - _inputTail);
+            data[..firstPart].CopyTo(_inputBuffer.AsSpan(_inputTail));
+            int remaining = data.Length - firstPart;
+            if (remaining > 0)
             {
-                _inputQueue.Enqueue(b);
+                data.Slice(firstPart, remaining).CopyTo(_inputBuffer.AsSpan(0));
             }
+
+            _inputTail = (_inputTail + data.Length) % _inputBuffer.Length;
+            _inputCount += data.Length;
         }
 
         if (wasEmpty)
         {
             NotifyInputAvailable();
         }
+    }
+
+    private void EnsureInputCapacity(int required)
+    {
+        if (required <= _inputBuffer.Length)
+            return;
+
+        int newCapacity = Math.Max(_inputBuffer.Length * 2, required);
+        byte[] newBuffer = new byte[newCapacity];
+        if (_inputCount > 0)
+        {
+            int firstPart = Math.Min(_inputCount, _inputBuffer.Length - _inputHead);
+            Array.Copy(_inputBuffer, _inputHead, newBuffer, 0, firstPart);
+            int remaining = _inputCount - firstPart;
+            if (remaining > 0)
+            {
+                Array.Copy(_inputBuffer, 0, newBuffer, firstPart, remaining);
+            }
+        }
+
+        _inputBuffer = newBuffer;
+        _inputHead = 0;
+        _inputTail = _inputCount;
     }
 
     /// <summary>
@@ -213,13 +474,77 @@ public abstract class TerminalSession : ITerminalSession
         if (_disposed)
             return;
 
+        if (_pumpCts != null)
+        {
+            _pumpCts.Cancel();
+            try
+            {
+                _pumpTask?.GetAwaiter().GetResult();
+            }
+            catch { }
+            _pumpCts.Dispose();
+            _pumpCts = null;
+            _pumpTask = null;
+        }
+
+        if (_transport != null && !_leaveTransportOpen)
+        {
+            _transport.Dispose();
+            _transport = null;
+        }
+
         _buffer.Dispose();
         _decoder.Dispose();
         Dispose(true);
 
-        lock (_inputQueue)
+        lock (_queueLock)
         {
-            _inputQueue.Clear();
+            _inputCount = 0;
+            _inputHead = 0;
+            _inputTail = 0;
+        }
+
+        GC.SuppressFinalize(this);
+        _disposed = true;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed)
+            return;
+
+        if (_pumpCts != null)
+        {
+            _pumpCts.Cancel();
+            if (_pumpTask != null)
+            {
+                try
+                {
+                    await _pumpTask.ConfigureAwait(false);
+                }
+                catch { }
+            }
+            _pumpCts.Dispose();
+            _pumpCts = null;
+            _pumpTask = null;
+        }
+
+        if (_transport != null && !_leaveTransportOpen)
+        {
+            await _transport.DisposeAsync().ConfigureAwait(false);
+            _transport = null;
+        }
+
+        _buffer.Dispose();
+        _decoder.Dispose();
+        Dispose(true);
+
+        lock (_queueLock)
+        {
+            _inputCount = 0;
+            _inputHead = 0;
+            _inputTail = 0;
         }
 
         GC.SuppressFinalize(this);

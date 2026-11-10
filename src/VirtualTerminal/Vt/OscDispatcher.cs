@@ -38,14 +38,25 @@ internal static class OscDispatcher
                 d.SetTitle(DecodeUtf8(rest));
                 break;
 
-            case 4: // set palette entry: 4 ; c ; spec
+            case 4: // set/query palette entry: 4 ; c ; spec
                 {
                     int semi = rest.IndexOf((byte)';');
                     if (semi > 0 && int.TryParse(DecodeUtf8(rest.Slice(0, semi)), NumberStyles.Integer, CultureInfo.InvariantCulture, out int c))
                     {
-                        TerminalColor? col = ParseColorSpec(DecodeUtf8(rest.Slice(semi + 1)));
-                        if (col.HasValue && c >= 0 && c < 256)
-                            d.Options.Palette[c] = col.Value;
+                        string spec = DecodeUtf8(rest.Slice(semi + 1));
+                        if (spec == "?")
+                        {
+                            if (d.Options.AllowOSCColorQueries && c >= 0 && c < 256)
+                            {
+                                TerminalColor col = d.Options.Palette[c];
+                                d.Respond($"\x1b]4;{c};rgb:{col.R:x2}{col.R:x2}/{col.G:x2}{col.G:x2}/{col.B:x2}{col.B:x2}\x1b\\");
+                            }
+                            break;
+                        }
+
+                        TerminalColor? colParsed = ParseColorSpec(spec);
+                        if (colParsed.HasValue && c >= 0 && c < 256)
+                            d.Options.Palette[c] = colParsed.Value;
                     }
                     break;
                 }
@@ -56,12 +67,25 @@ internal static class OscDispatcher
                 {
                     string spec = DecodeUtf8(rest);
                     if (spec == "?")
-                        break; // query → Phase 2 (gated by AllowOSCColorQueries)
-                    TerminalColor? col = ParseColorSpec(spec);
-                    if (!col.HasValue)
+                    {
+                        if (d.Options.AllowOSCColorQueries)
+                        {
+                            TerminalColor col = command switch
+                            {
+                                10 => d.Options.DefaultForeground,
+                                11 => d.Options.DefaultBackground,
+                                _ => d.Options.DefaultForeground,
+                            };
+                            d.Respond($"\x1b]{command};rgb:{col.R:x2}{col.R:x2}/{col.G:x2}{col.G:x2}/{col.B:x2}{col.B:x2}\x1b\\");
+                        }
                         break;
-                    if (command == 10) d.Options.DefaultForeground = col.Value;
-                    else if (command == 11) d.Options.DefaultBackground = col.Value;
+                    }
+
+                    TerminalColor? colParsed = ParseColorSpec(spec);
+                    if (!colParsed.HasValue)
+                        break;
+                    if (command == 10) d.Options.DefaultForeground = colParsed.Value;
+                    else if (command == 11) d.Options.DefaultBackground = colParsed.Value;
                     break;
                 }
 
@@ -127,7 +151,7 @@ internal static class OscDispatcher
             return hex.Length switch
             {
                 3 => TerminalColor.FromArgb((byte)(Hex(hex, 0) * 17), (byte)(Hex(hex, 1) * 17), (byte)(Hex(hex, 2) * 17)),
-                6 => TerminalColor.FromArgb(Hex(hex, 0), Hex(hex, 4), Hex(hex, 8)),
+                6 => TerminalColor.FromArgb(Hex(hex, 0), Hex(hex, 2), Hex(hex, 4)),
                 _ => null,
             };
         }

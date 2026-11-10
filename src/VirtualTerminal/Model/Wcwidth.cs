@@ -139,8 +139,19 @@ public static class Wcwidth
     {
         int c = rune.Value;
 
-        if (c < 0x20 || (c >= 0x7F && c < 0xA0))
+        // Fast-path: printable ASCII (0x20..0x7E) is overwhelmingly common and always width 1.
+        if ((uint)(c - 0x20) <= (0x7E - 0x20))
+            return 1;
+
+        // C0 controls, DEL, and C1 controls (0x7F..0x9F) are non-printable.
+        if ((uint)c < 0x20 || ((uint)(c - 0x7F) <= (0x9F - 0x7F)))
             return -1;
+
+        // Fast-path: Latin-1 Supplement, Latin Extended-A/B, IPA, and Spacing Modifier Letters
+        // below 0x0300 have no zero-width combining marks (ZeroWidth starts at 0x0300) and no
+        // wide characters (Wide starts at 0x1100).
+        if (c < 0x0300)
+            return 1;
 
         if (InRanges(c, ZeroWidth))
             return 0;
