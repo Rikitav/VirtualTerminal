@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading;
 using VirtualTerminal.Buffer;
 using VirtualTerminal.Interfaces;
+using VirtualTerminal.Serialization;
 
 namespace VirtualTerminal.Session;
 
@@ -280,6 +281,44 @@ public abstract class TerminalSession : ITerminalSession
         }
 
         _decoder.Write(data.Span);
+        NotifyBufferUpdated();
+    }
+
+    /// <summary>
+    /// Creates a binary snapshot representing the current screen buffer and decoder state.
+    /// </summary>
+    public byte[] CreateSnapshot()
+    {
+        ThrowIfDisposed();
+        return TerminalSnapshotSerializer.SerializeBinary(Buffer, InternalDecoder.State);
+    }
+
+    /// <summary>
+    /// Restores the session's screen buffer and decoder state from a binary snapshot.
+    /// </summary>
+    public void RestoreSnapshot(ReadOnlySpan<byte> snapshot)
+    {
+        ThrowIfDisposed();
+        TerminalSnapshotSerializer.RestoreBinary(snapshot, Buffer, InternalDecoder.State);
+        NotifyBufferUpdated();
+    }
+
+    /// <summary>
+    /// Creates a JSON snapshot representing the current screen buffer and decoder state.
+    /// </summary>
+    public string CreateSnapshotJson(bool indented = false)
+    {
+        ThrowIfDisposed();
+        return TerminalSnapshotSerializer.SerializeJson(Buffer, InternalDecoder.State, indented);
+    }
+
+    /// <summary>
+    /// Restores the session's screen buffer and decoder state from a JSON snapshot.
+    /// </summary>
+    public void RestoreSnapshotJson(string json)
+    {
+        ThrowIfDisposed();
+        TerminalSnapshotSerializer.RestoreJson(json, Buffer, InternalDecoder.State);
         NotifyBufferUpdated();
     }
 

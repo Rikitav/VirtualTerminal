@@ -671,6 +671,30 @@ public sealed class TerminalScreenBuffer : IDisposable
     public IReadOnlyList<TerminalRow> GetScrollback()
         => _scrollback;
 
+    /// <summary>Gets a row directly from the primary grid.</summary>
+    public TerminalRow GetPrimaryRow(int y) => _primary[y];
+
+    /// <summary>Gets a row from the alternate grid if allocated, or null.</summary>
+    public TerminalRow? GetAltRow(int y) => _alt?[y];
+
+    /// <summary>Pushes a row directly into the scrollback ring buffer.</summary>
+    public void PushScrollback(TerminalRow row)
+    {
+        lock (SyncRoot)
+        {
+            _scrollback.Push(row);
+        }
+    }
+
+    /// <summary>Clears the scrollback ring buffer.</summary>
+    public void ClearScrollback()
+    {
+        lock (SyncRoot)
+        {
+            _scrollback.Clear();
+        }
+    }
+
     /// <summary>
     /// Returns the text of the active screen, one row per line. Continuation cells are skipped
     /// and trailing blanks are trimmed. Call under <see cref="SyncRoot"/>.
