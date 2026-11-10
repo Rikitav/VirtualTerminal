@@ -27,6 +27,8 @@ public sealed class TerminalScreenBuffer : IDisposable
 
     private int _scrollTop;
     private int _scrollBottom;
+    private int _scrollLeft;
+    private int _scrollRight;
 
     private readonly ScrollbackRingBuffer _scrollback;
 
@@ -45,6 +47,12 @@ public sealed class TerminalScreenBuffer : IDisposable
 
     /// <summary>Gets the bottom row of the current scroll region (inclusive).</summary>
     public int ScrollBottom => _scrollBottom;
+
+    /// <summary>Gets the left column of the current horizontal scroll region (inclusive).</summary>
+    public int ScrollLeft => _scrollLeft;
+
+    /// <summary>Gets the right column of the current horizontal scroll region (inclusive).</summary>
+    public int ScrollRight => _scrollRight;
 
     /// <summary>Gets a value indicating whether the alternate screen is active.</summary>
     public bool IsAlternate => _isAlt;
@@ -258,11 +266,36 @@ public sealed class TerminalScreenBuffer : IDisposable
         _scrollBottom = bottom;
     }
 
-    /// <summary>Resets the scroll region to cover the entire screen.</summary>
+    /// <summary>Sets the horizontal scroll region (left and right margins, 0-based, inclusive).</summary>
+    public void SetHorizontalScrollRegion(int left, int right)
+    {
+        if (left < 0)
+            left = 0;
+
+        if (right >= _columns)
+            right = _columns - 1;
+
+        if (left >= right)
+            return; // invalid region; ignore (DEC spec)
+
+        _scrollLeft = left;
+        _scrollRight = right;
+    }
+
+    /// <summary>Resets the horizontal scroll region to cover the entire line.</summary>
+    public void ResetHorizontalScrollRegion()
+    {
+        _scrollLeft = 0;
+        _scrollRight = _columns - 1;
+    }
+
+    /// <summary>Resets both vertical and horizontal scroll regions to cover the entire screen.</summary>
     public void ResetScrollRegion()
     {
         _scrollTop = 0;
         _scrollBottom = _rows - 1;
+        _scrollLeft = 0;
+        _scrollRight = _columns - 1;
     }
 
     // ---- Scrolling ----
@@ -282,6 +315,23 @@ public sealed class TerminalScreenBuffer : IDisposable
         int region = bottom - top + 1;
         if (n > region)
             n = region;
+
+        // If left/right margins are restricted, perform rectangular sub-region scrolling
+        if (_scrollLeft > 0 || _scrollRight < _columns - 1)
+        {
+            int width = _scrollRight - _scrollLeft + 1;
+            for (int r = top; r <= bottom - n; r++)
+            {
+                _active[r + n].Cells.AsSpan(_scrollLeft, width).CopyTo(_active[r].Cells.AsSpan(_scrollLeft, width));
+                _active[r].Dirty = true;
+            }
+            for (int r = Math.Max(top, bottom - n + 1); r <= bottom; r++)
+            {
+                _active[r].Cells.AsSpan(_scrollLeft, width).Fill(TerminalCellInfo.Blank);
+                _active[r].Dirty = true;
+            }
+            return;
+        }
 
         if (n == 1)
         {
@@ -365,6 +415,23 @@ public sealed class TerminalScreenBuffer : IDisposable
         int region = bottom - top + 1;
         if (n > region)
             n = region;
+
+        // If left/right margins are restricted, perform rectangular sub-region scrolling
+        if (_scrollLeft > 0 || _scrollRight < _columns - 1)
+        {
+            int width = _scrollRight - _scrollLeft + 1;
+            for (int r = bottom; r >= top + n; r--)
+            {
+                _active[r - n].Cells.AsSpan(_scrollLeft, width).CopyTo(_active[r].Cells.AsSpan(_scrollLeft, width));
+                _active[r].Dirty = true;
+            }
+            for (int r = top; r < top + n && r <= bottom; r++)
+            {
+                _active[r].Cells.AsSpan(_scrollLeft, width).Fill(TerminalCellInfo.Blank);
+                _active[r].Dirty = true;
+            }
+            return;
+        }
 
         if (n == 1)
         {

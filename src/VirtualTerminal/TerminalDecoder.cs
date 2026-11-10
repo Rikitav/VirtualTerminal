@@ -521,9 +521,12 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
                     ClearTab(parameters.At(0, 0));
                     break;                  // TBC
 
-                // ---- Save / restore (ANSI) ----
+                // ---- Save / restore (ANSI) / Left and Right Margins (DECSLRM) ----
                 case 's':
-                    State.SaveCursor();
+                    if (State.Modes.LeftRightMarginMode)
+                        SetHorizontalScrollRegion(parameters.At(0, 1), parameters.At(1, Buffer.Columns));
+                    else
+                        State.SaveCursor();
                     break;
                 case 'u':
                     State.RestoreCursor();
@@ -673,21 +676,37 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
 
     private void CursorHorizontal(int delta)
     {
+        int limit = delta < 0
+            ? (State.Modes.LeftRightMarginMode && State.CursorX >= Buffer.ScrollLeft ? Buffer.ScrollLeft : 0)
+            : (State.Modes.LeftRightMarginMode && State.CursorX <= Buffer.ScrollRight ? Buffer.ScrollRight : Buffer.Columns - 1);
+
         State.CursorX = Math.Clamp(State.CursorX + delta, 0, Buffer.Columns - 1);
+        if (delta < 0 && State.CursorX < limit)
+            State.CursorX = limit;
+
+        if (delta > 0 && State.CursorX > limit)
+            State.CursorX = limit;
+
         State.WrapPending = false;
     }
 
     private void CursorLine(int count, int dir)
     {
         count = Math.Max(1, count);
-        State.CursorY = Math.Clamp(State.CursorY + dir * count, 0, Buffer.Rows - 1);
-        State.CursorX = 0;
+        int minY = State.Modes.OriginMode ? Buffer.ScrollTop : 0;
+        int maxY = State.Modes.OriginMode ? Buffer.ScrollBottom : Buffer.Rows - 1;
+        State.CursorY = Math.Clamp(State.CursorY + dir * count, minY, maxY);
+        State.CursorX = State.Modes.OriginMode ? Buffer.ScrollLeft : 0;
         State.WrapPending = false;
     }
 
     private void CursorToColumn(int column)
     {
-        State.CursorX = Math.Clamp(column - 1, 0, Buffer.Columns - 1);
+        int target = State.Modes.OriginMode
+            ? Buffer.ScrollLeft + column - 1 : column - 1;
+        int minX = State.Modes.OriginMode ? Buffer.ScrollLeft : 0;
+        int maxX = State.Modes.OriginMode ? Buffer.ScrollRight : Buffer.Columns - 1;
+        State.CursorX = Math.Clamp(target, minX, maxX);
         State.WrapPending = false;
     }
 
@@ -695,8 +714,9 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     {
         int target = State.Modes.OriginMode
             ? Buffer.ScrollTop + row - 1 : row - 1;
-
-        State.CursorY = Math.Clamp(target, 0, Buffer.Rows - 1);
+        int minY = State.Modes.OriginMode ? Buffer.ScrollTop : 0;
+        int maxY = State.Modes.OriginMode ? Buffer.ScrollBottom : Buffer.Rows - 1;
+        State.CursorY = Math.Clamp(target, minY, maxY);
         State.WrapPending = false;
     }
 
@@ -705,9 +725,16 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         int y = State.Modes.OriginMode
             ? Buffer.ScrollTop + row - 1 : row - 1;
 
-        int x = col - 1;
-        State.CursorY = Math.Clamp(y, 0, Buffer.Rows - 1);
-        State.CursorX = Math.Clamp(x, 0, Buffer.Columns - 1);
+        int x = State.Modes.OriginMode
+            ? Buffer.ScrollLeft + col - 1 : col - 1;
+
+        int minY = State.Modes.OriginMode ? Buffer.ScrollTop : 0;
+        int maxY = State.Modes.OriginMode ? Buffer.ScrollBottom : Buffer.Rows - 1;
+        int minX = State.Modes.OriginMode ? Buffer.ScrollLeft : 0;
+        int maxX = State.Modes.OriginMode ? Buffer.ScrollRight : Buffer.Columns - 1;
+
+        State.CursorY = Math.Clamp(y, minY, maxY);
+        State.CursorX = Math.Clamp(x, minX, maxX);
         State.WrapPending = false;
     }
 
@@ -827,6 +854,13 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
 
                 case 6:
                     State.Modes.OriginMode = set;
+                    CursorPositionSet(1, 1);
+                    break;
+
+                case 69:
+                    State.Modes.LeftRightMarginMode = set;
+                    if (!set)
+                        Buffer.ResetHorizontalScrollRegion();
                     break;
 
                 case 7:
@@ -932,15 +966,18 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
 
     private void SetScrollRegion(int top, int bottom)
     {
-        if (top == 1 && bottom == Buffer.Rows)
-            Buffer.ResetScrollRegion();
-        else
-            Buffer.SetScrollRegion(top - 1, bottom - 1);
+        Buffer.SetScrollRegion(top - 1, bottom - 1);
 
         // Setting the region homes the cursor (respecting origin mode).
-        State.CursorY = State.Modes.OriginMode ? Buffer.ScrollTop : 0;
-        State.CursorX = 0;
-        State.WrapPending = false;
+        CursorPositionSet(1, 1);
+    }
+
+    private void SetHorizontalScrollRegion(int left, int right)
+    {
+        Buffer.SetHorizontalScrollRegion(left - 1, right - 1);
+
+        // Setting the region homes the cursor (respecting origin mode).
+        CursorPositionSet(1, 1);
     }
 
     // ============== Reports ==============
@@ -955,7 +992,7 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
 
             case 6:
                 int row = State.Modes.OriginMode ? State.CursorY - Buffer.ScrollTop + 1 : State.CursorY + 1;
-                int col = State.CursorX + 1;
+                int col = State.Modes.OriginMode ? State.CursorX - Buffer.ScrollLeft + 1 : State.CursorX + 1;
                 Respond($"\x1b[{row};{col}R");
                 break;
         }

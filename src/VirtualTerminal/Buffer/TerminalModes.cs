@@ -30,6 +30,9 @@ public sealed class TerminalModes
     /// <summary>DEC private ?67 — backspace sends 0x08 instead of 0x7F.</summary>
     public bool BackspaceSendsControlH;
 
+    /// <summary>DEC private ?69 (DECLRMM) — left and right margin mode.</summary>
+    public bool LeftRightMarginMode;
+
     /// <summary>ANSI 20 (LNM) — line feed/new line mode: Enter sends CR+LF, LF does CR+LF.</summary>
     public bool LineFeedNewLine = true;
 
@@ -58,6 +61,7 @@ public sealed class TerminalModes
         ReverseVideo = ReverseVideo,
         ApplicationKeypad = ApplicationKeypad,
         BackspaceSendsControlH = BackspaceSendsControlH,
+        LeftRightMarginMode = LeftRightMarginMode,
         LineFeedNewLine = LineFeedNewLine,
         BracketedPaste = BracketedPaste,
         FocusReporting = FocusReporting,
@@ -81,4 +85,3 @@ public enum MouseTrackingMode
     /// <summary>Any-event tracking: report press, release, and motion events.</summary>
     AnyEvent,
 }
-
