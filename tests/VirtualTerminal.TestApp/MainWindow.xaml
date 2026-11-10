@@ -5,55 +5,62 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:VirtualTerminal.TestApp"
         xmlns:vt="clr-namespace:VirtualTerminal;assembly=VirtualTerminal.WPF"
+        xmlns:controls="clr-namespace:VirtualTerminal.Controls;assembly=VirtualTerminal.WPF"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="40"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="30"/>
-        </Grid.RowDefinitions>
+        Title="VirtualTerminal WPF - Multiplexer &amp; Terminal Demo" Height="650" Width="950">
+    <TabControl Background="#1E1E1E">
+        <TabItem Header="Multiplexer Workspace (Demo)" Background="#252526" Foreground="#CCCCCC">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition/>
-        </Grid.ColumnDefinitions>
+                <Border Grid.Row="0" Background="#2D2D30" Padding="8,5" BorderBrush="#3F3F46" BorderThickness="0,0,0,1">
+                    <DockPanel LastChildFill="False">
+                        <TextBlock Text="Multiplexer Workspace" Foreground="#FFFFFF" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,14,0"/>
+                        <Button Content="+ New Tab" Padding="8,3" Margin="0,0,6,0" Click="Button_NewTab_Click"/>
+                        <Button Content="Split Vertical (│)" Padding="8,3" Margin="0,0,6,0" Click="Button_SplitVertical_Click"/>
+                        <Button Content="Split Horizontal (─)" Padding="8,3" Margin="0,0,6,0" Click="Button_SplitHorizontal_Click"/>
+                        <Button Content="Close Active Pane (✕)" Padding="8,3" Margin="0,0,10,0" Click="Button_ClosePane_Click"/>
+                        <Button Content="+ TUI Menu Pane" Padding="8,3" Margin="0,0,6,0" Click="Button_LaunchTui_Click"/>
+                        <TextBlock Text="• Drag splitters to resize • Use top-right action buttons (│, ─, ✕)" Foreground="#888888" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                    </DockPanel>
+                </Border>
 
-        <Border Grid.Row="0" Grid.Column="0" BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Margin="5">
-            <DockPanel>
-                <TextBlock
-                    Text="CMD : "
-                    VerticalAlignment="Center"
-                    Margin="5,0,0,0"/>
+                <controls:TerminalMultiplexerControl x:Name="PART_Multiplexer" Grid.Row="1"/>
+            </Grid>
+        </TabItem>
 
-                <Button
-                    DockPanel.Dock="Right"
-                    Content="Invalidate"
-                    Click="Button_Click_Invalidate"/>
+        <TabItem Header="Single Terminal (Classic)" Background="#252526" Foreground="#CCCCCC">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="40"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="30"/>
+                </Grid.RowDefinitions>
 
-                <Button
-                    DockPanel.Dock="Right"
-                    Content="Start"
-                    Click="Button_Click_Start"/>
+                <Border Grid.Row="0" BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Margin="5">
+                    <DockPanel>
+                        <TextBlock Text="CMD : " VerticalAlignment="Center" Margin="5,0,0,0"/>
+                        <Button DockPanel.Dock="Right" Content="Invalidate" Click="Button_Click_Invalidate"/>
+                        <Button DockPanel.Dock="Right" Content="Start" Click="Button_Click_Start"/>
+                        <TextBox x:Name="PART_CommandLineName" VerticalContentAlignment="Center" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Text="powershell.exe"/>
+                    </DockPanel>
+                </Border>
+                
+                <vt:TerminalControl 
+                    x:Name="PART_Terminal_Left"
+                    Grid.Row="1"
+                    AllowDirectInput="True"
+                    Background="Black"
+                    FontFamily="Cascadia Mono"/>
 
-                <TextBox
-                    x:Name="PART_CommandLineName"
-                    VerticalContentAlignment="Center"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Stretch"
-                    Text="powershell.exe"/>
-            </DockPanel>
-        </Border>
-        
-        <vt:TerminalControl 
-            x:Name="PART_Terminal_Left"
-            Grid.Row="1" Grid.Column="0"
-            AllowDirectInput="True"
-            Background="Black"
-            FontFamily="Cascadia Mono"/>
-
-        <vt:PromptBox
-            x:Name="PART_Prompt_Left"
-            Grid.Row="2" Grid.Column="0"
-            Prompt=">"/>
-    </Grid>
+                <vt:PromptBox
+                    x:Name="PART_Prompt_Left"
+                    Grid.Row="2"
+                    Prompt=">"/>
+            </Grid>
+        </TabItem>
+    </TabControl>
 </Window>

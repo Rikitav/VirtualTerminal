@@ -94,6 +94,13 @@ public class TerminalControl : TemplatedControl, IDisposable
         set => SetValue(CurrentSessionProperty, value);
     }
 
+    /// <summary>Alias for <see cref="CurrentSession"/> providing cross-platform parity with WPF.</summary>
+    public ITerminalSession? Session
+    {
+        get => CurrentSession;
+        set => CurrentSession = value;
+    }
+
     /// <summary>Gets or sets the terminal font size in device-independent pixels.</summary>
     public double TerminalFontSize
     {
