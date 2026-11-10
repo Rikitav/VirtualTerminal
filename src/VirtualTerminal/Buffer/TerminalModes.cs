@@ -1,3 +1,4 @@
+using VirtualTerminal.Enums;
 using VirtualTerminal.Input;
 
 namespace VirtualTerminal.Buffer;
@@ -17,11 +18,14 @@ public sealed class TerminalModes
     /// <summary>DEC private ?7 (DECAWM) — autowrap on reaching the right margin (default on).</summary>
     public bool AutoWrap = true;
 
-    /// <summary>DEC private ?12 — cursor blink.</summary>
-    public bool CursorBlink;
+    /// <summary>DEC private ?12 — cursor blink (default on matching DECSCUSR 0/1).</summary>
+    public bool CursorBlink = true;
 
     /// <summary>DEC private ?25 (DECTCEM) — cursor visible (default on).</summary>
     public bool CursorVisible = true;
+
+    /// <summary>DECSCUSR cursor shape (Block, Underline, Bar).</summary>
+    public CursorShape CursorShape = CursorShape.Block;
 
     /// <summary>DEC private ?5 (DECSCNM) — reverse video (screen-wide inverse).</summary>
     public bool ReverseVideo;
@@ -47,7 +51,7 @@ public sealed class TerminalModes
     /// <summary>DEC private ?1004 — focus reporting.</summary>
     public bool FocusReporting;
 
-    /// <summary>Mouse reporting enabled at all (any of ?9/?1000/?1002/?1003).</summary>
+    /// <summary>Mouse tracking mode (off / X10 click / button-event / any-event motion).</summary>
     public MouseTrackingMode MouseTracking = MouseTrackingMode.Off;
 
     /// <summary>DEC private ?1006 — SGR mouse encoding.</summary>
@@ -71,6 +75,7 @@ public sealed class TerminalModes
             AutoWrap = AutoWrap,
             CursorBlink = CursorBlink,
             CursorVisible = CursorVisible,
+            CursorShape = CursorShape,
             ReverseVideo = ReverseVideo,
             ApplicationKeypad = ApplicationKeypad,
             BackspaceSendsControlH = BackspaceSendsControlH,
@@ -94,15 +99,16 @@ public sealed class TerminalModes
 /// <summary>Mouse tracking mode (off / X10 click / button-event / any-event motion).</summary>
 public enum MouseTrackingMode
 {
-    /// <summary>No mouse reporting.</summary>
-    Off,
-
-    /// <summary>Legacy X11/X10 mode: report only button presses with coordinates.</summary>
-    X10,
-
-    /// <summary>Normal tracking: report button press and release events.</summary>
-    ButtonEvent,
-
-    /// <summary>Any-event tracking: report press, release, and motion events.</summary>
-    AnyEvent,
+    /// <summary>No mouse tracking.</summary>
+    Off = 0,
+    /// <summary>X10 compatibility: button press only (?9).</summary>
+    X10 = 1,
+    /// <summary>Normal tracking: button press and release (?1000).</summary>
+    ButtonPressRelease = 2,
+    /// <summary>Highlight tracking (?1001).</summary>
+    Highlight = 3,
+    /// <summary>Button-event tracking: button press, release, and drag (?1002).</summary>
+    ButtonEvent = 4,
+    /// <summary>Any-event tracking: all motion and buttons (?1003).</summary>
+    AnyEvent = 5,
 }

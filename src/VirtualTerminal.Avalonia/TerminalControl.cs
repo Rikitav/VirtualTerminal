@@ -567,6 +567,7 @@ public class TerminalControl : TemplatedControl, IDisposable
                 && state.Modes.CursorVisible && CursorVisible;
 
             _cursorRenderer.CursorBlinkMode = state.Modes.CursorBlink;
+            _cursorRenderer.Shape = state.Modes.CursorShape;
             _cursorRenderer.BackgroundColor = Background is SolidColorBrush scb ? scb.Color : Colors.Black;
             _cursorRenderer.Render(context);
         }

@@ -469,9 +469,40 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         char fc = (char)final;
         try
         {
-            // DECSCUSR: CSI Ps SP q — cursor style is a renderer concern; parse and ignore.
+            // DECSCUSR: CSI Ps SP q — set cursor shape and blink
             if (fc == 'q' && intermediates.Length == 1 && intermediates[0] == ' ')
+            {
+                int style = parameters.At(0, 1);
+                switch (style)
+                {
+                    case 0:
+                    case 1:
+                        State.Modes.CursorShape = CursorShape.Block;
+                        State.Modes.CursorBlink = true;
+                        break;
+                    case 2:
+                        State.Modes.CursorShape = CursorShape.Block;
+                        State.Modes.CursorBlink = false;
+                        break;
+                    case 3:
+                        State.Modes.CursorShape = CursorShape.Underline;
+                        State.Modes.CursorBlink = true;
+                        break;
+                    case 4:
+                        State.Modes.CursorShape = CursorShape.Underline;
+                        State.Modes.CursorBlink = false;
+                        break;
+                    case 5:
+                        State.Modes.CursorShape = CursorShape.Bar;
+                        State.Modes.CursorBlink = true;
+                        break;
+                    case 6:
+                        State.Modes.CursorShape = CursorShape.Bar;
+                        State.Modes.CursorBlink = false;
+                        break;
+                }
                 return;
+            }
 
             // DECRQSS: CSI ? Ps $ p
             if (fc == 'p' && intermediates.Length == 1 && intermediates[0] == '$' && privateMarker == '?')
@@ -727,6 +758,16 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
             case "\"q":
                 int cursorStyle = State.Modes.CursorBlink ? 1 : 2;
                 Respond($"\x1bP1$r{cursorStyle}\"q\x1b\\");
+                break;
+            case " q":
+                int decscusrStyle = State.Modes.CursorShape switch
+                {
+                    CursorShape.Block => State.Modes.CursorBlink ? 1 : 2,
+                    CursorShape.Underline => State.Modes.CursorBlink ? 3 : 4,
+                    CursorShape.Bar => State.Modes.CursorBlink ? 5 : 6,
+                    _ => 1
+                };
+                Respond($"\x1bP1$r{decscusrStyle} q\x1b\\");
                 break;
             case "\"p":
                 Respond("\x1bP1$r65;1\"p\x1b\\");

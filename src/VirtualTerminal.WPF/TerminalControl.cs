@@ -530,6 +530,7 @@ public partial class TerminalControl : Control, IDisposable
 
         _cursorRenderer.IsCursorVisible = IsFocused && _scrollOffset == 0 && state.Modes.CursorVisible && CursorVisible;
         _cursorRenderer.CursorBlinkMode = state.Modes.CursorBlink;
+        _cursorRenderer.Shape = state.Modes.CursorShape;
         _cursorRenderer.BackgroundColor = ScreenBackground;
         _cursorRenderer.Render(drawingContext);
     }

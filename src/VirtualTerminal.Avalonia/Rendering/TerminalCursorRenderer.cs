@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Media;
+using VirtualTerminal.Enums;
 
 namespace VirtualTerminal.Rendering;
 
@@ -31,6 +32,11 @@ public abstract class TerminalCursorRenderer
     /// conventional terminal behavior).
     /// </summary>
     public bool CursorBlinkMode { get; set; }
+
+    /// <summary>
+    /// Gets or sets the active cursor shape (Block, Underline, Bar) according to DECSCUSR.
+    /// </summary>
+    public CursorShape Shape { get; set; } = CursorShape.Block;
 
     /// <summary>
     /// Gets or sets the control's current background color. Set by the owning control immediately

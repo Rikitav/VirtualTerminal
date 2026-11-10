@@ -1,13 +1,14 @@
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Threading;
+using VirtualTerminal.Enums;
 using VirtualTerminal.Rendering;
 
 namespace VirtualTerminal.Cursors;
 
 /// <summary>
 /// Cursor visual that glides from its previous cell to the new one. Near moves (typing, arrow
-/// keys) animate: the bar is drawn at both the previous cell (A) and the target cell (B),
+/// keys) animate: the cursor shape is drawn at both the previous cell (A) and the target cell (B),
 /// connected by a transition quadrilateral, and A interpolates toward B with a cosine ease-in-out
 /// over <see cref="AnimationDuration"/>. Far jumps (newline, prompt redraws, absolute cursor
 /// positioning) teleport, so the cursor never sweeps through transient positions. The cursor is
@@ -51,7 +52,7 @@ public sealed class AnimatedTerminalCursorRenderer : TerminalCursorRenderer
     /// <summary>Initializes a new instance of the <see cref="AnimatedTerminalCursorRenderer"/> class.</summary>
     public AnimatedTerminalCursorRenderer()
     {
-        _timer = new DispatcherTimer(FrameInterval, DispatcherPriority.Background, Dispatcher.UIThread, OnTick);
+        _timer = new DispatcherTimer(FrameInterval, DispatcherPriority.Background, OnTick);
     }
 
     /// <inheritdoc/>
@@ -88,6 +89,7 @@ public sealed class AnimatedTerminalCursorRenderer : TerminalCursorRenderer
             double cellH = _target.Height;
             double dxCells = cellW > 0 ? Math.Abs(cellRect.X - _target.X) / cellW : double.MaxValue;
             double dyCells = cellH > 0 ? Math.Abs(cellRect.Y - _target.Y) / cellH : double.MaxValue;
+
             if (dxCells + dyCells > MaxGlideCells)
             {
                 _timer.Stop();
@@ -121,13 +123,15 @@ public sealed class AnimatedTerminalCursorRenderer : TerminalCursorRenderer
         if (_animating)
         {
             Rect current = Interpolate(_start, _target, Ease(Progress()));
-            DrawQuadrilateral(context, current, _target, brush);
-            DrawBar(context, current, brush);
-            DrawBar(context, _target, brush);
+            Rect a = GetShapeRect(current, Shape);
+            Rect b = GetShapeRect(_target, Shape);
+            DrawQuadrilateral(context, a, b, brush);
+            DrawShape(context, a, brush);
+            DrawShape(context, b, brush);
         }
         else
         {
-            DrawBar(context, _target, brush);
+            DrawShape(context, GetShapeRect(_target, Shape), brush);
         }
     }
 
@@ -168,23 +172,47 @@ public sealed class AnimatedTerminalCursorRenderer : TerminalCursorRenderer
     private static Color Invert(Color c) =>
         new(255, (byte)~c.R, (byte)~c.G, (byte)~c.B);
 
-    private static double BarWidth(Rect cellRect) => Math.Max(2, cellRect.Width * 0.15);
-
-    private static void DrawBar(DrawingContext context, Rect cellRect, IBrush brush)
+    private static Rect GetShapeRect(Rect cell, CursorShape shape) => shape switch
     {
-        context.DrawRectangle(brush, null, new Rect(cellRect.X, cellRect.Y, BarWidth(cellRect), cellRect.Height));
+        CursorShape.Block => cell,
+        CursorShape.Underline => new Rect(
+            cell.X,
+            cell.Y + cell.Height - Math.Max(2, cell.Height * 0.15),
+            cell.Width,
+            Math.Max(2, cell.Height * 0.15)),
+        CursorShape.Bar => new Rect(
+            cell.X,
+            cell.Y,
+            Math.Max(2, cell.Width * 0.15),
+            cell.Height),
+        _ => cell,
+    };
+
+    private static void DrawShape(DrawingContext context, Rect shapeRect, IBrush brush)
+    {
+        context.DrawRectangle(brush, null, shapeRect);
     }
 
-    /// <summary>Fills the quadrilateral swept between the A and B bar rectangles.</summary>
+    /// <summary>Fills the quadrilateral swept between the A and B cursor rectangles.</summary>
     private static void DrawQuadrilateral(DrawingContext context, Rect a, Rect b, IBrush brush)
     {
         var geometry = new StreamGeometry();
         using (StreamGeometryContext ctx = geometry.Open())
         {
-            ctx.BeginFigure(new Point(a.X, a.Y));
-            ctx.LineTo(new Point(b.X, b.Y));
-            ctx.LineTo(new Point(b.X + BarWidth(b), b.Y + b.Height));
-            ctx.LineTo(new Point(a.X + BarWidth(a), a.Y + a.Height));
+            if (b.X >= a.X)
+            {
+                ctx.BeginFigure(new Point(a.X, a.Y));
+                ctx.LineTo(new Point(b.Right, b.Y));
+                ctx.LineTo(new Point(b.Right, b.Bottom));
+                ctx.LineTo(new Point(a.X, a.Bottom));
+            }
+            else
+            {
+                ctx.BeginFigure(new Point(b.X, b.Y));
+                ctx.LineTo(new Point(a.Right, a.Y));
+                ctx.LineTo(new Point(a.Right, a.Bottom));
+                ctx.LineTo(new Point(b.X, b.Bottom));
+            }
         }
 
         context.DrawGeometry(brush, null, geometry);

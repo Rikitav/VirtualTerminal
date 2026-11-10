@@ -1,14 +1,15 @@
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
+using VirtualTerminal.Enums;
 using VirtualTerminal.Rendering;
 
 namespace VirtualTerminal.Cursors;
 
 /// <summary>
-/// Default cursor visual: a thin vertical bar (15% of the cell width, at least 2 device units)
-/// that snaps instantly to the target cell and blinks on a private 530ms timer. Replaceable via
-/// <see cref="TerminalControl.CursorRenderer"/>.
+/// Default cursor visual: renders the active <see cref="TerminalCursorRenderer.Shape"/> (Block, Underline, Bar)
+/// that snaps instantly to the target cell and blinks on a private 530ms timer when blinking is enabled.
+/// Replaceable via <see cref="TerminalControl.CursorRenderer"/>.
 /// </summary>
 public sealed class DefaultTerminalCursorRenderer : TerminalCursorRenderer
 {
@@ -46,17 +47,32 @@ public sealed class DefaultTerminalCursorRenderer : TerminalCursorRenderer
     /// <inheritdoc/>
     public override void Render(DrawingContext context)
     {
-        if (!IsCursorVisible || !_blinkOn)
+        if (!IsCursorVisible || (CursorBlinkMode && !_blinkOn))
             return;
 
-        double width = Math.Max(2, _currentRect.Width * 0.15);
-        context.DrawRectangle(CursorBrush, null, new Rect(_currentRect.X, _currentRect.Y, width, _currentRect.Height));
+        Rect shapeRect = Shape switch
+        {
+            CursorShape.Block => _currentRect,
+            CursorShape.Underline => new Rect(
+                _currentRect.X,
+                _currentRect.Y + _currentRect.Height - Math.Max(2, _currentRect.Height * 0.15),
+                _currentRect.Width,
+                Math.Max(2, _currentRect.Height * 0.15)),
+            CursorShape.Bar => new Rect(
+                _currentRect.X,
+                _currentRect.Y,
+                Math.Max(2, _currentRect.Width * 0.15),
+                _currentRect.Height),
+            _ => _currentRect,
+        };
+
+        context.DrawRectangle(CursorBrush, null, shapeRect);
     }
 
     private void OnBlinkTick(object? sender, EventArgs e)
     {
         _blinkOn = !_blinkOn;
-        if (IsCursorVisible)
+        if (IsCursorVisible && CursorBlinkMode)
             TerminalControl?.InvalidateVisual();
     }
 }

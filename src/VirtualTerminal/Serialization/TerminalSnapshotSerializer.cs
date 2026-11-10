@@ -375,6 +375,7 @@ public static class TerminalSnapshotSerializer
                 MouseTracking = (int)state.Modes.MouseTracking,
                 SgrMouseEncoding = state.Modes.SgrMouseEncoding,
                 KittyKeyboardFlags = (int)state.Modes.KittyKeyboardFlags,
+                CursorShape = (int)state.Modes.CursorShape,
             },
         };
     }
@@ -411,6 +412,7 @@ public static class TerminalSnapshotSerializer
             state.Modes.MouseTracking = (MouseTrackingMode)m.Modes.MouseTracking;
             state.Modes.SgrMouseEncoding = m.Modes.SgrMouseEncoding;
             state.Modes.KittyKeyboardFlags = (KittyKeyboardFlags)m.Modes.KittyKeyboardFlags;
+            state.Modes.CursorShape = (CursorShape)m.Modes.CursorShape;
         }
 
         return state;
@@ -548,6 +550,7 @@ public static class TerminalSnapshotSerializer
         writer.Write((int)modes.MouseTracking);
         writer.Write(modes.SgrMouseEncoding);
         writer.Write((int)modes.KittyKeyboardFlags);
+        writer.Write((byte)modes.CursorShape);
     }
 
     private static TerminalState ReadState(BinaryReader reader)
@@ -581,6 +584,10 @@ public static class TerminalSnapshotSerializer
         modes.MouseTracking = (MouseTrackingMode)reader.ReadInt32();
         modes.SgrMouseEncoding = reader.ReadBoolean();
         modes.KittyKeyboardFlags = (KittyKeyboardFlags)reader.ReadInt32();
+        if (reader.BaseStream.Position < reader.BaseStream.Length)
+        {
+            modes.CursorShape = (CursorShape)reader.ReadByte();
+        }
 
         return state;
     }
@@ -729,6 +736,8 @@ public sealed class ModesSnapshotModel
     public bool SgrMouseEncoding { get; set; }
     /// <summary>Kitty Keyboard Protocol flags.</summary>
     public int KittyKeyboardFlags { get; set; }
+    /// <summary>Cursor shape (Block, Underline, Bar).</summary>
+    public int CursorShape { get; set; }
 }
 
 #endregion

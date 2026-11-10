@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
+using VirtualTerminal.Enums;
 using VirtualTerminal.Rendering;
 
 namespace VirtualTerminal.Cursors;
@@ -130,15 +131,15 @@ public sealed class LandingTerminalCursorRenderer : TerminalCursorRenderer
 
             // Takeoff: the cursor at the source cell grows and fades out.
             Rect lift = ExpandAroundCenter(_takeoff, 1 + (ExpandFactor - 1) * t);
-            DrawBar(context, lift, CursorBrush(Alpha(1 - raw)));
+            DrawShape(context, GetShapeRect(lift, Shape), CursorBrush(Alpha(1 - raw)));
 
             // Landing: an oversized transparent cursor at the target shrinks into place.
             Rect land = ExpandAroundCenter(_target, 1 + (ExpandFactor - 1) * (1 - t));
-            DrawBar(context, land, CursorBrush(Alpha(raw)));
+            DrawShape(context, GetShapeRect(land, Shape), CursorBrush(Alpha(raw)));
             return;
         }
 
-        DrawBar(context, _target, CursorBrush(255));
+        DrawShape(context, GetShapeRect(_target, Shape), CursorBrush(255));
     }
 
     private void OnTick(object? sender, EventArgs e)
@@ -187,10 +188,24 @@ public sealed class LandingTerminalCursorRenderer : TerminalCursorRenderer
     private static Color Invert(Color c, byte alpha) =>
         Color.FromArgb(alpha, (byte)~c.R, (byte)~c.G, (byte)~c.B);
 
-    private static double BarWidth(Rect cellRect) => Math.Max(2, cellRect.Width * 0.15);
-
-    private static void DrawBar(DrawingContext context, Rect cellRect, Brush brush)
+    private static Rect GetShapeRect(Rect cell, CursorShape shape) => shape switch
     {
-        context.DrawRectangle(brush, null, new Rect(cellRect.X, cellRect.Y, BarWidth(cellRect), cellRect.Height));
+        CursorShape.Block => cell,
+        CursorShape.Underline => new Rect(
+            cell.X,
+            cell.Y + cell.Height - Math.Max(2, cell.Height * 0.15),
+            cell.Width,
+            Math.Max(2, cell.Height * 0.15)),
+        CursorShape.Bar => new Rect(
+            cell.X,
+            cell.Y,
+            Math.Max(2, cell.Width * 0.15),
+            cell.Height),
+        _ => cell,
+    };
+
+    private static void DrawShape(DrawingContext context, Rect shapeRect, Brush brush)
+    {
+        context.DrawRectangle(brush, null, shapeRect);
     }
 }
