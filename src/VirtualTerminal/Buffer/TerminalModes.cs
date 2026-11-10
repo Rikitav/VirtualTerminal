@@ -1,3 +1,5 @@
+using VirtualTerminal.Input;
+
 namespace VirtualTerminal.Buffer;
 
 /// <summary>DEC/ANSI mode flags tracked by the terminal state (DECSET/DECRST).</summary>
@@ -51,27 +53,42 @@ public sealed class TerminalModes
     /// <summary>DEC private ?1006 — SGR mouse encoding.</summary>
     public bool SgrMouseEncoding;
 
+    /// <summary>Kitty Keyboard Protocol progressive enhancement flags.</summary>
+    public KittyKeyboardFlags KittyKeyboardFlags = KittyKeyboardFlags.None;
+
+    /// <summary>Kitty Keyboard Protocol flag stack for push/pop operations.</summary>
+    public Stack<KittyKeyboardFlags> KittyKeyboardStack { get; } = new();
+
     /// <summary>Creates a copy of the current mode state.</summary>
     /// <returns>A new <see cref="TerminalModes"/> instance with the same flag values.</returns>
-    public TerminalModes Clone() => new()
+    public TerminalModes Clone()
     {
-        ApplicationCursorKeys = ApplicationCursorKeys,
-        InsertMode = InsertMode,
-        OriginMode = OriginMode,
-        AutoWrap = AutoWrap,
-        CursorBlink = CursorBlink,
-        CursorVisible = CursorVisible,
-        ReverseVideo = ReverseVideo,
-        ApplicationKeypad = ApplicationKeypad,
-        BackspaceSendsControlH = BackspaceSendsControlH,
-        LeftRightMarginMode = LeftRightMarginMode,
-        LineFeedNewLine = LineFeedNewLine,
-        BracketedPaste = BracketedPaste,
-        SynchronizedOutput = SynchronizedOutput,
-        FocusReporting = FocusReporting,
-        MouseTracking = MouseTracking,
-        SgrMouseEncoding = SgrMouseEncoding,
-    };
+        var clone = new TerminalModes
+        {
+            ApplicationCursorKeys = ApplicationCursorKeys,
+            InsertMode = InsertMode,
+            OriginMode = OriginMode,
+            AutoWrap = AutoWrap,
+            CursorBlink = CursorBlink,
+            CursorVisible = CursorVisible,
+            ReverseVideo = ReverseVideo,
+            ApplicationKeypad = ApplicationKeypad,
+            BackspaceSendsControlH = BackspaceSendsControlH,
+            LeftRightMarginMode = LeftRightMarginMode,
+            LineFeedNewLine = LineFeedNewLine,
+            BracketedPaste = BracketedPaste,
+            SynchronizedOutput = SynchronizedOutput,
+            FocusReporting = FocusReporting,
+            MouseTracking = MouseTracking,
+            SgrMouseEncoding = SgrMouseEncoding,
+            KittyKeyboardFlags = KittyKeyboardFlags,
+        };
+
+        foreach (var flag in KittyKeyboardStack.Reverse())
+            clone.KittyKeyboardStack.Push(flag);
+
+        return clone;
+    }
 }
 
 /// <summary>Mouse tracking mode (off / X10 click / button-event / any-event motion).</summary>

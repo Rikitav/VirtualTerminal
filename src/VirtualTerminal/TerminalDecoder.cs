@@ -590,7 +590,49 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
                         State.SaveCursor();
                     break;
                 case 'u':
-                    State.RestoreCursor();
+                    if (privateMarker == '?')
+                    {
+                        // Kitty Keyboard Protocol query: CSI ? u -> CSI ? {flags} u
+                        Respond($"\x1b[?{(int)State.Modes.KittyKeyboardFlags}u");
+                    }
+                    else if (privateMarker == '>')
+                    {
+                        // Kitty Keyboard Protocol push flags: CSI > {flags} u
+                        int flags = parameters.At(0, 0);
+                        State.Modes.KittyKeyboardStack.Push(State.Modes.KittyKeyboardFlags);
+                        State.Modes.KittyKeyboardFlags = (VirtualTerminal.Input.KittyKeyboardFlags)flags;
+                    }
+                    else if (privateMarker == '<')
+                    {
+                        // Kitty Keyboard Protocol pop flags: CSI < {count} u
+                        int count = Math.Max(1, parameters.At(0, 1));
+                        for (int i = 0; i < count; i++)
+                        {
+                            if (State.Modes.KittyKeyboardStack.Count > 0)
+                                State.Modes.KittyKeyboardFlags = State.Modes.KittyKeyboardStack.Pop();
+                            else
+                            {
+                                State.Modes.KittyKeyboardFlags = VirtualTerminal.Input.KittyKeyboardFlags.None;
+                                break;
+                            }
+                        }
+                    }
+                    else if (privateMarker == '=')
+                    {
+                        // Kitty Keyboard Protocol set flags: CSI = {flags} [; {mode}] u
+                        int flags = parameters.At(0, 0);
+                        int mode = parameters.At(1, 1);
+                        if (mode == 2)
+                            State.Modes.KittyKeyboardFlags |= (VirtualTerminal.Input.KittyKeyboardFlags)flags;
+                        else if (mode == 3)
+                            State.Modes.KittyKeyboardFlags &= ~(VirtualTerminal.Input.KittyKeyboardFlags)flags;
+                        else
+                            State.Modes.KittyKeyboardFlags = (VirtualTerminal.Input.KittyKeyboardFlags)flags;
+                    }
+                    else
+                    {
+                        State.RestoreCursor();
+                    }
                     break;
 
                 // ---- Modes ----
