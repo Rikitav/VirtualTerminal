@@ -136,6 +136,26 @@ public class TerminalTabControl : Grid
         }
     }
 
+    /// <summary>Updates the content of a tab and synchronizes the content area safely.</summary>
+    public void SetTabContent(TerminalTabItem tab, Control? content)
+    {
+        if (ReferenceEquals(_selectedTab, tab))
+        {
+            _contentArea.Content = null;
+        }
+        tab.Content = content;
+        if (ReferenceEquals(_selectedTab, tab))
+        {
+            _contentArea.Content = content;
+        }
+    }
+
+    /// <summary>Refreshes the content displayed in the content area for the currently selected tab.</summary>
+    public void RefreshContent()
+    {
+        _contentArea.Content = _selectedTab?.Content;
+    }
+
     /// <summary>Adds a new tab with optional title and content.</summary>
     public TerminalTabItem AddTab(string? title = null, Control? content = null)
     {

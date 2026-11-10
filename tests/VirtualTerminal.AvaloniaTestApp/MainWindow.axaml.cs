@@ -59,6 +59,29 @@ public partial class MainWindow : Window
         {
             PART_Multiplexer.TabControl.SelectedTab = PART_Multiplexer.TabControl.Tabs[1];
         }
+
+        if (Environment.GetCommandLineArgs().Contains("--test-splits"))
+        {
+            // Test 1: Split vertical on single tab
+            PART_Multiplexer.TabControl.SelectedTab = PART_Multiplexer.TabControl.Tabs[0];
+            var term1 = PART_Multiplexer.SplitActivePane(Orientation.Vertical);
+            if (term1 == null) throw new InvalidOperationException("Failed to split vertical on single tab");
+
+            // Test 2: Split horizontal on nested pane
+            var term2 = PART_Multiplexer.SplitActivePane(Orientation.Horizontal);
+            if (term2 == null) throw new InvalidOperationException("Failed to split horizontal on nested pane");
+
+            // Test 3: Close active pane
+            PART_Multiplexer.CloseActivePane();
+
+            // Test 4: Split horizontal on Tab 2
+            PART_Multiplexer.TabControl.SelectedTab = PART_Multiplexer.TabControl.Tabs[1];
+            var term3 = PART_Multiplexer.SplitActivePane(Orientation.Horizontal);
+            if (term3 == null) throw new InvalidOperationException("Failed to split horizontal on pre-split tab");
+
+            Console.WriteLine("AVALONIA_SPLIT_TEST_SUCCESS");
+            Environment.Exit(0);
+        }
     }
 
     private TerminalControl CreateDemoTerminal(ITerminalSession? session = null)

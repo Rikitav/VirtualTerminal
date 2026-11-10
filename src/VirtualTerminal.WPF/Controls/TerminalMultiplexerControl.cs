@@ -86,15 +86,25 @@ public class TerminalMultiplexerControl : Grid
         {
             // The entire tab was a single terminal (or empty); wrap it into a split
             var existing = tab.Content ?? currentActive ?? CreateTerminal();
+            TerminalSplitControl.DisconnectFromParent(existing);
+            TerminalSplitControl.DisconnectFromParent(newTerminal);
+
             var split = new TerminalSplitControl(existing, newTerminal, orientation);
-            tab.Content = split;
-            _tabControl.SelectedTab = tab; // refresh content
+            _tabControl.SetTabContent(tab, split);
         }
         else if (tab.Content is TerminalSplitControl rootSplit)
         {
-            // Replace current leaf with a new nested split
-            var nestedSplit = new TerminalSplitControl(currentActive, newTerminal, orientation);
-            rootSplit.ReplaceChild(currentActive, nestedSplit);
+            if (!rootSplit.SplitChild(currentActive, newTerminal, orientation))
+            {
+                TerminalSplitControl.DisconnectFromParent(rootSplit);
+                TerminalSplitControl.DisconnectFromParent(newTerminal);
+                var split = new TerminalSplitControl(rootSplit, newTerminal, orientation);
+                _tabControl.SetTabContent(tab, split);
+            }
+            else
+            {
+                _tabControl.RefreshContent();
+            }
         }
 
         ActiveTerminal = newTerminal;
@@ -125,8 +135,12 @@ public class TerminalMultiplexerControl : Grid
             UIElement? remaining = rootSplit.CloseChild(target);
             if (remaining != null && !ReferenceEquals(remaining, rootSplit))
             {
-                tab.Content = remaining;
-                _tabControl.SelectedTab = tab;
+                TerminalSplitControl.DisconnectFromParent(remaining);
+                _tabControl.SetTabContent(tab, remaining);
+            }
+            else
+            {
+                _tabControl.RefreshContent();
             }
 
             var nextActive = FindFirstTerminal(tab.Content);

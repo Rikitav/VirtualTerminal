@@ -1,7 +1,9 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 
 namespace VirtualTerminal.Controls;
 
@@ -93,12 +95,98 @@ public class TerminalSplitControl : Grid
         }
     }
 
-    /// <summary>Sets both panes simultaneously and updates layout.</summary>
+    /// <summary>Sets both panes simultaneously and updates layout safely.</summary>
     public void SetPanes(Control? pane1, Control? pane2)
     {
+        if (_pane1 != null && !ReferenceEquals(_pane1, pane1) && !ReferenceEquals(_pane1, pane2))
+            DisconnectFromParent(_pane1);
+
+        if (_pane2 != null && !ReferenceEquals(_pane2, pane1) && !ReferenceEquals(_pane2, pane2))
+            DisconnectFromParent(_pane2);
+
         _pane1 = pane1;
         _pane2 = pane2;
         RebuildLayout();
+    }
+
+    /// <summary>
+    /// Safely disconnects a Control from any visual or logical parent it currently belongs to in Avalonia.
+    /// </summary>
+    public static void DisconnectFromParent(Control? element)
+    {
+        if (element == null)
+            return;
+
+        if (element.Parent is Panel panel)
+        {
+            panel.Children.Remove(element);
+            return;
+        }
+        if (element.Parent is ContentPresenter cp)
+        {
+            cp.Content = null;
+            return;
+        }
+        if (element.Parent is ContentControl cc)
+        {
+            cc.Content = null;
+            return;
+        }
+        if (element.Parent is Border border)
+        {
+            border.Child = null;
+            return;
+        }
+
+        var visualParent = (element as Visual)?.GetVisualParent();
+        if (visualParent is Panel vPanel)
+        {
+            vPanel.Children.Remove(element);
+        }
+        else if (visualParent is ContentPresenter vCp)
+        {
+            vCp.Content = null;
+        }
+        else if (visualParent is Border vBorder)
+        {
+            vBorder.Child = null;
+        }
+    }
+
+    /// <summary>
+    /// Splits an existing child pane in place with a new pane, without violating logical parent constraints.
+    /// </summary>
+    public bool SplitChild(Control childToSplit, Control newPane, Orientation orientation)
+    {
+        if (ReferenceEquals(_pane1, childToSplit))
+        {
+            Children.Remove(childToSplit);
+            DisconnectFromParent(childToSplit);
+            DisconnectFromParent(newPane);
+            var nested = new TerminalSplitControl(childToSplit, newPane, orientation);
+            _pane1 = nested;
+            RebuildLayout();
+            return true;
+        }
+
+        if (ReferenceEquals(_pane2, childToSplit))
+        {
+            Children.Remove(childToSplit);
+            DisconnectFromParent(childToSplit);
+            DisconnectFromParent(newPane);
+            var nested = new TerminalSplitControl(childToSplit, newPane, orientation);
+            _pane2 = nested;
+            RebuildLayout();
+            return true;
+        }
+
+        if (_pane1 is TerminalSplitControl childSplit1 && childSplit1.SplitChild(childToSplit, newPane, orientation))
+            return true;
+
+        if (_pane2 is TerminalSplitControl childSplit2 && childSplit2.SplitChild(childToSplit, newPane, orientation))
+            return true;
+
+        return false;
     }
 
     /// <summary>
@@ -108,12 +196,14 @@ public class TerminalSplitControl : Grid
     {
         if (ReferenceEquals(_pane1, oldChild))
         {
+            DisconnectFromParent(oldChild);
             SetPanes(newChild, _pane2);
             return true;
         }
 
         if (ReferenceEquals(_pane2, oldChild))
         {
+            DisconnectFromParent(oldChild);
             SetPanes(_pane1, newChild);
             return true;
         }
@@ -135,10 +225,26 @@ public class TerminalSplitControl : Grid
         PaneCloseRequested?.Invoke(this, childToClose);
 
         if (ReferenceEquals(_pane1, childToClose))
-            return _pane2;
+        {
+            var remaining = _pane2;
+            Children.Clear();
+            _pane1 = null;
+            _pane2 = null;
+            DisconnectFromParent(childToClose);
+            DisconnectFromParent(remaining);
+            return remaining;
+        }
 
         if (ReferenceEquals(_pane2, childToClose))
-            return _pane1;
+        {
+            var remaining = _pane1;
+            Children.Clear();
+            _pane1 = null;
+            _pane2 = null;
+            DisconnectFromParent(childToClose);
+            DisconnectFromParent(remaining);
+            return remaining;
+        }
 
         if (_pane1 is TerminalSplitControl childSplit1)
         {
@@ -204,6 +310,7 @@ public class TerminalSplitControl : Grid
 
         if (_pane1 != null && _pane2 == null)
         {
+            DisconnectFromParent(_pane1);
             Children.Add(_pane1);
             SetRow(_pane1, 0);
             SetColumn(_pane1, 0);
@@ -212,6 +319,7 @@ public class TerminalSplitControl : Grid
 
         if (_pane1 == null && _pane2 != null)
         {
+            DisconnectFromParent(_pane2);
             Children.Add(_pane2);
             SetRow(_pane2, 0);
             SetColumn(_pane2, 0);
@@ -219,6 +327,9 @@ public class TerminalSplitControl : Grid
         }
 
         // Both panes are non-null: create split with GridSplitter
+        DisconnectFromParent(_pane1!);
+        DisconnectFromParent(_pane2!);
+
         if (_orientation == Orientation.Vertical)
         {
             // Left/right split
