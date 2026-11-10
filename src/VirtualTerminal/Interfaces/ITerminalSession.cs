@@ -7,7 +7,7 @@ namespace VirtualTerminal.Interfaces;
 /// Represents a terminal backend session that can provide output via a <see cref="TerminalScreenBuffer"/>
 /// and accept input as bytes (typically VT/ANSI sequences).
 /// </summary>
-public interface ITerminalSession : IDisposable
+public interface ITerminalSession : IDisposable, IAsyncDisposable
 {
     /// <summary>
     /// Raised when the terminal buffer content has changed and the UI should re-render.
@@ -33,6 +33,11 @@ public interface ITerminalSession : IDisposable
     /// Gets the underlaying VT escape sequnces decoder
     /// </summary>
     public ITerminalDecoder Decoder { get; }
+
+    /// <summary>
+    /// Gets the attached transport, or <c>null</c> if unattached.
+    /// </summary>
+    public ITerminalTransport? Transport => null;
 
     /// <summary>
     /// Gets the encoding expected by <see cref="Write"/>.
@@ -80,4 +85,11 @@ public interface ITerminalSession : IDisposable
     /// </summary>
     /// <returns>Array containing all available read bytes; empty if no data available.</returns>
     public byte[] ReadAll();
+
+    /// <inheritdoc />
+    ValueTask IAsyncDisposable.DisposeAsync()
+    {
+        Dispose();
+        return ValueTask.CompletedTask;
+    }
 }
