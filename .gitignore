@@ -362,3 +362,6 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /diff.txt
+
+# Generated XML documentation files
+**/docs/reference/

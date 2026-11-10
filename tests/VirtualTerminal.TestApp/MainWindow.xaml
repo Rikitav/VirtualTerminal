@@ -7,60 +7,36 @@
         xmlns:vt="clr-namespace:VirtualTerminal;assembly=VirtualTerminal.WPF"
         xmlns:controls="clr-namespace:VirtualTerminal.Controls;assembly=VirtualTerminal.WPF"
         mc:Ignorable="d"
-        Title="VirtualTerminal WPF - Multiplexer &amp; Terminal Demo" Height="650" Width="950">
-    <TabControl Background="#1E1E1E">
-        <TabItem Header="Multiplexer Workspace (Demo)" Background="#252526" Foreground="#CCCCCC">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
+        Title="VirtualTerminal WPF - Multiplexer &amp; Control Tiling Demo" Height="700" Width="1000">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
-                <Border Grid.Row="0" Background="#2D2D30" Padding="8,5" BorderBrush="#3F3F46" BorderThickness="0,0,0,1">
-                    <DockPanel LastChildFill="False">
-                        <TextBlock Text="Multiplexer Workspace" Foreground="#FFFFFF" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,14,0"/>
-                        <Button Content="+ New Tab" Padding="8,3" Margin="0,0,6,0" Click="Button_NewTab_Click"/>
-                        <Button Content="Split Vertical (│)" Padding="8,3" Margin="0,0,6,0" Click="Button_SplitVertical_Click"/>
-                        <Button Content="Split Horizontal (─)" Padding="8,3" Margin="0,0,6,0" Click="Button_SplitHorizontal_Click"/>
-                        <Button Content="Close Active Pane (✕)" Padding="8,3" Margin="0,0,10,0" Click="Button_ClosePane_Click"/>
-                        <Button Content="+ TUI Menu Pane" Padding="8,3" Margin="0,0,6,0" Click="Button_LaunchTui_Click"/>
-                        <TextBlock Text="• Drag splitters to resize • Use top-right action buttons (│, ─, ✕)" Foreground="#888888" VerticalAlignment="Center" Margin="10,0,0,0"/>
-                    </DockPanel>
-                </Border>
+        <!-- Multiplexer Actions Toolbar (bound to ICommand and public API) -->
+        <Border Grid.Row="0" Background="#252526" Padding="10,6" BorderBrush="#3F3F46" BorderThickness="0,0,0,1">
+            <DockPanel LastChildFill="False">
+                <TextBlock Text="Multiplexer Manager:" Foreground="#FFFFFF" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"/>
 
-                <controls:TerminalMultiplexerControl x:Name="PART_Multiplexer" Grid.Row="1"/>
-            </Grid>
-        </TabItem>
+                <!-- Command-bound action buttons -->
+                <Button Content="Split Right (Ctrl+Shift+E)" Command="{Binding SplitVerticalCommand, ElementName=PART_Multiplexer}" Padding="8,4" Margin="0,0,6,0"/>
+                <Button Content="Split Down (Ctrl+Shift+O)" Command="{Binding SplitHorizontalCommand, ElementName=PART_Multiplexer}" Padding="8,4" Margin="0,0,6,0"/>
+                <Button Content="Close Active (Ctrl+Shift+W)" Command="{Binding CloseActiveCommand, ElementName=PART_Multiplexer}" Padding="8,4" Margin="0,0,10,0"/>
+                <Button Content="Next (Alt+→)" Command="{Binding FocusNextCommand, ElementName=PART_Multiplexer}" Padding="6,4" Margin="0,0,4,0"/>
+                <Button Content="Prev (Alt+←)" Command="{Binding FocusPreviousCommand, ElementName=PART_Multiplexer}" Padding="6,4" Margin="0,0,10,0"/>
 
-        <TabItem Header="Single Terminal (Classic)" Background="#252526" Foreground="#CCCCCC">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="40"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="30"/>
-                </Grid.RowDefinitions>
+                <!-- Public API custom actions -->
+                <Button Content="+ Generic Control" Click="Button_AddCustomControl_Click" Padding="8,4" Margin="0,0,6,0" ToolTip="Split with a non-terminal WPF control"/>
+                <Button Content="+ TUI Terminal" Click="Button_AddTuiTerminal_Click" Padding="8,4" Margin="0,0,10,0" ToolTip="Split with a TUI menu terminal"/>
+                <Button Content="Save Layout" Click="Button_SaveLayout_Click" Padding="8,4" Margin="0,0,4,0"/>
+                <Button Content="Restore Layout" Click="Button_RestoreLayout_Click" Padding="8,4" Margin="0,0,10,0"/>
 
-                <Border Grid.Row="0" BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Margin="5">
-                    <DockPanel>
-                        <TextBlock Text="CMD : " VerticalAlignment="Center" Margin="5,0,0,0"/>
-                        <Button DockPanel.Dock="Right" Content="Invalidate" Click="Button_Click_Invalidate"/>
-                        <Button DockPanel.Dock="Right" Content="Start" Click="Button_Click_Start"/>
-                        <TextBox x:Name="PART_CommandLineName" VerticalContentAlignment="Center" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Text="powershell.exe"/>
-                    </DockPanel>
-                </Border>
-                
-                <vt:TerminalControl 
-                    x:Name="PART_Terminal_Left"
-                    Grid.Row="1"
-                    AllowDirectInput="True"
-                    Background="Black"
-                    FontFamily="Cascadia Mono"/>
+                <TextBlock x:Name="PART_StatusText" Text="Panes: 1" Foreground="#AAAAAA" VerticalAlignment="Center" Margin="10,0,0,0"/>
+            </DockPanel>
+        </Border>
 
-                <vt:PromptBox
-                    x:Name="PART_Prompt_Left"
-                    Grid.Row="2"
-                    Prompt=">"/>
-            </Grid>
-        </TabItem>
-    </TabControl>
+        <!-- The tab-free MultiplexerControl hosting the split tree -->
+        <controls:MultiplexerControl x:Name="PART_Multiplexer" Grid.Row="1" Background="#1E1E1E"/>
+    </Grid>
 </Window>

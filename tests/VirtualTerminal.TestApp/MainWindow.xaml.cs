@@ -1,77 +1,85 @@
-using VirtualTerminal.Interfaces;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using VirtualTerminal.Controls;
 using VirtualTerminal.Cursors;
+using VirtualTerminal.Interfaces;
 using VirtualTerminal.Session;
 
 namespace VirtualTerminal.TestApp;
 
 public partial class MainWindow : Window
 {
+    private MultiplexerLayoutNode? _savedLayout;
+
     /// <summary>
-    /// MainWindow of testing application demonstrating multiplexing, tabs, splits, and terminal sessions.
+    /// MainWindow demonstrating generic control multiplexing, smooth animations, public APIs, and command bindings.
     /// </summary>
     public MainWindow()
     {
         InitializeComponent();
 
-        // Classic pane cursor
-        PART_Terminal_Left.CursorRenderer = new LandingTerminalCursorRenderer();
-
-        // Setup Multiplexer Demo
         SetupMultiplexerDemo();
     }
 
     private void SetupMultiplexerDemo()
     {
-        PART_Multiplexer.TerminalControlFactory = () => CreateDemoTerminal();
+        PART_Multiplexer.NewPaneFactory = () => CreateDemoTerminal();
+        PART_Multiplexer.ActiveControlChanged += (s, active) => UpdateStatus();
+        PART_Multiplexer.PaneOpened += (s, e) => UpdateStatus();
+        PART_Multiplexer.PaneClosed += (s, e) => UpdateStatus();
 
-        // Close initial default blank tab
-        if (PART_Multiplexer.TabControl.Tabs.Count > 0)
-        {
-            PART_Multiplexer.TabControl.CloseTab(PART_Multiplexer.TabControl.Tabs[0]);
-        }
+        // 1. Initial primary pane: PowerShell terminal
+        var shell = CreateDemoTerminal();
+        PART_Multiplexer.Root = shell;
 
-        // Tab 1: PowerShell shell
-        var shellTerm = CreateDemoTerminal();
-        PART_Multiplexer.TabControl.AddTab("PowerShell", shellTerm);
+        // 2. Split vertically with TUI Menu terminal
+        var tui = CreateDemoTerminal(new SimpleTuiDemoSession());
+        PART_Multiplexer.Split(shell, tui, Orientation.Vertical, 0.5, animate: false);
 
-        // Tab 2: Split workspace with TUI Demo and Shell
-        var tuiTerm = CreateDemoTerminal(new SimpleTuiDemoSession());
-        var splitShell = CreateDemoTerminal();
-        var split = new TerminalSplitControl(tuiTerm, splitShell, Orientation.Vertical);
-        PART_Multiplexer.TabControl.AddTab("Split Workspace (TUI + Shell)", split);
+        // 3. Split the right pane horizontally with a generic non-terminal WPF control
+        var genericControl = CreateGenericWpfControl("Editor & Inspector Pane");
+        PART_Multiplexer.Split(tui, genericControl, Orientation.Horizontal, 0.5, animate: false);
 
-        // Select the split demo tab by default
-        if (PART_Multiplexer.TabControl.Tabs.Count > 1)
-        {
-            PART_Multiplexer.TabControl.SelectedTab = PART_Multiplexer.TabControl.Tabs[1];
-        }
+        UpdateStatus();
 
+        // Automated test hook for headless verification
         if (Environment.GetCommandLineArgs().Contains("--test-splits"))
         {
-            // Test 1: Split vertical on single tab
-            PART_Multiplexer.TabControl.SelectedTab = PART_Multiplexer.TabControl.Tabs[0];
-            var term1 = PART_Multiplexer.SplitActivePane(Orientation.Vertical);
-            if (term1 == null) throw new InvalidOperationException("Failed to split vertical on single tab");
+            // Test 1: Split vertical on active pane
+            var term1 = CreateDemoTerminal();
+            if (!PART_Multiplexer.SplitActive(term1, Orientation.Vertical, animate: false))
+                throw new InvalidOperationException("Failed to split vertical");
 
-            // Test 2: Split horizontal on nested pane
-            var term2 = PART_Multiplexer.SplitActivePane(Orientation.Horizontal);
-            if (term2 == null) throw new InvalidOperationException("Failed to split horizontal on nested pane");
+            // Test 2: Split horizontal on active pane
+            var term2 = CreateGenericWpfControl("Test Pane 2");
+            if (!PART_Multiplexer.SplitActive(term2, Orientation.Horizontal, animate: false))
+                throw new InvalidOperationException("Failed to split horizontal");
 
             // Test 3: Close active pane
-            PART_Multiplexer.CloseActivePane();
+            if (!PART_Multiplexer.CloseActive())
+                throw new InvalidOperationException("Failed to close active pane");
 
-            // Test 4: Split horizontal on Tab 2
-            PART_Multiplexer.TabControl.SelectedTab = PART_Multiplexer.TabControl.Tabs[1];
-            var term3 = PART_Multiplexer.SplitActivePane(Orientation.Horizontal);
-            if (term3 == null) throw new InvalidOperationException("Failed to split horizontal on pre-split tab");
+            // Test 4: Focus navigation
+            PART_Multiplexer.FocusNext();
+            PART_Multiplexer.FocusPrevious();
+
+            // Test 5: Layout state capture and restore
+            var layout = PART_Multiplexer.GetLayoutState(c => c is TerminalControl ? "Terminal" : "Generic");
+            if (layout == null)
+                throw new InvalidOperationException("Failed to capture layout state");
+
+            if (!PART_Multiplexer.RestoreLayoutState(layout, id => id == "Terminal" ? CreateDemoTerminal() : CreateGenericWpfControl("Restored")))
+                throw new InvalidOperationException("Failed to restore layout state");
 
             Console.WriteLine("SPLIT_TEST_SUCCESS");
             Environment.Exit(0);
         }
+    }
+
+    private void UpdateStatus()
+    {
+        PART_StatusText.Text = $"Panes: {PART_Multiplexer.PaneCount} | Active: {PART_Multiplexer.ActiveControl?.GetType().Name ?? "None"}";
     }
 
     private TerminalControl CreateDemoTerminal(ITerminalSession? session = null)
@@ -110,62 +118,90 @@ public partial class MainWindow : Window
         return terminal;
     }
 
-    private void Button_NewTab_Click(object sender, RoutedEventArgs e)
+    private UIElement CreateGenericWpfControl(string title)
     {
-        PART_Multiplexer.AddTab();
-    }
-
-    private void Button_SplitVertical_Click(object sender, RoutedEventArgs e)
-    {
-        PART_Multiplexer.SplitActivePane(Orientation.Vertical);
-    }
-
-    private void Button_SplitHorizontal_Click(object sender, RoutedEventArgs e)
-    {
-        PART_Multiplexer.SplitActivePane(Orientation.Horizontal);
-    }
-
-    private void Button_ClosePane_Click(object sender, RoutedEventArgs e)
-    {
-        PART_Multiplexer.CloseActivePane();
-    }
-
-    private void Button_LaunchTui_Click(object sender, RoutedEventArgs e)
-    {
-        var tab = PART_Multiplexer.TabControl.SelectedTab;
-        if (tab?.Content is TerminalSplitControl)
+        var border = new Border
         {
-            PART_Multiplexer.SplitActivePane(Orientation.Horizontal);
-            if (PART_Multiplexer.ActiveTerminal != null)
-                PART_Multiplexer.ActiveTerminal.Session = new SimpleTuiDemoSession();
-        }
-        else
+            Background = new SolidColorBrush(Color.FromRgb(30, 30, 32)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(63, 63, 70)),
+            BorderThickness = new Thickness(1),
+            Margin = new Thickness(2),
+            Padding = new Thickness(12),
+        };
+
+        var sp = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+
+        var titleBlock = new TextBlock
         {
-            PART_Multiplexer.SplitActivePane(Orientation.Vertical);
-            if (PART_Multiplexer.ActiveTerminal != null)
-                PART_Multiplexer.ActiveTerminal.Session = new SimpleTuiDemoSession();
-        }
+            Text = $"Generic Non-Terminal Control:\n{title}",
+            Foreground = Brushes.LightGreen,
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            TextAlignment = TextAlignment.Center,
+            Margin = new Thickness(0, 0, 0, 10),
+        };
+        sp.Children.Add(titleBlock);
+
+        var descBlock = new TextBlock
+        {
+            Text = "The MultiplexerControl tiles and manages ANY WPF control (Buttons, TextBoxes, Canvases, UserControls) with smooth animated splits and layout persistence.",
+            Foreground = Brushes.LightGray,
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            TextAlignment = TextAlignment.Center,
+            Margin = new Thickness(0, 0, 0, 10),
+        };
+        sp.Children.Add(descBlock);
+
+        var sampleBox = new TextBox
+        {
+            Text = "Type inside this generic control...",
+            Background = new SolidColorBrush(Color.FromRgb(45, 45, 48)),
+            Foreground = Brushes.White,
+            Padding = new Thickness(6, 4, 6, 4),
+            Margin = new Thickness(0, 0, 0, 8),
+        };
+        sp.Children.Add(sampleBox);
+
+        var sampleBtn = new Button
+        {
+            Content = "Interactive Button",
+            Padding = new Thickness(8, 4, 8, 4),
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        sp.Children.Add(sampleBtn);
+
+        border.Child = sp;
+        return border;
     }
 
-    private void Button_Click_Start(object sender, RoutedEventArgs e)
+    private void Button_AddCustomControl_Click(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrEmpty(PART_CommandLineName.Text))
+        var custom = CreateGenericWpfControl($"Custom Pane #{PART_Multiplexer.PaneCount + 1}");
+        PART_Multiplexer.SplitActive(custom, Orientation.Vertical);
+    }
+
+    private void Button_AddTuiTerminal_Click(object sender, RoutedEventArgs e)
+    {
+        var tui = CreateDemoTerminal(new SimpleTuiDemoSession());
+        PART_Multiplexer.SplitActive(tui, Orientation.Horizontal);
+    }
+
+    private void Button_SaveLayout_Click(object sender, RoutedEventArgs e)
+    {
+        _savedLayout = PART_Multiplexer.GetLayoutState(c => c is TerminalControl ? "Terminal" : "Generic");
+        MessageBox.Show("Multiplexer layout captured successfully!", "Layout Saved", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void Button_RestoreLayout_Click(object sender, RoutedEventArgs e)
+    {
+        if (_savedLayout == null)
+        {
+            MessageBox.Show("Please save a layout first.", "No Layout Saved", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
-
-        try
-        {
-            PART_Terminal_Left.Session?.Dispose();
-            CommandLineSession session = new CommandLineSession(PART_CommandLineName.Text);
-            PART_Terminal_Left.Session = session;
-            PART_Prompt_Left.Session = session;
         }
-        catch
-        {
-        }
-    }
 
-    private void Button_Click_Invalidate(object sender, RoutedEventArgs e)
-    {
-        PART_Terminal_Left.InvalidateVisual();
+        PART_Multiplexer.RestoreLayoutState(_savedLayout, id =>
+            id == "Terminal" ? CreateDemoTerminal() : CreateGenericWpfControl("Restored Pane"));
     }
 }

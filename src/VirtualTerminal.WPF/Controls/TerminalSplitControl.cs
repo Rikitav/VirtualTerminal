@@ -1,12 +1,13 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace VirtualTerminal.Controls;
 
 /// <summary>
-/// Container that splits two terminal or child panes horizontally or vertically using an interactive <see cref="GridSplitter"/>.
-/// Supports arbitrary nested split trees.
+/// Container that splits two child panes horizontally or vertically using an interactive <see cref="GridSplitter"/>.
+/// Supports arbitrary nested split trees with smooth expansion animations.
 /// </summary>
 public class TerminalSplitControl : Grid
 {
@@ -16,6 +17,12 @@ public class TerminalSplitControl : Grid
     private Orientation _orientation;
     private double _splitRatio = 0.5;
     private double _splitterThickness = 4.0;
+
+    private DispatcherTimer? _animationTimer;
+    private DateTime _animationStart;
+    private double _animationFrom;
+    private double _animationTarget;
+    private TimeSpan _animationDuration;
 
     /// <summary>
     /// Event raised when a pane inside this split container requests to be closed.
@@ -70,14 +77,14 @@ public class TerminalSplitControl : Grid
         }
     }
 
-    /// <summary>Gets or sets the initial split ratio between Pane1 and Pane2 (from 0.0 to 1.0, default 0.5).</summary>
+    /// <summary>Gets or sets the split ratio between Pane1 and Pane2 (from 0.05 to 0.95, default 0.5).</summary>
     public double SplitRatio
     {
         get => _splitRatio;
         set
         {
-            _splitRatio = Math.Clamp(value, 0.05, 0.95);
-            RebuildLayout();
+            _splitRatio = Math.Clamp(value, 0.01, 0.99);
+            ApplySplitRatio();
         }
     }
 
@@ -104,6 +111,58 @@ public class TerminalSplitControl : Grid
         _pane1 = pane1;
         _pane2 = pane2;
         RebuildLayout();
+    }
+
+    /// <summary>
+    /// Smoothly animates the SplitRatio from <paramref name="fromRatio"/> to <paramref name="targetRatio"/> over <paramref name="duration"/>.
+    /// </summary>
+    public void AnimateSplit(double fromRatio, double targetRatio, TimeSpan duration)
+    {
+        _animationTimer?.Stop();
+
+        _animationFrom = Math.Clamp(fromRatio, 0.005, 0.99);
+        _animationTarget = Math.Clamp(targetRatio, 0.05, 0.95);
+        _animationDuration = duration <= TimeSpan.Zero ? TimeSpan.FromMilliseconds(180) : duration;
+        _animationStart = DateTime.UtcNow;
+
+        _splitRatio = _animationFrom;
+        ApplySplitRatio();
+
+        _animationTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Render, OnAnimationTick, Dispatcher);
+        _animationTimer.Start();
+    }
+
+    private void OnAnimationTick(object? sender, EventArgs e)
+    {
+        double elapsedMs = (DateTime.UtcNow - _animationStart).TotalMilliseconds;
+        double progress = Math.Clamp(elapsedMs / _animationDuration.TotalMilliseconds, 0.0, 1.0);
+
+        // Cubic ease-out: 1 - (1 - t)^3
+        double eased = 1.0 - Math.Pow(1.0 - progress, 3);
+        _splitRatio = _animationFrom + (_animationTarget - _animationFrom) * eased;
+        ApplySplitRatio();
+
+        if (progress >= 1.0)
+        {
+            _animationTimer?.Stop();
+            _animationTimer = null;
+            _splitRatio = _animationTarget;
+            ApplySplitRatio();
+        }
+    }
+
+    private void ApplySplitRatio()
+    {
+        if (_orientation == Orientation.Vertical && ColumnDefinitions.Count >= 3)
+        {
+            ColumnDefinitions[0].Width = new GridLength(_splitRatio, GridUnitType.Star);
+            ColumnDefinitions[2].Width = new GridLength(1.0 - _splitRatio, GridUnitType.Star);
+        }
+        else if (_orientation == Orientation.Horizontal && RowDefinitions.Count >= 3)
+        {
+            RowDefinitions[0].Height = new GridLength(_splitRatio, GridUnitType.Star);
+            RowDefinitions[2].Height = new GridLength(1.0 - _splitRatio, GridUnitType.Star);
+        }
     }
 
     /// <summary>
@@ -154,18 +213,22 @@ public class TerminalSplitControl : Grid
     }
 
     /// <summary>
-    /// Splits an existing child pane in place with a new pane, without violating logical parent constraints.
+    /// Splits an existing child pane in place with a new pane, with optional expansion animation.
     /// </summary>
-    public bool SplitChild(UIElement childToSplit, UIElement newPane, Orientation orientation)
+    public bool SplitChild(UIElement childToSplit, UIElement newPane, Orientation orientation, double ratio = 0.5, bool animate = true, TimeSpan? duration = null)
     {
         if (ReferenceEquals(_pane1, childToSplit))
         {
             Children.Remove(childToSplit);
             DisconnectFromParent(childToSplit);
             DisconnectFromParent(newPane);
-            var nested = new TerminalSplitControl(childToSplit, newPane, orientation);
+            var nested = new TerminalSplitControl(childToSplit, newPane, orientation) { SplitRatio = ratio };
             _pane1 = nested;
             RebuildLayout();
+            if (animate)
+            {
+                nested.AnimateSplit(0.005, ratio, duration ?? TimeSpan.FromMilliseconds(180));
+            }
             return true;
         }
 
@@ -174,16 +237,20 @@ public class TerminalSplitControl : Grid
             Children.Remove(childToSplit);
             DisconnectFromParent(childToSplit);
             DisconnectFromParent(newPane);
-            var nested = new TerminalSplitControl(childToSplit, newPane, orientation);
+            var nested = new TerminalSplitControl(childToSplit, newPane, orientation) { SplitRatio = ratio };
             _pane2 = nested;
             RebuildLayout();
+            if (animate)
+            {
+                nested.AnimateSplit(0.005, ratio, duration ?? TimeSpan.FromMilliseconds(180));
+            }
             return true;
         }
 
-        if (_pane1 is TerminalSplitControl childSplit1 && childSplit1.SplitChild(childToSplit, newPane, orientation))
+        if (_pane1 is TerminalSplitControl childSplit1 && childSplit1.SplitChild(childToSplit, newPane, orientation, ratio, animate, duration))
             return true;
 
-        if (_pane2 is TerminalSplitControl childSplit2 && childSplit2.SplitChild(childToSplit, newPane, orientation))
+        if (_pane2 is TerminalSplitControl childSplit2 && childSplit2.SplitChild(childToSplit, newPane, orientation, ratio, animate, duration))
             return true;
 
         return false;
@@ -267,6 +334,50 @@ public class TerminalSplitControl : Grid
         }
 
         return this;
+    }
+
+    /// <summary>
+    /// Collects all leaf elements in this split tree in visual depth-first order.
+    /// </summary>
+    public void CollectLeaves(List<UIElement> leaves)
+    {
+        if (_pane1 is TerminalSplitControl childSplit1)
+            childSplit1.CollectLeaves(leaves);
+        else if (_pane1 != null)
+            leaves.Add(_pane1);
+
+        if (_pane2 is TerminalSplitControl childSplit2)
+            childSplit2.CollectLeaves(leaves);
+        else if (_pane2 != null)
+            leaves.Add(_pane2);
+    }
+
+    /// <summary>
+    /// Finds the currently focused leaf element or the first leaf in this subtree.
+    /// </summary>
+    public UIElement? FindActiveLeaf()
+    {
+        UIElement? first = null;
+
+        UIElement? Search(UIElement? element)
+        {
+            if (element is TerminalSplitControl sc)
+            {
+                var active = Search(sc._pane1);
+                if (active != null) return active;
+                active = Search(sc._pane2);
+                if (active != null) return active;
+            }
+            else if (element != null)
+            {
+                first ??= element;
+                if (element.IsFocused || (element is FrameworkElement fe && fe.IsKeyboardFocusWithin))
+                    return element;
+            }
+            return null;
+        }
+
+        return Search(this) ?? first;
     }
 
     /// <summary>
