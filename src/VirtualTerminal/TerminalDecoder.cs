@@ -38,6 +38,15 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     private bool _pendingReturn;
     private int _pendingLineFeeds;
 
+    // DEC Character Set Designation & G0/G1 states.
+    private char _g0 = 'B'; // 'B' = US-ASCII, '0' = DEC Special Graphics
+    private char _g1 = 'B';
+    private int _activeCharset; // 0 = G0, 1 = G1
+
+    // DECRQSS buffer
+    private bool _inDecrqss;
+    private readonly StringBuilder _dcsPayload = new();
+
     /// <summary>Gets the terminal screen buffer being modified by this decoder.</summary>
     public TerminalScreenBuffer Buffer { get; }
 
@@ -174,7 +183,7 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     internal void RaiseIterm2Annotation(string arguments)
         => Iterm2Annotation?.Invoke(this, arguments);
 
-    private void Respond(string response)
+    internal void Respond(string response)
     {
         if (SendOutput is null)
             return;
@@ -228,8 +237,15 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
             bool insertMode = State.Modes.InsertMode;
             int lastDirtyRow = -1;
 
-            foreach (Rune rune in runes)
+            char activeDesignation = _activeCharset == 1 ? _g1 : _g0;
+
+            foreach (Rune r in runes)
             {
+                Rune rune = r;
+                if (activeDesignation == '0' && rune.Value >= 0x5F && rune.Value <= 0x7E)
+                {
+                    rune = MapDecSpecialGraphics(rune.Value);
+                }
                 int width = Wcwidth.Of(rune);
                 if (width < 0)
                     continue;  // non-printable; should not reach here
@@ -348,6 +364,12 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
                 FlushPendingNewline();
                 Tab();
                 break;
+            case 0x0E: // Shift-Out (SO) -> invoke G1
+                _activeCharset = 1;
+                break;
+            case 0x0F: // Shift-In (SI) -> invoke G0
+                _activeCharset = 0;
+                break;
             default:
                 break;  // other C0 ignored
         }
@@ -378,6 +400,23 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     public void EscDispatch(byte final, ReadOnlySpan<byte> intermediates)
     {
         FlushPendingNewline();
+
+        if (intermediates.Length == 1)
+        {
+            switch ((char)intermediates[0])
+            {
+                case '(':
+                    _g0 = (char)final;
+                    return;
+                case ')':
+                    _g1 = (char)final;
+                    return;
+                case '#':
+                    if (final == '8')
+                        AlignmentTest();
+                    return;
+            }
+        }
 
         switch ((char)final)
         {
@@ -439,6 +478,28 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
             {
                 RequestSelectionOrSetting(parameters.At(0, 0));
                 return;
+            }
+
+            if (intermediates.Length == 1)
+            {
+                if (intermediates[0] == (byte)'*' && fc == 'y')
+                {
+                    DecRequestChecksumRectangularArea(parameters);
+                    return;
+                }
+                if (intermediates[0] == (byte)'$')
+                {
+                    if (fc == 'z')
+                    {
+                        DecEraseRectangularArea(parameters);
+                        return;
+                    }
+                    if (fc == 'x')
+                    {
+                        DecFillRectangularArea(parameters);
+                        return;
+                    }
+                }
             }
 
             switch (fc)
@@ -583,19 +644,190 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     public void DcsHook(byte final, ReadOnlySpan<byte> intermediates, in CsiParams parameters, char privateMarker)
     {
         FlushPendingNewline();
-        // Phase 1: DCS payload is consumed by the parser but not interpreted (Sixel/DECRQSS = Phase 3).
+        _dcsPayload.Clear();
+        _inDecrqss = final == (byte)'q' && intermediates.Length == 1 && intermediates[0] == (byte)'$';
     }
 
     /// <inheritdoc/>
     public void DcsPut(byte b)
     {
+        if (_inDecrqss && _dcsPayload.Length < 128)
+        {
+            _dcsPayload.Append((char)b);
+        }
     }
 
     /// <inheritdoc/>
     public void DcsUnhook()
     {
         FlushPendingNewline();
+        if (_inDecrqss)
+        {
+            _inDecrqss = false;
+            HandleDecrqss(_dcsPayload.ToString());
+            _dcsPayload.Clear();
+        }
     }
+
+    private void HandleDecrqss(string setting)
+    {
+        switch (setting)
+        {
+            case "m":
+                Respond($"\x1bP1$r{EncodeSgr()}m\x1b\\");
+                break;
+            case "r":
+                Respond($"\x1bP1$r{Buffer.ScrollTop + 1};{Buffer.ScrollBottom + 1}r\x1b\\");
+                break;
+            case "s":
+                Respond($"\x1bP1$r{Buffer.ScrollLeft + 1};{Buffer.ScrollRight + 1}s\x1b\\");
+                break;
+            case "\"q":
+                int cursorStyle = State.Modes.CursorBlink ? 1 : 2;
+                Respond($"\x1bP1$r{cursorStyle}\"q\x1b\\");
+                break;
+            case "\"p":
+                Respond("\x1bP1$r65;1\"p\x1b\\");
+                break;
+            default:
+                Respond("\x1bP0$r\x1b\\");
+                break;
+        }
+    }
+
+    private void DecRequestChecksumRectangularArea(in CsiParams parameters)
+    {
+        int pid = parameters.At(0, 0);
+        int page = parameters.At(1, 0);
+        int pt = parameters.At(2, 1);
+        int pl = parameters.At(3, 1);
+        int pb = parameters.At(4, Buffer.Rows);
+        int pr = parameters.At(5, Buffer.Columns);
+
+        if (State.Modes.OriginMode)
+        {
+            pt += Buffer.ScrollTop;
+            pb += Buffer.ScrollTop;
+            pl += Buffer.ScrollLeft;
+            pr += Buffer.ScrollLeft;
+        }
+
+        int top = Math.Clamp(Math.Min(pt, pb) - 1, 0, Buffer.Rows - 1);
+        int bottom = Math.Clamp(Math.Max(pt, pb) - 1, 0, Buffer.Rows - 1);
+        int left = Math.Clamp(Math.Min(pl, pr) - 1, 0, Buffer.Columns - 1);
+        int right = Math.Clamp(Math.Max(pl, pr) - 1, 0, Buffer.Columns - 1);
+
+        uint sum = 0;
+        for (int y = top; y <= bottom; y++)
+        {
+            for (int x = left; x <= right; x++)
+            {
+                TerminalCellInfo cell = Buffer.GetCell(y, x);
+                sum += (uint)(cell.Character.Value & 0xFF);
+            }
+        }
+
+        ushort checksum = (ushort)(0x10000 - (sum & 0xFFFF));
+        Respond($"\x1bP{pid}!~{checksum:X4}\x1b\\");
+    }
+
+    private void DecEraseRectangularArea(in CsiParams parameters)
+    {
+        int pt = parameters.At(0, 1);
+        int pl = parameters.At(1, 1);
+        int pb = parameters.At(2, Buffer.Rows);
+        int pr = parameters.At(3, Buffer.Columns);
+
+        if (State.Modes.OriginMode)
+        {
+            pt += Buffer.ScrollTop;
+            pb += Buffer.ScrollTop;
+            pl += Buffer.ScrollLeft;
+            pr += Buffer.ScrollLeft;
+        }
+
+        int top = Math.Clamp(Math.Min(pt, pb) - 1, 0, Buffer.Rows - 1);
+        int bottom = Math.Clamp(Math.Max(pt, pb) - 1, 0, Buffer.Rows - 1);
+        int left = Math.Clamp(Math.Min(pl, pr) - 1, 0, Buffer.Columns - 1);
+        int right = Math.Clamp(Math.Max(pl, pr) - 1, 0, Buffer.Columns - 1);
+
+        int count = right - left + 1;
+        for (int y = top; y <= bottom; y++)
+        {
+            Buffer.ClearCells(y, left, count);
+        }
+    }
+
+    private void DecFillRectangularArea(in CsiParams parameters)
+    {
+        int pch = parameters.At(0, 32);
+        int pt = parameters.At(1, 1);
+        int pl = parameters.At(2, 1);
+        int pb = parameters.At(3, Buffer.Rows);
+        int pr = parameters.At(4, Buffer.Columns);
+
+        if (State.Modes.OriginMode)
+        {
+            pt += Buffer.ScrollTop;
+            pb += Buffer.ScrollTop;
+            pl += Buffer.ScrollLeft;
+            pr += Buffer.ScrollLeft;
+        }
+
+        int top = Math.Clamp(Math.Min(pt, pb) - 1, 0, Buffer.Rows - 1);
+        int bottom = Math.Clamp(Math.Max(pt, pb) - 1, 0, Buffer.Rows - 1);
+        int left = Math.Clamp(Math.Min(pl, pr) - 1, 0, Buffer.Columns - 1);
+        int right = Math.Clamp(Math.Max(pl, pr) - 1, 0, Buffer.Columns - 1);
+
+        Rune fillRune = Rune.IsValid(pch) ? new Rune(pch) : new Rune(' ');
+        CellRenderStyle style = State.Attributes.ToCellStyle(Options.Palette, Options.BoldAsBright);
+
+        for (int y = top; y <= bottom; y++)
+        {
+            for (int x = left; x <= right; x++)
+            {
+                ref TerminalCellInfo cell = ref Buffer.GetCell(y, x);
+                cell = new TerminalCellInfo(fillRune, style);
+            }
+        }
+    }
+
+    private static Rune MapDecSpecialGraphics(int ch) => ch switch
+    {
+        0x5F => new Rune(' '),
+        0x60 => new Rune('\u25c6'), // diamond
+        0x61 => new Rune('\u2592'), // checkerboard
+        0x62 => new Rune('\u2409'), // HT
+        0x63 => new Rune('\u240c'), // FF
+        0x64 => new Rune('\u240d'), // CR
+        0x65 => new Rune('\u240a'), // LF
+        0x66 => new Rune('\u00b0'), // degree
+        0x67 => new Rune('\u00b1'), // plus/minus
+        0x68 => new Rune('\u2424'), // NL
+        0x69 => new Rune('\u240b'), // VT
+        0x6A => new Rune('\u2518'), // lower-right corner
+        0x6B => new Rune('\u2510'), // upper-right corner
+        0x6C => new Rune('\u250c'), // upper-left corner
+        0x6D => new Rune('\u2514'), // lower-left corner
+        0x6E => new Rune('\u253c'), // crossing lines
+        0x6F => new Rune('\u23ba'), // horizontal scan 1
+        0x70 => new Rune('\u23bb'), // horizontal scan 3
+        0x71 => new Rune('\u2500'), // horizontal scan 5
+        0x72 => new Rune('\u23bc'), // horizontal scan 7
+        0x73 => new Rune('\u23bd'), // horizontal scan 9
+        0x74 => new Rune('\u251c'), // left T
+        0x75 => new Rune('\u2524'), // right T
+        0x76 => new Rune('\u2534'), // bottom T
+        0x77 => new Rune('\u252c'), // top T
+        0x78 => new Rune('\u2502'), // vertical line
+        0x79 => new Rune('\u2264'), // <=
+        0x7A => new Rune('\u2265'), // >=
+        0x7B => new Rune('\u03c0'), // pi
+        0x7C => new Rune('\u2260'), // !=
+        0x7D => new Rune('\u00a3'), // pound
+        0x7E => new Rune('\u00b7'), // middle dot
+        _ => new Rune(ch)
+    };
 
     /// <inheritdoc/>
     public void SosPmApcDispatch(byte kind, ReadOnlySpan<byte> data)
@@ -828,6 +1060,9 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
             Buffer.ClearTabStop(State.CursorX);
         else if (mode == 3)
             Buffer.ClearAllTabStops();
+        _g0 = 'B';
+        _g1 = 'B';
+        _activeCharset = 0;
     }
 
     // ============== Modes ==============
@@ -942,6 +1177,10 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
 
                 case 2004:
                     State.Modes.BracketedPaste = set;
+                    break;
+
+                case 2026:
+                    State.Modes.SynchronizedOutput = set;
                     break;
 
                 default:

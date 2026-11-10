@@ -39,6 +39,9 @@ public sealed class TerminalModes
     /// <summary>DEC private ?2004 — bracketed paste.</summary>
     public bool BracketedPaste;
 
+    /// <summary>DEC private ?2026 — synchronized output (BSU/ESU).</summary>
+    public bool SynchronizedOutput;
+
     /// <summary>DEC private ?1004 — focus reporting.</summary>
     public bool FocusReporting;
 
@@ -64,6 +67,7 @@ public sealed class TerminalModes
         LeftRightMarginMode = LeftRightMarginMode,
         LineFeedNewLine = LineFeedNewLine,
         BracketedPaste = BracketedPaste,
+        SynchronizedOutput = SynchronizedOutput,
         FocusReporting = FocusReporting,
         MouseTracking = MouseTracking,
         SgrMouseEncoding = SgrMouseEncoding,

@@ -381,4 +381,138 @@ public class EscTest2ConformanceTests
         Assert.Equal("01", t.GetLineText(2).Substring(0, 2));
         Assert.Equal("89", t.GetLineText(2).Substring(8, 2));
     }
+
+    // ==========================================
+    // 7. DEC Rectangle Operations (DECRQCRA, DECERA, DECFRA)
+    // ==========================================
+
+    [Fact]
+    public void Test_DECRQCRA_RectangleChecksum()
+    {
+        EscTestDriver t = new(10, 4);
+        t.Write("ABCD\r\nEFGH");
+
+        // Request checksum for rows 1..2, cols 1..4 with request ID 42:
+        // CSI Pid ; Pn ; Pt ; Pl ; Pb ; Pr * y
+        t.Write("\x1b[42;0;1;1;2;4*y");
+
+        // Sum of ASCII 'A'+'B'+'C'+'D'+'E'+'F'+'G'+'H':
+        // 65+66+67+68 + 69+70+71+72 = 266 + 282 = 548 = 0x0224
+        // Checksum is 0x10000 - 0x0224 = 0xFDDC
+        t.AssertResponse("\x1bP42!~FDDC\x1b\\");
+    }
+
+    [Fact]
+    public void Test_DECERA_And_DECFRA_RectangleOperations()
+    {
+        EscTestDriver t = new(10, 4);
+        t.Write("XXXXXXXXXX\r\nXXXXXXXXXX\r\nXXXXXXXXXX\r\nXXXXXXXXXX");
+
+        // DECERA: Erase rectangle rows 2..3, cols 3..7
+        t.Write("\x1b[2;3;3;7$z");
+        t.AssertLine(1, "XXXXXXXXXX");
+        t.AssertLine(2, "XX     XXX", trimTrailing: false);
+        t.AssertLine(3, "XX     XXX", trimTrailing: false);
+        t.AssertLine(4, "XXXXXXXXXX");
+
+        // DECFRA: Fill rectangle rows 2..3, cols 3..5 with '#' (ASCII 35)
+        t.Write("\x1b[35;2;3;3;5$x");
+        t.AssertLine(2, "XX###  XXX", trimTrailing: false);
+        t.AssertLine(3, "XX###  XXX", trimTrailing: false);
+    }
+
+    // ==========================================
+    // 8. DECRQSS (Request Status String)
+    // ==========================================
+
+    [Fact]
+    public void Test_DECRQSS_StatusStringInquiries()
+    {
+        EscTestDriver t = new(80, 24);
+
+        // Query margins (defaults: Pt=1, Pb=24)
+        // DCS $ q r ST
+        t.Write("\x1bP$qr\x1b\\");
+        t.AssertResponse("\x1bP1$r1;24r\x1b\\");
+
+        // Query DECSLRM (defaults: Pl=1, Pr=80)
+        t.Write("\x1bP$qs\x1b\\");
+        t.AssertResponse("\x1bP1$r1;80s\x1b\\");
+
+        // Query SGR
+        t.Write("\x1b[1;31m");
+        t.Write("\x1bP$qm\x1b\\");
+        string sgrResp = t.ReadResponse();
+        Assert.Contains("\x1bP1$r", sgrResp);
+        Assert.Contains("m\x1b\\", sgrResp);
+
+        // Invalid query -> DCS 0 $ r ST
+        t.Write("\x1bP$qUNKNOWN\x1b\\");
+        t.AssertResponse("\x1bP0$r\x1b\\");
+    }
+
+    // ==========================================
+    // 9. DEC Special Graphics & Shift-In / Shift-Out
+    // ==========================================
+
+    [Fact]
+    public void Test_DEC_SpecialGraphics_And_ShiftInOut()
+    {
+        EscTestDriver t = new(20, 4);
+
+        // Designate G1 as DEC Special Graphics (ESC ) 0)
+        t.Write("\x1b)0");
+
+        // In G0 (default), 'l', 'q', 'k' print regular ASCII
+        t.Write("lqk\r\n");
+        t.AssertLine(1, "lqk");
+
+        // Shift-Out (0x0E / SO) -> switches to G1 (Special Graphics)
+        // 'l' = ┌, 'q' = ─, 'k' = ┐
+        t.Write("\x0Elqk\r\n");
+        t.AssertLine(2, "┌─┐");
+
+        // Shift-In (0x0F / SI) -> switches back to G0
+        t.Write("\x0Flqk");
+        t.AssertLine(3, "lqk");
+    }
+
+    // ==========================================
+    // 10. OSC Color Queries & Synchronized Output
+    // ==========================================
+
+    [Fact]
+    public void Test_OSC_ColorQueries()
+    {
+        EscTestDriver t = new(80, 24);
+        t.Decoder.Options.AllowOSCColorQueries = true;
+
+        // Query OSC 10 (Default Foreground)
+        t.Write("\x1b]10;?\x07");
+        t.AssertResponseContains("\x1b]10;rgb:");
+
+        // Query OSC 11 (Default Background)
+        t.Write("\x1b]11;?\x07");
+        t.AssertResponseContains("\x1b]11;rgb:");
+
+        // Query OSC 4 palette entry 1
+        t.Write("\x1b]4;1;?\x07");
+        t.AssertResponseContains("\x1b]4;1;rgb:");
+    }
+
+    [Fact]
+    public void Test_SynchronizedOutput_Mode2026()
+    {
+        EscTestDriver t = new(80, 24);
+
+        Assert.False(t.Decoder.State.Modes.SynchronizedOutput);
+
+        // BSU: CSI ? 2026 h
+        t.Write("\x1b[?2026h");
+        Assert.True(t.Decoder.State.Modes.SynchronizedOutput);
+
+        // ESU: CSI ? 2026 l
+        t.Write("\x1b[?2026l");
+        Assert.False(t.Decoder.State.Modes.SynchronizedOutput);
+    }
 }
