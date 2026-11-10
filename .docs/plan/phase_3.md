@@ -1,73 +1,64 @@
-# Phase 3: Session Engine, Multiplexing & Transport Modernization
+# Phase 3: Session Engine & Transport Modernization
 
 ## 1. Executive Summary
-Phase 3 elevates `VirtualTerminal` from a single-session engine to a robust terminal multiplexer and multi-transport pipeline framework. It introduces high-throughput stream pipelines via `System.IO.Pipelines`, a native split-pane / tab multiplexing model (similar to `tmux` or Windows Terminal tabs), headless daemon support, and advanced input protocols (Kitty Keyboard Protocol).
+Phase 3 modernizes the session, transport, and input layers of `VirtualTerminal`. The core library focuses strictly on transport abstractions (streaming, pipelines), session lifecycle (headless execution, detach/reattach, state serialization), and advanced input encoding (Kitty Keyboard Protocol). Multiplexing (split panes, tab layouts) is deliberately excluded from the core library, remaining a frontend concern.
 
 ---
 
 ## 2. Key Objectives & Deliverables
 
-### 2.1 Transport Layer Pipeline Refactoring (`System.IO.Pipelines`)
-- **Problem**: `TerminalSession` uses `ConcurrentQueue<byte>` with explicit `lock` synchronization and byte-by-byte enqueueing. High-speed process outputs incur heavy CPU lock contention and allocation of queue node objects.
-- **Solution**:
-  - Replace queueing with `System.IO.Pipelines.Pipe`.
-  - Support high-performance producer-consumer streaming between process pipes (`PseudoConsole`) and the terminal decoder.
-  - Implement zero-copy buffer slicing via `ReadOnlySequence<byte>`.
-  - Implement automatic backpressure: if the terminal consumer or renderer slows down, the pipe suspends reader ingestion to prevent memory runaway.
+### 2.1 Transport Pipeline Modernization (`System.IO.Pipelines` & `ITerminalTransport`)
+- **Transport Abstraction**:
+  - Introduce `ITerminalTransport` representing bidirectional byte communication (PTY, SSH, WebSocket, Mock/In-Memory):
+    - `PipeReader Input { get; }` (bytes coming from transport into terminal decoder)
+    - `PipeWriter Output { get; }` (bytes sent from terminal/keyboard to transport)
+  - Seamless zero-copy buffering via `System.IO.Pipelines.Pipe` with automatic backpressure: if decoder or renderer is busy, ingestion pauses to prevent unbounded RAM growth.
+- **Async Streaming Pump**:
+  - `ProcessInputAsync(PipeReader reader, CancellationToken ct)` reading directly into `TerminalDecoder.Write(ReadOnlySpan<byte>)` via `ReadOnlySequence<byte>`.
 
-### 2.2 Built-in Session Multiplexer & Layout Engine
-- **Multiplexer Architecture**:
-  - Introduce `TerminalMultiplexer`: coordinates multiple active `ITerminalSession` instances.
-  - **Tree-Based Layout Model**:
-    - `MultiplexerNode`: Abstract base for split containers and terminal leaves.
-    - `SplitPaneNode`: Horizontal or vertical split container with configurable split ratio (`0.0 .. 1.0`).
-    - `TerminalLeafNode`: Hosts an individual `ITerminalSession`.
-  - **Tab Management**:
-    - Each tab owns an independent `MultiplexerNode` root.
-    - Synchronized active session focus switching and keyboard input routing.
-  - **Pane Operations**:
-    - `SplitHorizontal(session, ratio = 0.5)`
-    - `SplitVertical(session, ratio = 0.5)`
-    - `ClosePane(paneId)`
-    - `FocusNextPane()`, `FocusPreviousPane()`, `FocusDirection(Direction)`
-    - `SwapPanes(paneA, paneB)`
+### 2.2 Modern Input Encoding: Kitty Keyboard Protocol
+- **Specification Compliance**:
+  - Progressive keyboard enhancement protocol (supported by Ghostty, Kitty, WezTerm, Neovim, Helix).
+  - Capability flags query & negotiation (`CSI ? u`, `CSI > flags u`, `CSI < count u`).
+  - Progressive enhancement flags:
+    - Flag 1 (`1 << 0`): Disambiguate escape codes (e.g. Esc vs Alt, Shift+Enter, Tab vs Ctrl+I, Enter vs Ctrl+M).
+    - Flag 2 (`1 << 1`): Report event types (press, repeat, release).
+    - Flag 4 (`1 << 2`): Report alternate keys.
+    - Flag 8 (`1 << 3`): Report all keys as escape codes.
+    - Flag 16 (`1 << 4`): Report associated text.
+  - Integration with `KeyboardEncoder` emitting `CSI unicode-key : alternate-key ; modifiers : event-type u`.
 
-### 2.3 Headless Daemon, Detach / Reattach & State Persistence
-- **Detached Execution**:
-  - Allow terminal processes and sessions to continue running in background daemon mode when UI controls are closed or detached.
-  - Reattaching reconstructs the screen buffer and streams history seamlessly.
-- **State Serialization**:
-  - Binary and JSON snapshot serializer for screen buffers, active modes, scrollback history, and cursor position.
-  - Instant session restoration and session sharing.
-
-### 2.4 Modern Input Protocol: Kitty Keyboard Protocol
-- **Feature**:
-  - Implement progressive keyboard enhancement protocol (supported by Ghostty, Kitty, WezTerm, Neovim).
-  - Sequence: `CSI > flags u` (Push keyboard flags), `CSI < count u` (Pop keyboard flags).
-  - Distinct key-press, key-release, and repeat events.
-  - Disambiguation of Escape vs Alt, Shift+Enter, Ctrl+I vs Tab, Ctrl+M vs Enter.
-  - Enables rich modern CLI/TUI applications (e.g. Helix, Neovim, Micro) to operate with modern keyboard events.
+### 2.3 Session Lifecycle, Detach / Reattach & State Serialization
+- **Headless Execution**:
+  - Allow `TerminalSession` to execute without an attached renderer or window.
+  - Thread-safe detach and reattach of `TerminalDecoder` / `TerminalScreenBuffer`.
+- **State Snapshot Serialization**:
+  - Structured binary and JSON state snapshots for saving and restoring session state:
+    - Screen buffer dimensions, active screen, cursor position.
+    - Grid cell matrix (runes, colors, attributes).
+    - Terminal modes (`DECOM`, `DECAWM`, `DECLRMM`, `SynchronizedOutput`, etc.).
+    - Scrollback ring buffer history.
+  - Fast serialization into and out of `Stream`.
 
 ---
 
 ## 3. Implementation Steps
 
-1. **Implement `PipeTerminalTransport`**:
-   - Create `ITerminalTransport` interface using `PipeReader` / `PipeWriter`.
-   - Adapt `CommandLineSession` and `UnixPtySession` to use pipeline transports.
-2. **Design `TerminalMultiplexer`**:
-   - Create models: `TerminalTab`, `SplitPaneNode`, `TerminalLeafNode`.
-   - Add focus management, resizing cascades, and unified notification dispatch.
-3. **Add Kitty Keyboard Encoder**:
-   - Extend `KeyboardEncoder` to support CSI `u` format with modifier bitmasks.
-   - Add capability negotiation (`CSI ? u` query).
-4. **Implement Session Snapshot Serializer**:
-   - Add `SaveState(Stream stream)` and `RestoreState(Stream stream)`.
+1. **Transport Abstraction & Pipelines**:
+   - Define `ITerminalTransport` and `PipeTerminalTransport`.
+   - Add async pipeline pump to `TerminalSession`.
+2. **Kitty Keyboard Protocol**:
+   - Add progressive keyboard enhancement mode tracking to `TerminalModes`.
+   - Implement Kitty keyboard encoding in `KeyboardEncoder`.
+   - Add CSI `u` query response (`CSI ? u`) in `TerminalDecoder`.
+3. **Session State Snapshot Serialization**:
+   - Implement `TerminalSnapshotSerializer` (`Save(Stream)` / `Load(Stream)`).
+   - Add unit tests validating round-trip session state restoration.
 
 ---
 
 ## 4. Acceptance Criteria & Metrics
-- Zero lock contention in high-throughput pipe reads (`Pipelines` throughput > 500 MB/s).
-- Seamless creation of nested 2x2 and 3x3 split-pane configurations with correct resize propagation.
-- Passing Kitty Keyboard protocol tests under `TerminalDecoderTests`.
-- Successfully detach and reattach an active interactive session without dropping output bytes.
+- Zero lock contention during stream pipeline reading.
+- Full Kitty Keyboard Protocol compliance for modifier combinations and event types.
+- 100% round-trip fidelity when saving and restoring session state snapshots.
+- All existing tests pass without regressions.

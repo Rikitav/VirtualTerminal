@@ -29,11 +29,11 @@ This directory contains the multi-phase architectural plan for optimizing, refac
                                                   |
                                                   v
 +----------------------------------------------------------------------------------------------------+
-|  Phase 3: Session Engine, Multiplexing & Transport Modernization                                   |
-|  - High-throughput System.IO.Pipelines streaming                                                   |
-|  - Native TerminalMultiplexer (Split panes, tabs, layout tree)                                     |
-|  - Headless daemon mode & session detach/reattach persistence                                      |
-|  - Kitty Keyboard Protocol (progressive enhancement)                                              |
+|  Phase 3: Session Engine & Transport Modernization                                                 |
+|  - High-throughput System.IO.Pipelines & ITerminalTransport abstraction                            |
+|  - Zero-copy async streaming pipeline with backpressure                                             |
+|  - Headless daemon execution & state snapshot serialization                                        |
+|  - Kitty Keyboard Protocol (progressive enhancement & key disambiguation)                          |
 +----------------------------------------------------------------------------------------------------+
                                                   |
                                                   v
