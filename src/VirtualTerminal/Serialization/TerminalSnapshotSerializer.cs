@@ -189,20 +189,17 @@ public static class TerminalSnapshotSerializer
     public static string SerializeJson(TerminalScreenBuffer buffer, TerminalState state, bool indented = false)
     {
         TerminalSnapshotModel model = ToModel(buffer, state);
-        JsonSerializerOptions options = indented
-            ? new JsonSerializerOptions { WriteIndented = true, TypeInfoResolver = TerminalSnapshotJsonContext.Default }
-            : TerminalSnapshotJsonContext.Default.Options;
-
-        return JsonSerializer.Serialize(model, typeof(TerminalSnapshotModel), options);
+        return indented
+            ? JsonSerializer.Serialize(model, TerminalSnapshotIndentedJsonContext.Default.TerminalSnapshotModel)
+            : JsonSerializer.Serialize(model, TerminalSnapshotJsonContext.Default.TerminalSnapshotModel);
     }
 
     /// <summary>Deserializes terminal buffer and state from a JSON string.</summary>
     public static (TerminalScreenBuffer Buffer, TerminalState State) DeserializeJson(string json)
     {
-        TerminalSnapshotModel? model = (TerminalSnapshotModel?)JsonSerializer.Deserialize(
+        TerminalSnapshotModel? model = JsonSerializer.Deserialize(
             json,
-            typeof(TerminalSnapshotModel),
-            TerminalSnapshotJsonContext.Default);
+            TerminalSnapshotJsonContext.Default.TerminalSnapshotModel);
 
         if (model == null)
             throw aerial_InvalidData("Failed to parse JSON terminal snapshot.");
@@ -598,7 +595,18 @@ public static class TerminalSnapshotSerializer
 [JsonSerializable(typeof(CellSnapshotModel))]
 [JsonSerializable(typeof(StateSnapshotModel))]
 [JsonSerializable(typeof(ModesSnapshotModel))]
+[JsonSourceGenerationOptions(WriteIndented = false)]
 internal sealed partial class TerminalSnapshotJsonContext : JsonSerializerContext
+{
+}
+
+[JsonSerializable(typeof(TerminalSnapshotModel))]
+[JsonSerializable(typeof(RowSnapshotModel))]
+[JsonSerializable(typeof(CellSnapshotModel))]
+[JsonSerializable(typeof(StateSnapshotModel))]
+[JsonSerializable(typeof(ModesSnapshotModel))]
+[JsonSourceGenerationOptions(WriteIndented = true)]
+internal sealed partial class TerminalSnapshotIndentedJsonContext : JsonSerializerContext
 {
 }
 
