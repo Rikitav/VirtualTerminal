@@ -311,6 +311,12 @@ public class TerminalControl : TemplatedControl, IDisposable
             ReconfigureRenderer();
         }
 
+        if (change.Property == ForegroundProperty || change.Property == BackgroundProperty)
+        {
+            SyncOptionsToDecoder();
+            InvalidateVisual();
+        }
+
         if (change.Property == PaddingProperty)
         {
             InvalidateVisual();
