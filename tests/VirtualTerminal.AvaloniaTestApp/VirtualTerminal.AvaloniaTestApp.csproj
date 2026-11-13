@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-    <BaseOutputPath>..\bin</BaseOutputPath>
+    <BaseOutputPath>..\..\bin</BaseOutputPath>
     <DocumentationFile>..\docs\reference\$(AssemblyName).xml</DocumentationFile>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
   </PropertyGroup>

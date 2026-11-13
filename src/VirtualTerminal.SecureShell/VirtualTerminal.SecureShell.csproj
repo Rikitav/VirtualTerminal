@@ -9,7 +9,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!--<IsAotCompatible>True</IsAotCompatible>-->
 
-    <BaseOutputPath>..\bin</BaseOutputPath>
+    <BaseOutputPath>..\..\bin</BaseOutputPath>
     <DocumentationFile>..\docs\reference\$(AssemblyName).xml</DocumentationFile>
 
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
