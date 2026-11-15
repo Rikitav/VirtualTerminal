@@ -6,27 +6,28 @@ namespace VirtualTerminal.Input;
 [Flags]
 public enum TerminalModifier
 {
-    /// <summary>No modifier held.</summary>
     /// <summary>
-    /// Shift.
+    /// No modifier held.
     /// </summary>
     None = 0,
- /// <summary>
- /// Alt.
- /// </summary>
 
-    /// <summary>Shift key.</summary>
     /// <summary>
-    /// Meta.
+    /// Shift key.
     /// </summary>
     Shift = 1,
 
-    /// <summary>Alt key.</summary>
+    /// <summary>
+    /// Alt key.
+    /// </summary>
     Alt = 2,
 
-    /// <summary>Control key.</summary>
+    /// <summary>
+    /// Control key.
+    /// </summary>
     Control = 4,
 
-    /// <summary>Meta / Windows / Command key.</summary>
+    /// <summary>
+    /// Meta / Windows / Command key.
+    /// </summary>
     Meta = 8,
 }

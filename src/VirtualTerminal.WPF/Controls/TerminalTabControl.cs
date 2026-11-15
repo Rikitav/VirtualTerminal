@@ -11,13 +11,19 @@ namespace VirtualTerminal.Controls;
 /// </summary>
 public class TerminalTabItem
 {
-    /// <summary>Gets or sets the display title of the tab.</summary>
+    /// <summary>
+    /// Gets or sets the display title of the tab.
+    /// </summary>
     public string Title { get; set; } = "Terminal";
 
-    /// <summary>Gets or sets the content element (such as a <see cref="TerminalControl"/> or <see cref="TerminalSplitControl"/>).</summary>
+    /// <summary>
+    /// Gets or sets the content element (such as a <see cref="TerminalControl"/> or <see cref="TerminalSplitControl"/>).
+    /// </summary>
     public UIElement? Content { get; set; }
 
-    /// <summary>Gets or sets custom user data associated with the tab.</summary>
+    /// <summary>
+    /// Gets or sets custom user data associated with the tab.
+    /// </summary>
     public object? Tag { get; set; }
 }
 
@@ -32,22 +38,34 @@ public class TerminalTabControl : Grid
     private readonly ObservableCollection<TerminalTabItem> _tabs = new();
     private TerminalTabItem? _selectedTab;
 
-    /// <summary>Event raised when the active selected tab changes.</summary>
+    /// <summary>
+    /// Event raised when the active selected tab changes.
+    /// </summary>
     public event EventHandler<TerminalTabItem?>? SelectedTabChanged;
 
-    /// <summary>Event raised when a tab is closed.</summary>
+    /// <summary>
+    /// Event raised when a tab is closed.
+    /// </summary>
     public event EventHandler<TerminalTabItem>? TabClosed;
 
-    /// <summary>Event raised when a new tab is added.</summary>
+    /// <summary>
+    /// Event raised when a new tab is added.
+    /// </summary>
     public event EventHandler<TerminalTabItem>? TabAdded;
 
-    /// <summary>Factory method invoked when the user clicks the '+' button to generate new tab content.</summary>
+    /// <summary>
+    /// Factory method invoked when the user clicks the '+' button to generate new tab content.
+    /// </summary>
     public Func<UIElement>? NewTabContentFactory { get; set; }
 
-    /// <summary>Gets the collection of tabs.</summary>
+    /// <summary>
+    /// Gets the collection of tabs.
+    /// </summary>
     public ReadOnlyObservableCollection<TerminalTabItem> Tabs { get; }
 
-    /// <summary>Initializes a new instance of <see cref="TerminalTabControl"/>.</summary>
+    /// <summary>
+    /// Initializes a new instance of <see cref="TerminalTabControl"/>.
+    /// </summary>
     public TerminalTabControl()
     {
         Tabs = new ReadOnlyObservableCollection<TerminalTabItem>(_tabs);
@@ -56,7 +74,7 @@ public class TerminalTabControl : Grid
         RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
         // Tab strip header container
-        var headerBorder = new Border
+        Border headerBorder = new Border
         {
             Background = new SolidColorBrush(Color.FromRgb(37, 37, 38)),
             BorderBrush = new SolidColorBrush(Color.FromRgb(45, 45, 48)),
@@ -64,11 +82,11 @@ public class TerminalTabControl : Grid
             MinHeight = 32,
         };
 
-        var headerGrid = new Grid();
+        Grid headerGrid = new Grid();
         headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var scrollViewer = new ScrollViewer
+        ScrollViewer scrollViewer = new ScrollViewer
         {
             HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
             VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
@@ -115,7 +133,9 @@ public class TerminalTabControl : Grid
         Children.Add(_contentArea);
     }
 
-    /// <summary>Gets or sets the currently selected tab.</summary>
+    /// <summary>
+    /// Gets or sets the currently selected tab.
+    /// </summary>
     public TerminalTabItem? SelectedTab
     {
         get => _selectedTab;
@@ -131,7 +151,9 @@ public class TerminalTabControl : Grid
         }
     }
 
-    /// <summary>Updates the content of a tab and synchronizes the content area safely.</summary>
+    /// <summary>
+    /// Updates the content of a tab and synchronizes the content area safely.
+    /// </summary>
     public void SetTabContent(TerminalTabItem tab, UIElement? content)
     {
         if (ReferenceEquals(_selectedTab, tab))
@@ -145,19 +167,23 @@ public class TerminalTabControl : Grid
         }
     }
 
-    /// <summary>Refreshes the content displayed in the content area for the currently selected tab.</summary>
+    /// <summary>
+    /// Refreshes the content displayed in the content area for the currently selected tab.
+    /// </summary>
     public void RefreshContent()
     {
         _contentArea.Content = _selectedTab?.Content;
     }
 
-    /// <summary>Adds a new tab with optional title and content.</summary>
+    /// <summary>
+    /// Adds a new tab with optional title and content.
+    /// </summary>
     public TerminalTabItem AddTab(string? title = null, UIElement? content = null)
     {
         content ??= NewTabContentFactory?.Invoke() ?? new TerminalControl();
         title ??= $"Terminal {_tabs.Count + 1}";
 
-        var item = new TerminalTabItem
+        TerminalTabItem item = new TerminalTabItem
         {
             Title = title,
             Content = content,
@@ -170,7 +196,9 @@ public class TerminalTabControl : Grid
         return item;
     }
 
-    /// <summary>Closes the specified tab.</summary>
+    /// <summary>
+    /// Closes the specified tab.
+    /// </summary>
     public void CloseTab(TerminalTabItem tab)
     {
         int index = _tabs.IndexOf(tab);
@@ -216,7 +244,7 @@ public class TerminalTabControl : Grid
 
     private FrameworkElement CreateTabHeaderControl(TerminalTabItem tab)
     {
-        var border = new Border
+        Border border = new Border
         {
             Tag = tab,
             Padding = new Thickness(10, 4, 6, 4),
@@ -225,9 +253,9 @@ public class TerminalTabControl : Grid
             CornerRadius = new CornerRadius(3, 3, 0, 0),
         };
 
-        var sp = new StackPanel { Orientation = Orientation.Horizontal };
+        StackPanel sp = new StackPanel { Orientation = Orientation.Horizontal };
 
-        var titleText = new TextBlock
+        TextBlock titleText = new TextBlock
         {
             Text = tab.Title,
             VerticalAlignment = VerticalAlignment.Center,
@@ -236,7 +264,7 @@ public class TerminalTabControl : Grid
         };
         sp.Children.Add(titleText);
 
-        var closeButton = new Button
+        Button closeButton = new Button
         {
             Content = "×",
             Width = 18,

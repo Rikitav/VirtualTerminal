@@ -15,7 +15,7 @@ public partial class Win32Process : IDisposable
     /// Gets the underlying process handle.
     /// </summary>
     public IntPtr Handle => _handle;
-    
+
     /// <summary>
     /// Initializes a new <see cref="Win32Process"/> wrapper for the specified process handle.
     /// </summary>

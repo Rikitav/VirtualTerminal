@@ -7,13 +7,24 @@ namespace VirtualTerminal.Rendering;
 /// </summary>
 public enum BoxLineStyle : byte
 {
-    /// <summary>No line arm.</summary>
+    /// <summary>
+    /// No line arm.
+    /// </summary>
     None = 0,
-    /// <summary>Single light line (1px or 1/12 cell width).</summary>
+
+    /// <summary>
+    /// Single light line (1px or 1/12 cell width).
+    /// </summary>
     Light = 1,
-    /// <summary>Single heavy line (2-3px or 1/6 cell width).</summary>
+
+    /// <summary>
+    /// Single heavy line (2-3px or 1/6 cell width).
+    /// </summary>
     Heavy = 2,
-    /// <summary>Double line.</summary>
+
+    /// <summary>
+    /// Double line.
+    /// </summary>
     Double = 3,
 }
 
@@ -22,47 +33,74 @@ public enum BoxLineStyle : byte
 /// </summary>
 public readonly struct BoxArms
 {
-    /// <summary>Left arm style.</summary>
+    /// <summary>
+    /// Left arm style.
+    /// </summary>
     public BoxLineStyle Left { get; init; }
-    /// <summary>Right arm style.</summary>
+
+    /// <summary>
+    /// Right arm style.
+    /// </summary>
     public BoxLineStyle Right { get; init; }
-    /// <summary>Top arm style.</summary>
+
+    /// <summary>
+    /// Top arm style.
+    /// </summary>
     public BoxLineStyle Top { get; init; }
-    /// <summary>Bottom arm style.</summary>
+
+    /// <summary>
+    /// Bottom arm style.
+    /// </summary>
     public BoxLineStyle Bottom { get; init; }
-    /// <summary>Whether this corner is rounded (arcs instead of right angles).</summary>
+
+    /// <summary>
+    /// Whether this corner is rounded (arcs instead of right angles).
+    /// </summary>
     public bool IsRounded { get; init; }
-    /// <summary>Diagonal forward slash (/ from bottom-left to top-right).</summary>
+
+    /// <summary>
+    /// Diagonal forward slash (/ from bottom-left to top-right).
+    /// </summary>
     public bool DiagonalSlash { get; init; }
-    /// <summary>Diagonal backslash (\ from top-left to bottom-right).</summary>
+
+    /// <summary>
+    /// Diagonal backslash (\ from top-left to bottom-right).
+    /// </summary>
     public bool DiagonalBackslash { get; init; }
 }
 
 /// <summary>
 /// Normalized relative sub-rectangle `[0.0 .. 1.0]` for procedural block elements.
 /// </summary>
-public readonly struct BlockRect
+/// <remarks>
+/// Initializes a normalized block rect.
+/// </remarks>
+public readonly struct BlockRect(double x, double y, double width, double height, double alpha = 1.0)
 {
-    /// <summary>Normalized X offset (0.0 to 1.0).</summary>
-    public double X { get; init; }
-    /// <summary>Normalized Y offset (0.0 to 1.0).</summary>
-    public double Y { get; init; }
-    /// <summary>Normalized width (0.0 to 1.0).</summary>
-    public double Width { get; init; }
-    /// <summary>Normalized height (0.0 to 1.0).</summary>
-    public double Height { get; init; }
-    /// <summary>Alpha multiplier (1.0 for solid, 0.25/0.5/0.75 for shades).</summary>
-    public double Alpha { get; init; }
+    /// <summary>
+    /// Normalized X offset (0.0 to 1.0).
+    /// </summary>
+    public double X { get; } = x;
 
-    /// <summary>Initializes a normalized block rect.</summary>
-    public BlockRect(double x, double y, double width, double height, double alpha = 1.0)
-    {
-        X = x;
-        Y = y;
-        Width = width;
-        Height = height;
-        Alpha = alpha;
-    }
+    /// <summary>
+    /// Normalized Y offset (0.0 to 1.0).
+    /// </summary>
+    public double Y { get; } = y;
+
+    /// <summary>
+    /// Normalized width (0.0 to 1.0).
+    /// </summary>
+    public double Width { get; } = width;
+
+    /// <summary>
+    /// Normalized height (0.0 to 1.0).
+    /// </summary>
+    public double Height { get; } = height;
+
+    /// <summary>
+    /// Alpha multiplier (1.0 for solid, 0.25/0.5/0.75 for shades).
+    /// </summary>
+    public double Alpha { get; } = alpha;
 }
 
 /// <summary>
@@ -71,13 +109,19 @@ public readonly struct BlockRect
 /// </summary>
 public static class BoxDrawing
 {
-    /// <summary>Determines whether the rune is within the Unicode Box Drawing range (U+2500..U+257F).</summary>
+    /// <summary>
+    /// Determines whether the rune is within the Unicode Box Drawing range (U+2500..U+257F).
+    /// </summary>
     public static bool IsBoxDrawing(Rune rune) => rune.Value is >= 0x2500 and <= 0x257F;
 
-    /// <summary>Determines whether the rune is within the Unicode Block Elements range (U+2580..U+259F).</summary>
+    /// <summary>
+    /// Determines whether the rune is within the Unicode Block Elements range (U+2580..U+259F).
+    /// </summary>
     public static bool IsBlockElement(Rune rune) => rune.Value is >= 0x2580 and <= 0x259F;
 
-    /// <summary>Determines whether the rune can be procedurally synthesized (box drawing or block element).</summary>
+    /// <summary>
+    /// Determines whether the rune can be procedurally synthesized (box drawing or block element).
+    /// </summary>
     public static bool IsProcedural(Rune rune) => rune.Value is >= 0x2500 and <= 0x259F;
 
     /// <summary>
@@ -206,9 +250,12 @@ public static class BoxDrawing
             _ => default,
         };
 
-        return arms.Left != BoxLineStyle.None || arms.Right != BoxLineStyle.None ||
-               arms.Top != BoxLineStyle.None || arms.Bottom != BoxLineStyle.None ||
-               arms.DiagonalSlash || arms.DiagonalBackslash;
+        return arms.Left != BoxLineStyle.None
+            || arms.Right != BoxLineStyle.None
+            || arms.Top != BoxLineStyle.None
+            || arms.Bottom != BoxLineStyle.None
+            || arms.DiagonalSlash
+            || arms.DiagonalBackslash;
     }
 
     /// <summary>
@@ -262,16 +309,16 @@ public static class BoxDrawing
             0x2593 => [new BlockRect(0, 0, 1.0, 1.0, alpha: 0.75)],
 
             // Quadrant blocks
-            0x2596 => [new BlockRect(0, 0.5, 0.5, 0.5)],                         // Quadrant lower left
-            0x2597 => [new BlockRect(0.5, 0.5, 0.5, 0.5)],                       // Quadrant lower right
-            0x2598 => [new BlockRect(0, 0, 0.5, 0.5)],                           // Quadrant upper left
-            0x259D => [new BlockRect(0.5, 0, 0.5, 0.5)],                         // Quadrant upper right
-            0x2599 => [new BlockRect(0, 0, 0.5, 0.5), new BlockRect(0, 0.5, 1.0, 0.5)], // Upper left and lower left/right
-            0x259A => [new BlockRect(0, 0, 0.5, 0.5), new BlockRect(0.5, 0.5, 0.5, 0.5)], // Upper left and lower right (diagonal)
-            0x259B => [new BlockRect(0, 0, 1.0, 0.5), new BlockRect(0, 0.5, 0.5, 0.5)], // Upper left/right and lower left
-            0x259C => [new BlockRect(0, 0, 1.0, 0.5), new BlockRect(0.5, 0.5, 0.5, 0.5)], // Upper left/right and lower right
-            0x259E => [new BlockRect(0.5, 0, 0.5, 0.5), new BlockRect(0, 0.5, 0.5, 0.5)], // Upper right and lower left (diagonal)
-            0x259F => [new BlockRect(0.5, 0, 0.5, 0.5), new BlockRect(0, 0.5, 1.0, 0.5)], // Upper right and lower left/right
+            0x2596 => [new BlockRect(0, 0.5, 0.5, 0.5)],                                    // Quadrant lower left
+            0x2597 => [new BlockRect(0.5, 0.5, 0.5, 0.5)],                                  // Quadrant lower right
+            0x2598 => [new BlockRect(0, 0, 0.5, 0.5)],                                      // Quadrant upper left
+            0x259D => [new BlockRect(0.5, 0, 0.5, 0.5)],                                    // Quadrant upper right
+            0x2599 => [new BlockRect(0, 0, 0.5, 0.5), new BlockRect(0, 0.5, 1.0, 0.5)],     // Upper left and lower left/right
+            0x259A => [new BlockRect(0, 0, 0.5, 0.5), new BlockRect(0.5, 0.5, 0.5, 0.5)],   // Upper left and lower right (diagonal)
+            0x259B => [new BlockRect(0, 0, 1.0, 0.5), new BlockRect(0, 0.5, 0.5, 0.5)],     // Upper left/right and lower left
+            0x259C => [new BlockRect(0, 0, 1.0, 0.5), new BlockRect(0.5, 0.5, 0.5, 0.5)],   // Upper left/right and lower right
+            0x259E => [new BlockRect(0.5, 0, 0.5, 0.5), new BlockRect(0, 0.5, 0.5, 0.5)],   // Upper right and lower left (diagonal)
+            0x259F => [new BlockRect(0.5, 0, 0.5, 0.5), new BlockRect(0, 0.5, 1.0, 0.5)],   // Upper right and lower left/right
 
             _ => [],
         };

@@ -1,5 +1,4 @@
 using System.Text;
-using VirtualTerminal.Buffer;
 
 namespace VirtualTerminal.Tests;
 

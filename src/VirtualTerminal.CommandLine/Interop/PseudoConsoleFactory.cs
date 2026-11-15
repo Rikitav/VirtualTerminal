@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel;
-using System.IO;
 using System.Runtime.InteropServices;
 using VirtualTerminal.Buffer;
 

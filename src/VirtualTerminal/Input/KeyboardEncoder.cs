@@ -160,7 +160,9 @@ public static class KeyboardEncoder
         return $"\x1b[{unicodeKey}{modPart}u";
     }
 
-    /// <summary>The bracketed-paste envelope (active only when <c>?2004</c> is set).</summary>
+    /// <summary>
+    /// The bracketed-paste envelope (active only when <c>?2004</c> is set).
+    /// </summary>
     public static string WrapBracketedPaste(string text, bool bracketedPaste)
         => bracketedPaste ? $"\x1b[200~{text}\x1b[201~" : text;
 
@@ -197,7 +199,9 @@ public static class KeyboardEncoder
         return "";
     }
 
-    /// <summary>xterm modifier code: 1 + shift + 2*alt + 4*ctrl (+ 8*meta).</summary>
+    /// <summary>
+    /// xterm modifier code: 1 + shift + 2*alt + 4*ctrl (+ 8*meta).
+    /// </summary>
     public static int EncodeModifiers(TerminalModifier modifiers)
     {
         int mod = 1;

@@ -21,7 +21,9 @@ public sealed class UnixPtySession : TerminalSession
     private Task? _readTask;
     private bool _disposed;
 
-    /// <summary>Starts a new Unix PTY session running the requested shell.</summary>
+    /// <summary>
+    /// Starts a new Unix PTY session running the requested shell.
+    /// </summary>
     /// <param name="shellPath">Path to the shell executable, or null for the user's default shell.</param>
     /// <param name="workingDirectory">Working directory for the shell, or null for the current directory.</param>
     /// <param name="environment">Optional extra environment variables merged into the child environment.</param>
@@ -124,7 +126,7 @@ public sealed class UnixPtySession : TerminalSession
 
     private static string[] BuildEnvironment(IReadOnlyDictionary<string, string>? extra)
     {
-        var variables = new Dictionary<string, string>(StringComparer.Ordinal);
+        Dictionary<string, string> variables = new Dictionary<string, string>(StringComparer.Ordinal);
 
         foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
         {

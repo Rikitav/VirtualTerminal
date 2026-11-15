@@ -96,8 +96,10 @@ public class BufferStreamWriter(TerminalScreenBuffer buffer, ITerminalDecoder de
         {
             Span<byte> writeData = stackalloc byte[maxByteCount];
             int bytesWritten = Encoding.GetBytes(chars, writeData);
+
             if (bytesWritten > 0)
                 _decoder.Write(writeData[..bytesWritten]);
+
             return;
         }
 

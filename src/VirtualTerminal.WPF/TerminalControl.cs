@@ -69,16 +69,24 @@ public partial class TerminalControl : Control, IDisposable
     private DateTime _suppressRenderUntil = DateTime.MinValue;
     private static readonly TimeSpan ResizeRenderSuppression = TimeSpan.FromMilliseconds(100);
 
-    /// <summary>Copies the current selection to the clipboard.</summary>
+    /// <summary>
+    /// Copies the current selection to the clipboard.
+    /// </summary>
     public static readonly RoutedUICommand CopyCommand = new RoutedUICommand("Copy", "Copy", typeof(TerminalControl));
 
-    /// <summary>Pastes the clipboard content into the session.</summary>
+    /// <summary>
+    /// Pastes the clipboard content into the session.
+    /// </summary>
     public static readonly RoutedUICommand PasteCommand = new RoutedUICommand("Paste", "Paste", typeof(TerminalControl));
 
-    /// <summary>Selects the whole visible screen.</summary>
+    /// <summary>
+    /// Selects the whole visible screen.
+    /// </summary>
     public static readonly RoutedUICommand SelectAllCommand = new RoutedUICommand("Select All", "SelectAll", typeof(TerminalControl));
 
-    /// <summary>Clears the terminal screen and scrollback.</summary>
+    /// <summary>
+    /// Clears the terminal screen and scrollback.
+    /// </summary>
     public static readonly RoutedUICommand ClearCommand = new RoutedUICommand("Clear", "Clear", typeof(TerminalControl));
 
     private SolidColorBrush _foregroundBrush = new SolidColorBrush(Colors.White);
@@ -319,7 +327,9 @@ public partial class TerminalControl : Control, IDisposable
     private void InvalidateCommandState()
         => CommandManager.InvalidateRequerySuggested();
 
-    /// <summary>Selects the entire visible screen.</summary>
+    /// <summary>
+    /// Selects the entire visible screen.
+    /// </summary>
     public void SelectAll()
     {
         if (_decoder is null)
@@ -330,7 +340,9 @@ public partial class TerminalControl : Control, IDisposable
         InvalidateVisual();
     }
 
-    /// <summary>Clears the terminal screen and moves the cursor to the home position.</summary>
+    /// <summary>
+    /// Clears the terminal screen and moves the cursor to the home position.
+    /// </summary>
     public void Clear()
     {
         // Standard "clear screen + home" via escape sequences (decoded, not a direct buffer wipe).
@@ -823,7 +835,9 @@ public partial class TerminalControl : Control, IDisposable
         _ => TerminalMouseButton.None,
     };
 
-    /// <summary>True when motion reports must be sent under the current tracking mode.</summary>
+    /// <summary>
+    /// True when motion reports must be sent under the current tracking mode.
+    /// </summary>
     private bool ShouldReportMotion()
     {
         if (_decoder is null)
@@ -1003,7 +1017,9 @@ public partial class TerminalControl : Control, IDisposable
         e.Handled = true;
     }
 
-    /// <summary>Scrolls the viewport by <paramref name="lines"/> (positive = up into history).</summary>
+    /// <summary>
+    /// Scrolls the viewport by <paramref name="lines"/> (positive = up into history).
+    /// </summary>
     public void ScrollBy(int lines)
     {
         if (_decoder is null)
@@ -1021,7 +1037,9 @@ public partial class TerminalControl : Control, IDisposable
         InvalidateVisual();
     }
 
-    /// <summary>Snaps the viewport back to the live bottom of the buffer.</summary>
+    /// <summary>
+    /// Snaps the viewport back to the live bottom of the buffer.
+    /// </summary>
     public void ScrollToBottom()
     {
         if (_scrollOffset == 0)
@@ -1233,19 +1251,29 @@ public partial class TerminalControl : Control, IDisposable
         GC.SuppressFinalize(this);
     }
 
-    /// <summary>Raised when the connected program changes the title (OSC 0/1/2).</summary>
+    /// <summary>
+    /// Raised when the connected program changes the title (OSC 0/1/2).
+    /// </summary>
     public event EventHandler<string>? TitleChanged;
 
-    /// <summary>Raised on BEL.</summary>
+    /// <summary>
+    /// Raised on BEL.
+    /// </summary>
     public event EventHandler? Bell;
 
-    /// <summary>Raised when an OSC 9 desktop notification is received.</summary>
+    /// <summary>
+    /// Raised when an OSC 9 desktop notification is received.
+    /// </summary>
     public event EventHandler<string>? NotificationReceived;
 
-    /// <summary>Raised when an OSC 133 shell-integration mark is received.</summary>
+    /// <summary>
+    /// Raised when an OSC 133 shell-integration mark is received.
+    /// </summary>
     public event EventHandler<string>? ShellIntegrationMark;
 
-    /// <summary>Raised when an OSC 1337 iTerm2 annotation is received.</summary>
+    /// <summary>
+    /// Raised when an OSC 1337 iTerm2 annotation is received.
+    /// </summary>
     public event EventHandler<string>? Iterm2Annotation;
 
     /// <summary>Raised on the UI thread after the session buffer has been updated with new
@@ -1254,52 +1282,72 @@ public partial class TerminalControl : Control, IDisposable
     public event EventHandler? ScreenUpdated;
 
     // ---- DependencyProperty registrations ----
-    /// <summary>Defines the <see cref="Session"/> dependency property.</summary>
+    /// <summary>
+    /// Defines the <see cref="Session"/> dependency property.
+    /// </summary>
     public static readonly DependencyProperty SessionProperty = DependencyProperty.Register(
         nameof(Session), typeof(ITerminalSession), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: null));
 
-    /// <summary>Defines the <see cref="AllowDirectInput"/> dependency property.</summary>
+    /// <summary>
+    /// Defines the <see cref="AllowDirectInput"/> dependency property.
+    /// </summary>
     public static readonly DependencyProperty AllowDirectInputProperty = DependencyProperty.Register(
         nameof(AllowDirectInput), typeof(bool), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: true));
 
-    /// <summary>Defines the <see cref="ScrollDownVisible"/> dependency property.</summary>
+    /// <summary>
+    /// Defines the <see cref="ScrollDownVisible"/> dependency property.
+    /// </summary>
     public static readonly DependencyProperty ScrollDownVisibleProperty = DependencyProperty.Register(
         nameof(ScrollDownVisible), typeof(bool), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: true));
 
-    /// <summary>Defines the <see cref="ScreenBackground"/> dependency property.</summary>
+    /// <summary>
+    /// Defines the <see cref="ScreenBackground"/> dependency property.
+    /// </summary>
     public static readonly DependencyProperty ScreenBackgroundProperty = DependencyProperty.Register(
         nameof(ScreenBackground), typeof(WindowsColor), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: Colors.Black));
 
-    /// <summary>Defines the <see cref="ScreenForeground"/> dependency property.</summary>
+    /// <summary>
+    /// Defines the <see cref="ScreenForeground"/> dependency property.
+    /// </summary>
     public static readonly DependencyProperty ScreenForegroundProperty = DependencyProperty.Register(
         nameof(ScreenForeground), typeof(WindowsColor), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: Colors.White));
 
-    /// <summary>Defines the <see cref="CursorVisible"/> dependency property.</summary>
+    /// <summary>
+    /// Defines the <see cref="CursorVisible"/> dependency property.
+    /// </summary>
     public static readonly DependencyProperty CursorVisibleProperty = DependencyProperty.Register(
         nameof(CursorVisible), typeof(bool), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: true));
 
-    /// <summary>Defines the <see cref="ScrollbackLines"/> dependency property.</summary>
+    /// <summary>
+    /// Defines the <see cref="ScrollbackLines"/> dependency property.
+    /// </summary>
     public static readonly DependencyProperty ScrollbackLinesProperty = DependencyProperty.Register(
         nameof(ScrollbackLines), typeof(int), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: 10000));
 
-    /// <summary>Defines the <see cref="LineHeight"/> dependency property.</summary>
+    /// <summary>
+    /// Defines the <see cref="LineHeight"/> dependency property.
+    /// </summary>
     public static readonly DependencyProperty LineHeightProperty = DependencyProperty.Register(
         nameof(LineHeight), typeof(double), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: 1.0));
 
-    /// <summary>Defines the <see cref="OutputText"/> dependency property.</summary>
+    /// <summary>
+    /// Defines the <see cref="OutputText"/> dependency property.
+    /// </summary>
     public static readonly DependencyProperty OutputTextProperty = DependencyProperty.Register(
         nameof(OutputText), typeof(string), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: string.Empty));
 
-    /// <summary>Defines the <see cref="AutoScrolling"/> dependency property.</summary>
+    /// <summary>
+    /// Defines the <see cref="AutoScrolling"/> dependency property.
+    /// </summary>
     public static readonly DependencyProperty AutoScrollingProperty = DependencyProperty.Register(
         nameof(AutoScrolling), typeof(bool), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: true));

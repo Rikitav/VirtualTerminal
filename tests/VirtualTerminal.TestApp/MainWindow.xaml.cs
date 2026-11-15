@@ -4,7 +4,6 @@ using System.Windows.Media;
 using VirtualTerminal.Controls;
 using VirtualTerminal.Cursors;
 using VirtualTerminal.Interfaces;
-using VirtualTerminal.Session;
 
 namespace VirtualTerminal.TestApp;
 
@@ -84,7 +83,7 @@ public partial class MainWindow : Window
 
     private TerminalControl CreateDemoTerminal(ITerminalSession? session = null)
     {
-        var terminal = new TerminalControl
+        TerminalControl terminal = new TerminalControl
         {
             AllowDirectInput = true,
             Background = Brushes.Black,
@@ -120,7 +119,7 @@ public partial class MainWindow : Window
 
     private UIElement CreateGenericWpfControl(string title)
     {
-        var border = new Border
+        Border border = new Border
         {
             Background = new SolidColorBrush(Color.FromRgb(30, 30, 32)),
             BorderBrush = new SolidColorBrush(Color.FromRgb(63, 63, 70)),
@@ -129,9 +128,9 @@ public partial class MainWindow : Window
             Padding = new Thickness(12),
         };
 
-        var sp = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        StackPanel sp = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
 
-        var titleBlock = new TextBlock
+        TextBlock titleBlock = new TextBlock
         {
             Text = $"Generic Non-Terminal Control:\n{title}",
             Foreground = Brushes.LightGreen,
@@ -142,7 +141,7 @@ public partial class MainWindow : Window
         };
         sp.Children.Add(titleBlock);
 
-        var descBlock = new TextBlock
+        TextBlock descBlock = new TextBlock
         {
             Text = "The MultiplexerControl tiles and manages ANY WPF control (Buttons, TextBoxes, Canvases, UserControls) with smooth animated splits and layout persistence.",
             Foreground = Brushes.LightGray,
@@ -153,7 +152,7 @@ public partial class MainWindow : Window
         };
         sp.Children.Add(descBlock);
 
-        var sampleBox = new TextBox
+        TextBox sampleBox = new TextBox
         {
             Text = "Type inside this generic control...",
             Background = new SolidColorBrush(Color.FromRgb(45, 45, 48)),
@@ -163,7 +162,7 @@ public partial class MainWindow : Window
         };
         sp.Children.Add(sampleBox);
 
-        var sampleBtn = new Button
+        Button sampleBtn = new Button
         {
             Content = "Interactive Button",
             Padding = new Thickness(8, 4, 8, 4),

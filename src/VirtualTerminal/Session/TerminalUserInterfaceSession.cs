@@ -12,13 +12,19 @@ public abstract class TerminalUserInterfaceSession : TerminalSession
 {
     private readonly StringBuilder _inputBuffer = new StringBuilder();
 
-    /// <summary>Current terminal width in columns.</summary>
+    /// <summary>
+    /// Current terminal width in columns.
+    /// </summary>
     protected int Width { get; private set; } = 80;
 
-    /// <summary>Current terminal height in rows.</summary>
+    /// <summary>
+    /// Current terminal height in rows.
+    /// </summary>
     protected int Height { get; private set; } = 24;
 
-    /// <summary>Feeds raw output bytes into the terminal decoder and notifies the UI.</summary>
+    /// <summary>
+    /// Feeds raw output bytes into the terminal decoder and notifies the UI.
+    /// </summary>
     protected void FeedOutput(ReadOnlySpan<byte> data)
     {
         if (data.IsEmpty)
@@ -28,7 +34,9 @@ public abstract class TerminalUserInterfaceSession : TerminalSession
         NotifyBufferUpdated();
     }
 
-    /// <summary>Feeds a text string into the terminal decoder and notifies the UI.</summary>
+    /// <summary>
+    /// Feeds a text string into the terminal decoder and notifies the UI.
+    /// </summary>
     protected void FeedOutput(string text)
     {
         if (string.IsNullOrEmpty(text))
@@ -38,7 +46,9 @@ public abstract class TerminalUserInterfaceSession : TerminalSession
         FeedOutput(bytes.AsSpan());
     }
 
-    /// <summary>Enters the alternate screen buffer and triggers the first render.</summary>
+    /// <summary>
+    /// Enters the alternate screen buffer and triggers the first render.
+    /// </summary>
     public virtual void Run()
     {
         ThrowIfDisposed();
@@ -71,22 +81,32 @@ public abstract class TerminalUserInterfaceSession : TerminalSession
         }
     }
 
-    /// <summary>Called to redraw the whole TUI surface.</summary>
+    /// <summary>
+    /// Called to redraw the whole TUI surface.
+    /// </summary>
     protected abstract void Render();
 
-    /// <summary>Called when a TUI key is pressed.</summary>
+    /// <summary>
+    /// Called when a TUI key is pressed.
+    /// </summary>
     /// <param name="key">The pressed key.</param>
     protected abstract void OnKey(ConsoleKey key);
 
-    /// <summary>Clears the screen and moves the cursor to the top-left corner.</summary>
+    /// <summary>
+    /// Clears the screen and moves the cursor to the top-left corner.
+    /// </summary>
     protected void ClearScreen()
         => FeedOutput("\x1b[2J\x1b[H");
 
-    /// <summary>Moves the cursor to the specified cell.</summary>
+    /// <summary>
+    /// Moves the cursor to the specified cell.
+    /// </summary>
     protected void SetCursor(int column, int row)
         => FeedOutput($"\x1b[{Math.Clamp(row, 0, Height - 1) + 1};{Math.Clamp(column, 0, Width - 1) + 1}H");
 
-    /// <summary>Draws text at the specified cell, clamped to the visible area.</summary>
+    /// <summary>
+    /// Draws text at the specified cell, clamped to the visible area.
+    /// </summary>
     protected void DrawText(int column, int row, string text)
     {
         if (row < 0 || row >= Height)
@@ -101,11 +121,15 @@ public abstract class TerminalUserInterfaceSession : TerminalSession
         FeedOutput(clipped);
     }
 
-    /// <summary>Sets foreground and background colors using the 256-color palette.</summary>
+    /// <summary>
+    /// Sets foreground and background colors using the 256-color palette.
+    /// </summary>
     protected void SetColor(byte foreground, byte background)
         => FeedOutput($"\x1b[38;5;{foreground}m\x1b[48;5;{background}m");
 
-    /// <summary>Resets all attributes to defaults.</summary>
+    /// <summary>
+    /// Resets all attributes to defaults.
+    /// </summary>
     protected void ResetColor()
         => FeedOutput("\x1b[0m");
 
@@ -143,7 +167,9 @@ public abstract class TerminalUserInterfaceSession : TerminalSession
         }
     }
 
-    /// <summary>Leaves the alternate screen buffer and shows the cursor again.</summary>
+    /// <summary>
+    /// Leaves the alternate screen buffer and shows the cursor again.
+    /// </summary>
     protected override void Dispose(bool disposing)
     {
         if (!disposing)
@@ -245,15 +271,20 @@ public abstract class TerminalUserInterfaceSession : TerminalSession
         // Single-byte keys
         _inputBuffer.Remove(0, 1);
 
-        key = first switch
+        if (first >= 'A' && first <= 'Z' || first >= 'a' && first <= 'z' || first >= '0' && first <= '9')
         {
-            '\r' or '\n' => ConsoleKey.Enter,
-            '\t' => ConsoleKey.Tab,
-            '\b' or '\x7F' => ConsoleKey.Backspace,
-            ' ' => ConsoleKey.Spacebar,
-            >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9'
-                => (ConsoleKey)char.ToUpperInvariant(first),
-            _ => ConsoleKey.None
+            key = (ConsoleKey)char.ToUpperInvariant(first);
+        }
+        else
+        {
+            key = first switch
+            {
+                '\r' or '\n' => ConsoleKey.Enter,
+                '\t' => ConsoleKey.Tab,
+                '\b' or '\x7F' => ConsoleKey.Backspace,
+                ' ' => ConsoleKey.Spacebar,
+                _ => ConsoleKey.None
+            };
         };
 
         return key != ConsoleKey.None;

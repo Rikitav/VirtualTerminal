@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -26,6 +25,7 @@ namespace VirtualTerminal;
 /// processed. Any non-newline event (text, escape/CSI/OSC/DCS sequences, BEL/BS/TAB, resize)
 /// flushes the parked bytes first.
 /// </para>
+/// 
 /// </summary>
 public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
 {
@@ -47,46 +47,72 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     private bool _inDecrqss;
     private readonly StringBuilder _dcsPayload = new();
 
-    /// <summary>Gets the terminal screen buffer being modified by this decoder.</summary>
+    /// <summary>
+    /// Gets the terminal screen buffer being modified by this decoder.
+    /// </summary>
     public TerminalScreenBuffer Buffer { get; }
 
-    /// <summary>Gets the current terminal state (cursor, attributes, modes).</summary>
+    /// <summary>
+    /// Gets the current terminal state (cursor, attributes, modes).
+    /// </summary>
     public TerminalState State { get; } = new();
 
-    /// <summary>Gets or sets options that control rendering and behavior.</summary>
+    /// <summary>
+    /// Gets or sets options that control rendering and behavior.
+    /// </summary>
     public TerminalOptions Options { get; set; }
 
     /// <inheritdoc />
     public bool AutoFlush { get; set; }
 
-    /// <summary>Current window title (OSC 0/1/2).</summary>
+    /// <summary>
+    /// Current window title (OSC 0/1/2).
+    /// </summary>
     public string Title { get; private set; } = string.Empty;
 
-    /// <summary>Raised when the title changes.</summary>
+    /// <summary>
+    /// Raised when the title changes.
+    /// </summary>
     public event EventHandler<string>? TitleChanged;
 
-    /// <summary>Raised on BEL.</summary>
+    /// <summary>
+    /// Raised on BEL.
+    /// </summary>
     public event EventHandler? Bell;
 
-    /// <summary>Raised when an OSC 9 desktop notification is received.</summary>
+    /// <summary>
+    /// Raised when an OSC 9 desktop notification is received.
+    /// </summary>
     public event EventHandler<string>? NotificationReceived;
 
-    /// <summary>Raised when an OSC 52 clipboard set/query is received.</summary>
+    /// <summary>
+    /// Raised when an OSC 52 clipboard set/query is received.
+    /// </summary>
     public event EventHandler<ClipboardRequestEventArgs>? ClipboardRequested;
 
-    /// <summary>Raised when an OSC 133 shell-integration mark is received.</summary>
+    /// <summary>
+    /// Raised when an OSC 133 shell-integration mark is received.
+    /// </summary>
     public event EventHandler<string>? ShellIntegrationMark;
 
-    /// <summary>Raised when an OSC 1337 iTerm2 annotation is received.</summary>
+    /// <summary>
+    /// Raised when an OSC 1337 iTerm2 annotation is received.
+    /// </summary>
     public event EventHandler<string>? Iterm2Annotation;
 
-    /// <summary>Wire to the session output queue so reports (DSR/DA/…) reach the client.</summary>
+    /// <summary>
+    /// Wire to the session output queue so reports (DSR/DA/…) reach the client.
+    /// </summary>
     public Action<ReadOnlySpan<byte>>? SendOutput { get; set; }
 
-    /// <summary>Gets the current cursor position as a point.</summary>
+    /// <summary>
+    /// Gets the current cursor position as a point.
+    /// </summary>
     public TerminalPoint CursorPosition => new(State.CursorX, State.CursorY);
 
-    /// <summary>Gets the encoding used by the underlying VT parser.</summary>
+    /// <summary>
+    /// Gets the encoding used by the underlying VT parser.
+    /// </summary>
     public Encoding Encoding => _parser.Encoding;
 
     /// <summary>
@@ -102,7 +128,9 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         _parser = new VtDecoder(this);
     }
 
-    /// <summary>Writes a span of raw VT/ANSI bytes to the decoder.</summary>
+    /// <summary>
+    /// Writes a span of raw VT/ANSI bytes to the decoder.
+    /// </summary>
     /// <param name="data">Bytes to process.</param>
     public void Write(ReadOnlySpan<byte> data)
     {
@@ -120,11 +148,15 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
             FlushPendingNewline();
     }
 
-    /// <summary>Resizes the underlying screen buffer and clamps the cursor into the new bounds.</summary>
+    /// <summary>
+    /// Resizes the underlying screen buffer and clamps the cursor into the new bounds.
+    /// </summary>
     public void Resize(ushort columns, ushort rows)
         => Resize(columns, rows, pushScrollback: true);
 
-    /// <summary>Resizes the underlying screen buffer and clamps the cursor into the new bounds.</summary>
+    /// <summary>
+    /// Resizes the underlying screen buffer and clamps the cursor into the new bounds.
+    /// </summary>
     /// <param name="columns">New number of columns.</param>
     /// <param name="rows">New number of rows.</param>
     /// <param name="pushScrollback"><c>true</c> to push removed rows into scrollback.</param>
@@ -137,12 +169,11 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         }
     }
 
-    /// <summary>Releases the underlying VT parser resources.</summary>
+    /// <summary>
+    /// Releases the underlying VT parser resources.
+    /// </summary>
     public void Dispose()
         => _parser.Dispose();
-
-    internal string? GetHyperlink(byte id)
-        => id == 0 || id > _hyperlinks.Count ? null : _hyperlinks[id - 1];
 
     internal byte RegisterHyperlink(string uri)
     {
@@ -168,7 +199,7 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         TitleChanged?.Invoke(this, title);
     }
 
-    private void RaiseBell()
+    internal void RaiseBell()
         => Bell?.Invoke(this, EventArgs.Empty);
 
     internal void RaiseNotification(string message)
@@ -246,6 +277,7 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
                 {
                     rune = MapDecSpecialGraphics(rune.Value);
                 }
+
                 int width = Wcwidth.Of(rune);
                 if (width < 0)
                     continue;  // non-printable; should not reach here
@@ -271,6 +303,7 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
                     {
                         State.CursorX = 0;
                         Index();
+                
                         cx = 0;
                         cy = State.CursorY;
                     }
@@ -285,6 +318,7 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
 
                 ref TerminalCellInfo cell = ref Buffer.GetCell(cy, cx);
                 CellStyleFlags flags = style.Flags;
+                
                 if (width == 2)
                     flags |= CellStyleFlags.Wide;
 
@@ -329,47 +363,68 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
             case 0x0A:
             case 0x0B:
             case 0x0C:
-                if (AutoFlush)
                 {
-                    LineFeed();
-                }
-                else
-                {
-                    // Trailing-newline debounce: park the line feed; FlushPendingNewline applies it
-                    // when any further bytes arrive.
-                    _pendingLineFeeds++;
+                    if (AutoFlush)
+                    {
+                        LineFeed();
+                    }
+                    else
+                    {
+                        // Trailing-newline debounce: park the line feed; FlushPendingNewline applies it
+                        // when any further bytes arrive.
+                        _pendingLineFeeds++;
+                    }
+
+                    break;
                 }
 
-                break;
             case 0x0D:
-                if (AutoFlush)
                 {
-                    CarriageReturn();
-                }
-                else
-                {
-                    _pendingReturn = true;
+                    if (AutoFlush)
+                    {
+                        CarriageReturn();
+                    }
+                    else
+                    {
+                        _pendingReturn = true;
+                    }
+
+                    break;
                 }
 
-                break;
             case 0x07:
-                FlushPendingNewline();
-                RaiseBell();
-                break;
+                {
+                    FlushPendingNewline();
+                    RaiseBell();
+                    break;
+                }
+
             case 0x08:
-                FlushPendingNewline();
-                CursorLeft();
-                break;
+                {
+                    FlushPendingNewline();
+                    CursorLeft();
+                    break;
+                }
+
             case 0x09:
-                FlushPendingNewline();
-                Tab();
-                break;
+                {
+                    FlushPendingNewline();
+                    Tab();
+                    break;
+                }
+
             case 0x0E: // Shift-Out (SO) -> invoke G1
-                _activeCharset = 1;
-                break;
+                {
+                    _activeCharset = 1;
+                    break;
+                }
+
             case 0x0F: // Shift-In (SI) -> invoke G0
-                _activeCharset = 0;
-                break;
+                {
+                    _activeCharset = 0;
+                    break;
+                }
+
             default:
                 break;  // other C0 ignored
         }
@@ -406,56 +461,107 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
             switch ((char)intermediates[0])
             {
                 case '(':
-                    _g0 = (char)final;
-                    return;
+                    {
+                        _g0 = (char)final;
+                        return;
+                    }
+  
                 case ')':
-                    _g1 = (char)final;
-                    return;
+                    {
+                        _g1 = (char)final;
+                        return;
+                    }
+
                 case '#':
-                    if (final == '8')
-                        AlignmentTest();
-                    return;
+                    {
+                        if (final == '8')
+                            AlignmentTest();
+                    
+                        return;
+                    }
             }
         }
 
         switch ((char)final)
         {
+            // DECSC
             case '7':
-                State.SaveCursor();
-                break;            // DECSC
+                {
+                    State.SaveCursor();
+                    break;
+                }
+
+            // DECRC
             case '8':
-                State.RestoreCursor();
-                break;         // DECRC
+                {
+                    State.RestoreCursor();
+                    break;
+                }
+
+            // IND
             case 'D':
-                Index();
-                break;                       // IND
+                {
+                    Index();
+                    break;
+                }
+
+            // NEL
             case 'E':
-                NewLine();
-                break;                     // NEL
+                {
+                    NewLine();
+                    break;
+                }
+
+            // HTS
             case 'H':
-                Buffer.SetTabStop(State.CursorX);
-                break; // HTS
+                {
+                    Buffer.SetTabStop(State.CursorX);
+                    break;
+                }
+
+            // RI
             case 'M':
-                ReverseIndex();
-                break;                // RI
+                {
+                    ReverseIndex();
+                    break;
+                }
+
+            // RIS
             case 'c':
-                FullReset();
-                break;                   // RIS
+                {
+                    FullReset();
+                    break;
+                }
+
+            // DECKPAM
             case '=':
-                State.Modes.ApplicationKeypad = true;
-                break;   // DECKPAM
+                {
+                    State.Modes.ApplicationKeypad = true;
+                    break;
+                }
+
+            // DECKPNM
             case '>':
-                State.Modes.ApplicationKeypad = false;
-                break;  // DECKPNM
+                {
+                    State.Modes.ApplicationKeypad = false;
+                    break;
+                }
+
+            // G0/G1/G2/G3 charset designation: UTF-8 terminals treat this as a no-op.
             case '(':
             case ')':
             case '*':
             case '+':
-                break;  // G0/G1/G2/G3 charset designation: UTF-8 terminals treat this as a no-op.
-            case '#':
-                if (intermediates.Length == 0 || intermediates[0] == '8')
-                    AlignmentTest();
                 break;
+
+            case '#':
+                {
+                    if (intermediates.Length == 0 || intermediates[0] == '8')
+                        AlignmentTest();
+                
+                    break;
+                }
+
             default:
                 break;
         }
@@ -480,27 +586,33 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
                         State.Modes.CursorShape = CursorShape.Block;
                         State.Modes.CursorBlink = true;
                         break;
+                    
                     case 2:
                         State.Modes.CursorShape = CursorShape.Block;
                         State.Modes.CursorBlink = false;
                         break;
+                    
                     case 3:
                         State.Modes.CursorShape = CursorShape.Underline;
                         State.Modes.CursorBlink = true;
                         break;
+                    
                     case 4:
                         State.Modes.CursorShape = CursorShape.Underline;
                         State.Modes.CursorBlink = false;
                         break;
+                    
                     case 5:
                         State.Modes.CursorShape = CursorShape.Bar;
                         State.Modes.CursorBlink = true;
                         break;
+                    
                     case 6:
                         State.Modes.CursorShape = CursorShape.Bar;
                         State.Modes.CursorBlink = false;
                         break;
                 }
+
                 return;
             }
 
@@ -525,6 +637,8 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
                         DecEraseRectangularArea(parameters);
                         return;
                     }
+
+
                     if (fc == 'x')
                     {
                         DecFillRectangularArea(parameters);
@@ -536,173 +650,243 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
             switch (fc)
             {
                 // ---- Cursor movement ----
+
+                // CUU
                 case 'A':
                     CursorVertical(-parameters.At(0, 1));
-                    break;       // CUU
+                    break;
+
+                // CUD
                 case 'B':
                     CursorVertical(+parameters.At(0, 1));
-                    break;       // CUD
+                    break;
+
+                // CUF
                 case 'C':
                     CursorHorizontal(+parameters.At(0, 1));
-                    break;     // CUF
+                    break;
+
+                // CUB
                 case 'D':
                     CursorHorizontal(-parameters.At(0, 1));
-                    break;     // CUB
+                    break;
+
+                // CNL
                 case 'E':
                     CursorLine(parameters.At(0, 1), +1);
-                    break;        // CNL
+                    break;
+
+                // CPL
                 case 'F':
                     CursorLine(parameters.At(0, 1), -1);
-                    break;        // CPL
+                    break;
+
+                // CHA / HPA
                 case 'G':
                 case '`':
                     CursorToColumn(parameters.At(0, 1));
-                    break; // CHA / HPA
+                    break;
+
+                // VPA
                 case 'd':
                     CursorToRow(parameters.At(0, 1));
-                    break;           // VPA
+                    break;
+
+                // VPR (rare)
                 case 'e':
                     CursorVertical(+parameters.At(0, 1));
-                    break;       // VPR (rare)
+                    break;
+
+                // CUP/HVP
                 case 'H':
                 case 'f':
                     CursorPositionSet(parameters.At(0, 1), parameters.At(1, 1));
-                    break; // CUP/HVP
+                    break;
 
                 // ---- Erase ----
+
+                // ED
                 case 'J':
                     EraseDisplay(parameters.At(0, 0));
-                    break;          // ED
+                    break;
+
+                // EL
                 case 'K':
                     EraseLine(parameters.At(0, 0));
-                    break;             // EL
+                    break;
+
+                // ECH
                 case 'X':
                     Buffer.EraseChars(State.CursorY, State.CursorX, Math.Max(1, parameters.At(0, 1)));
-                    break; // ECH
+                    break;
 
                 // ---- Insert / delete ----
+
+                // ICH
                 case '@':
                     Buffer.InsertChars(State.CursorY, State.CursorX, Math.Max(1, parameters.At(0, 1)));
-                    break; // ICH
+                    break;
+
+                // DCH
                 case 'P':
                     Buffer.DeleteChars(State.CursorY, State.CursorX, Math.Max(1, parameters.At(0, 1)));
-                    break;  // DCH
+                    break;
+
+                // IL
                 case 'L':
                     InsertLines(Math.Max(1, parameters.At(0, 1)));
-                    break; // IL
+                    break;
+
+                // DL
                 case 'M':
                     DeleteLines(Math.Max(1, parameters.At(0, 1)));
-                    break; // DL
+                    break;
 
                 // ---- Scroll region ----
+
+                // SU
                 case 'S':
                     Buffer.ScrollUp(Math.Max(1, parameters.At(0, 1)));
-                    break;  // SU
+                    break;
+
+                // SD
                 case 'T':
                     Buffer.ScrollDown(Math.Max(1, parameters.At(0, 1)));
-                    break; // SD
+                    break;
 
                 // ---- Tabs ----
+
+                // CHT
                 case 'I':
                     ForwardTab(Math.Max(1, parameters.At(0, 1)));
-                    break;  // CHT
+                    break;
+
+                // CBT
                 case 'Z':
                     BackwardTab(Math.Max(1, parameters.At(0, 1)));
-                    break; // CBT
+                    break;
+
+                // TBC
                 case 'g':
                     ClearTab(parameters.At(0, 0));
-                    break;                  // TBC
+                    break;
 
                 // ---- Save / restore (ANSI) / Left and Right Margins (DECSLRM) ----
+
                 case 's':
-                    if (State.Modes.LeftRightMarginMode)
-                        SetHorizontalScrollRegion(parameters.At(0, 1), parameters.At(1, Buffer.Columns));
-                    else
-                        State.SaveCursor();
-                    break;
+                    {
+                        if (State.Modes.LeftRightMarginMode)
+                            SetHorizontalScrollRegion(parameters.At(0, 1), parameters.At(1, Buffer.Columns));
+                        else
+                            State.SaveCursor();
+                        break;
+                    }
+
                 case 'u':
-                    if (privateMarker == '?')
                     {
-                        // Kitty Keyboard Protocol query: CSI ? u -> CSI ? {flags} u
-                        Respond($"\x1b[?{(int)State.Modes.KittyKeyboardFlags}u");
-                    }
-                    else if (privateMarker == '>')
-                    {
-                        // Kitty Keyboard Protocol push flags: CSI > {flags} u
-                        int flags = parameters.At(0, 0);
-                        State.Modes.KittyKeyboardStack.Push(State.Modes.KittyKeyboardFlags);
-                        State.Modes.KittyKeyboardFlags = (VirtualTerminal.Input.KittyKeyboardFlags)flags;
-                    }
-                    else if (privateMarker == '<')
-                    {
-                        // Kitty Keyboard Protocol pop flags: CSI < {count} u
-                        int count = Math.Max(1, parameters.At(0, 1));
-                        for (int i = 0; i < count; i++)
+                        if (privateMarker == '?')
                         {
-                            if (State.Modes.KittyKeyboardStack.Count > 0)
-                                State.Modes.KittyKeyboardFlags = State.Modes.KittyKeyboardStack.Pop();
-                            else
+                            // Kitty Keyboard Protocol query: CSI ? u -> CSI ? {flags} u
+                            Respond($"\x1b[?{(int)State.Modes.KittyKeyboardFlags}u");
+                        }
+                        else if (privateMarker == '>')
+                        {
+                            // Kitty Keyboard Protocol push flags: CSI > {flags} u
+                            int flags = parameters.At(0, 0);
+                            State.Modes.KittyKeyboardStack.Push(State.Modes.KittyKeyboardFlags);
+                            State.Modes.KittyKeyboardFlags = (VirtualTerminal.Input.KittyKeyboardFlags)flags;
+                        }
+                        else if (privateMarker == '<')
+                        {
+                            // Kitty Keyboard Protocol pop flags: CSI < {count} u
+                            int count = Math.Max(1, parameters.At(0, 1));
+                            for (int i = 0; i < count; i++)
                             {
-                                State.Modes.KittyKeyboardFlags = VirtualTerminal.Input.KittyKeyboardFlags.None;
-                                break;
+                                if (State.Modes.KittyKeyboardStack.Count > 0)
+                                    State.Modes.KittyKeyboardFlags = State.Modes.KittyKeyboardStack.Pop();
+                                else
+                                {
+                                    State.Modes.KittyKeyboardFlags = VirtualTerminal.Input.KittyKeyboardFlags.None;
+                                    break;
+                                }
                             }
                         }
-                    }
-                    else if (privateMarker == '=')
-                    {
-                        // Kitty Keyboard Protocol set flags: CSI = {flags} [; {mode}] u
-                        int flags = parameters.At(0, 0);
-                        int mode = parameters.At(1, 1);
-                        if (mode == 2)
-                            State.Modes.KittyKeyboardFlags |= (VirtualTerminal.Input.KittyKeyboardFlags)flags;
-                        else if (mode == 3)
-                            State.Modes.KittyKeyboardFlags &= ~(VirtualTerminal.Input.KittyKeyboardFlags)flags;
+                        else if (privateMarker == '=')
+                        {
+                            // Kitty Keyboard Protocol set flags: CSI = {flags} [; {mode}] u
+                            Input.KittyKeyboardFlags flags = (Input.KittyKeyboardFlags)parameters.At(0, 0);
+                            int mode = parameters.At(1, 1);
+
+                            switch (mode)
+                            {
+                                case 2:
+                                    State.Modes.KittyKeyboardFlags |= flags;
+                                    break;
+
+                                case 3:
+                                    State.Modes.KittyKeyboardFlags &= ~flags;
+                                    break;
+
+                                default:
+                                    State.Modes.KittyKeyboardFlags = flags;
+                                    break;
+                            }
+                        }
                         else
-                            State.Modes.KittyKeyboardFlags = (VirtualTerminal.Input.KittyKeyboardFlags)flags;
+                        {
+                            State.RestoreCursor();
+                        }
+
+                        break;
                     }
-                    else
-                    {
-                        State.RestoreCursor();
-                    }
-                    break;
 
                 // ---- Modes ----
+
                 case 'h':
                     SetModes(parameters, set: true, privateMarker);
                     break;
+
                 case 'l':
                     SetModes(parameters, set: false, privateMarker);
                     break;
 
                 // ---- Reports ----
+
                 case 'n':
                     DeviceStatusReport(parameters.At(0, 0));
                     break;
+
                 case 'c':
                 case '>': /* handled via marker below */
                     DeviceAttributes(privateMarker);
                     break;
+
                 case 'x':
                     DecRequestParameters(parameters.At(0, 1));
                     break; // DECREQTPARM
 
                 // ---- Scroll region (DECSTBM) ----
+
                 case 'r':
                     SetScrollRegion(parameters.At(0, 1), parameters.At(1, Buffer.Rows));
                     break;
 
                 // ---- SGR ----
+
                 case 'm':
                     SetGraphicRendition(parameters);
                     break;
 
                 default:
-                    break;  // ignore unknown CSI
+                    {
+                        Debug.WriteLine($"TerminalDecoder.CsiDispatch: unknown sequence {fc}.");
+                        break;  // ignore unknown CSI}
+                    }
             }
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"TerminalDecoder.CsiDispatch failed for final {fc}.\n{ex}");
+            Debug.WriteLine($"TerminalDecoder.CsiDispatch: failed for final {fc}.\n{ex}");
         }
     }
 
@@ -738,6 +922,7 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         {
             _inDecrqss = false;
             HandleDecrqss(_dcsPayload.ToString());
+
             _dcsPayload.Clear();
         }
     }
@@ -746,32 +931,41 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     {
         switch (setting)
         {
+            case " q":
+                {
+                    int decscusrStyle = State.Modes.CursorShape switch
+                    {
+                        CursorShape.Block => State.Modes.CursorBlink ? 1 : 2,
+                        CursorShape.Underline => State.Modes.CursorBlink ? 3 : 4,
+                        CursorShape.Bar => State.Modes.CursorBlink ? 5 : 6,
+                        _ => 1
+                    };
+
+                    Respond($"\x1bP1$r{decscusrStyle} q\x1b\\");
+                    break;
+                }
+
             case "m":
                 Respond($"\x1bP1$r{EncodeSgr()}m\x1b\\");
                 break;
+            
             case "r":
                 Respond($"\x1bP1$r{Buffer.ScrollTop + 1};{Buffer.ScrollBottom + 1}r\x1b\\");
                 break;
+            
             case "s":
                 Respond($"\x1bP1$r{Buffer.ScrollLeft + 1};{Buffer.ScrollRight + 1}s\x1b\\");
                 break;
+            
             case "\"q":
                 int cursorStyle = State.Modes.CursorBlink ? 1 : 2;
                 Respond($"\x1bP1$r{cursorStyle}\"q\x1b\\");
                 break;
-            case " q":
-                int decscusrStyle = State.Modes.CursorShape switch
-                {
-                    CursorShape.Block => State.Modes.CursorBlink ? 1 : 2,
-                    CursorShape.Underline => State.Modes.CursorBlink ? 3 : 4,
-                    CursorShape.Bar => State.Modes.CursorBlink ? 5 : 6,
-                    _ => 1
-                };
-                Respond($"\x1bP1$r{decscusrStyle} q\x1b\\");
-                break;
+            
             case "\"p":
                 Respond("\x1bP1$r65;1\"p\x1b\\");
                 break;
+            
             default:
                 Respond("\x1bP0$r\x1b\\");
                 break;
@@ -1018,7 +1212,9 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     private void CursorToColumn(int column)
     {
         int target = State.Modes.OriginMode
-            ? Buffer.ScrollLeft + column - 1 : column - 1;
+            ? Buffer.ScrollLeft + column - 1
+            : column - 1;
+        
         int minX = State.Modes.OriginMode ? Buffer.ScrollLeft : 0;
         int maxX = State.Modes.OriginMode ? Buffer.ScrollRight : Buffer.Columns - 1;
         State.CursorX = Math.Clamp(target, minX, maxX);
@@ -1028,7 +1224,9 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     private void CursorToRow(int row)
     {
         int target = State.Modes.OriginMode
-            ? Buffer.ScrollTop + row - 1 : row - 1;
+            ? Buffer.ScrollTop + row - 1
+            : row - 1;
+        
         int minY = State.Modes.OriginMode ? Buffer.ScrollTop : 0;
         int maxY = State.Modes.OriginMode ? Buffer.ScrollBottom : Buffer.Rows - 1;
         State.CursorY = Math.Clamp(target, minY, maxY);
@@ -1038,10 +1236,12 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     private void CursorPositionSet(int row, int col)
     {
         int y = State.Modes.OriginMode
-            ? Buffer.ScrollTop + row - 1 : row - 1;
+            ? Buffer.ScrollTop + row - 1
+            : row - 1;
 
         int x = State.Modes.OriginMode
-            ? Buffer.ScrollLeft + col - 1 : col - 1;
+            ? Buffer.ScrollLeft + col - 1
+            : col - 1;
 
         int minY = State.Modes.OriginMode ? Buffer.ScrollTop : 0;
         int maxY = State.Modes.OriginMode ? Buffer.ScrollBottom : Buffer.Rows - 1;
@@ -1143,6 +1343,7 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
             Buffer.ClearTabStop(State.CursorX);
         else if (mode == 3)
             Buffer.ClearAllTabStops();
+        
         _g0 = 'B';
         _g1 = 'B';
         _activeCharset = 0;
@@ -1176,10 +1377,13 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
                     break;
 
                 case 69:
-                    State.Modes.LeftRightMarginMode = set;
-                    if (!set)
-                        Buffer.ResetHorizontalScrollRegion();
-                    break;
+                    {
+                        State.Modes.LeftRightMarginMode = set;
+                        if (!set)
+                            Buffer.ResetHorizontalScrollRegion();
+                        
+                        break;
+                    }
 
                 case 7:
                     State.Modes.AutoWrap = set;
@@ -1200,6 +1404,7 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
                             Buffer.EnterAlternateScreen();
                         else
                             Buffer.LeaveAlternateScreen();
+
                         break;
                     }
 
@@ -1241,11 +1446,18 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
                 case 1002:
                 case 1003:
                     {
-                        State.Modes.MouseTracking = set
-                            ? (mode == 1003 ? MouseTrackingMode.AnyEvent
-                               : mode == 1002 ? MouseTrackingMode.ButtonEvent
-                               : MouseTrackingMode.X10)
-                            : MouseTrackingMode.Off;
+                        if (!set)
+                        {
+                            State.Modes.MouseTracking = MouseTrackingMode.Off;
+                            break;
+                        }
+
+                        State.Modes.MouseTracking = mode switch
+                        {
+                            1002 => MouseTrackingMode.ButtonEvent,
+                            1003 => MouseTrackingMode.AnyEvent,
+                            _ => MouseTrackingMode.X10,
+                        };
 
                         break;
                     }
@@ -1274,12 +1486,16 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         {
             switch (mode)
             {
+                // IRM
                 case 4:
                     State.Modes.InsertMode = set;
-                    break;       // IRM
+                    break;
+
+                // LNM
                 case 20:
                     State.Modes.LineFeedNewLine = set;
-                    break; // LNM
+                    break;
+                
                 default:
                     break;
             }
@@ -1313,10 +1529,18 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
                 break;  // terminal OK
 
             case 6:
-                int row = State.Modes.OriginMode ? State.CursorY - Buffer.ScrollTop + 1 : State.CursorY + 1;
-                int col = State.Modes.OriginMode ? State.CursorX - Buffer.ScrollLeft + 1 : State.CursorX + 1;
-                Respond($"\x1b[{row};{col}R");
-                break;
+                {
+                    int row = State.Modes.OriginMode
+                        ? State.CursorY - Buffer.ScrollTop + 1
+                        : State.CursorY + 1;
+                    
+                    int col = State.Modes.OriginMode
+                        ? State.CursorX - Buffer.ScrollLeft + 1
+                        : State.CursorX + 1;
+                    
+                    Respond($"\x1b[{row};{col}R");
+                    break;
+                }
         }
     }
 
@@ -1339,12 +1563,13 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         // DECRQSS: respond with the current value of the requested setting.
         switch (ps)
         {
-            case 1: // SGR
+            // SGR
+            case 1:
                 Respond($"\x1bP1$r{EncodeSgr()}\x1b\\");
                 break;
 
+            // Invalid request: respond with DCS 0 $ r ST.
             default:
-                // Invalid request: respond with DCS 0 $ r ST.
                 Respond("\x1bP0$r\x1b\\");
                 break;
         }
@@ -1617,7 +1842,12 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         _ => Underline.Single,
     };
 
-    private enum ColorTarget { Foreground, Background, Underline }
+    private enum ColorTarget
+    {
+        Foreground,
+        Background,
+        Underline
+    }
 
     private static int ConsumeColor(in CsiParams p, int i, ColorTarget target, ref CharAttributes a)
     {
@@ -1642,6 +1872,7 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
                 int end = start;
                 while (end < p.Length && p.IsSubParam(end))
                     end++;
+
                 int count = end - start;
                 if (count >= 4) // colorspace id present
                 {
@@ -1716,7 +1947,8 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         }
     }
 
-    private static byte ClampByte(int v) => (byte)Math.Clamp(v, 0, 255);
+    private static byte ClampByte(int v)
+        => (byte)Math.Clamp(v, 0, 255);
 
     // ============== SGR serialization (for DECRQSS) ==============
 
@@ -1725,42 +1957,70 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         CharAttributes a = State.Attributes;
         List<int> p = [];
 
-        if (a.Bold) p.Add(1);
-        if (a.Faint) p.Add(2);
-        if (a.Italic) p.Add(3);
-        if (a.Fraktur) p.Add(20);
+        if (a.Bold)
+            p.Add(1);
+        
+        if (a.Faint)
+            p.Add(2);
+        
+        if (a.Italic)
+            p.Add(3);
+        
+        if (a.Fraktur)
+            p.Add(20);
 
         switch (a.UnderlineStyle)
         {
             case Underline.Single:
                 p.Add(4);
                 break;
+            
             case Underline.Double:
                 p.Add(21);
                 break;
+            
             case Underline.Curly:
                 p.Add(4);
                 p.Add(3);
                 break;
+            
             case Underline.Dotted:
                 p.Add(4);
                 p.Add(4);
                 break;
+            
             case Underline.Dashed:
                 p.Add(4);
                 p.Add(5);
                 break;
         }
 
-        if (a.Blink == Blink.Slow) p.Add(5);
-        if (a.Blink == Blink.Rapid) p.Add(6);
-        if (a.Inverse) p.Add(7);
-        if (a.Conceal) p.Add(8);
-        if (a.Strikethrough) p.Add(9);
-        if (a.Framed) p.Add(51);
-        if (a.Encircled) p.Add(52);
-        if (a.Overline) p.Add(53);
-        if (a.DoublyUnderlined && a.UnderlineStyle != Underline.Double) p.Add(21);
+        if (a.Blink == Blink.Slow) 
+            p.Add(5);
+        
+        if (a.Blink == Blink.Rapid)
+            p.Add(6);
+        
+        if (a.Inverse) 
+            p.Add(7);
+        
+        if (a.Conceal) 
+            p.Add(8);
+        
+        if (a.Strikethrough) 
+            p.Add(9);
+       
+        if (a.Framed) 
+            p.Add(51);
+        
+        if (a.Encircled) 
+            p.Add(52);
+        
+        if (a.Overline) 
+            p.Add(53);
+        
+        if (a.DoublyUnderlined && a.UnderlineStyle != Underline.Double)
+            p.Add(21);
 
         EncodeColor(p, ColorTarget.Foreground, a);
         EncodeColor(p, ColorTarget.Background, a);
@@ -1775,8 +2035,8 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
     private static void EncodeColor(List<int> p, ColorTarget target, in CharAttributes a)
     {
         ColorSource source;
-        int index;
         TerminalColor rgb;
+        int index;
 
         switch (target)
         {
@@ -1785,16 +2045,19 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
                 index = a.ForegroundIndex;
                 rgb = a.ForegroundRgb;
                 break;
+            
             case ColorTarget.Background:
                 source = a.BackgroundSource;
                 index = a.BackgroundIndex;
                 rgb = a.BackgroundRgb;
                 break;
+            
             case ColorTarget.Underline:
                 source = a.UnderlineSource;
                 index = a.UnderlineIndex;
                 rgb = a.UnderlineRgb;
                 break;
+            
             default:
                 return;
         }
@@ -1810,35 +2073,70 @@ public sealed class TerminalDecoder : IVtHandler, ITerminalDecoder
         switch (source)
         {
             case ColorSource.Default:
-                p.Add(target == ColorTarget.Foreground ? 39
-                    : target == ColorTarget.Background ? 49 : 59);
-                break;
+                {
+                    if (target == ColorTarget.Foreground)
+                    {
+                        p.Add(39);
+                        break;
+                    }
+
+                    if (target == ColorTarget.Background)
+                    {
+                        p.Add(49);
+                        break;
+                    }
+
+                    p.Add(59);
+                    break;
+                }
 
             case ColorSource.Indexed:
-                // Use the compact ANSI forms for the 16 standard colors when possible.
-                if (target == ColorTarget.Foreground)
                 {
-                    if (index < 8) { p.Add(30 + index); break; }
-                    if (index < 16) { p.Add(90 + index - 8); break; }
-                }
-                else if (target == ColorTarget.Background)
-                {
-                    if (index < 8) { p.Add(40 + index); break; }
-                    if (index < 16) { p.Add(100 + index - 8); break; }
-                }
+                    // Use the compact ANSI forms for the 16 standard colors when possible.
+                    if (target == ColorTarget.Foreground)
+                    {
+                        if (index < 8)
+                        {
+                            p.Add(30 + index);
+                            break;
+                        }
+                        
+                        if (index < 16)
+                        {
+                            p.Add(90 + index - 8);
+                            break;
+                        }
+                    }
+                    else if (target == ColorTarget.Background)
+                    {
+                        if (index < 8)
+                        {
+                            p.Add(40 + index);
+                            break;
+                        }
+                        
+                        if (index < 16)
+                        {
+                            p.Add(100 + index - 8);
+                            break;
+                        }
+                    }
 
-                p.Add(prefix);
-                p.Add(5);
-                p.Add(index);
-                break;
+                    p.Add(prefix);
+                    p.Add(5);
+                    p.Add(index);
+                    break;
+                }
 
             case ColorSource.Direct:
-                p.Add(prefix);
-                p.Add(2);
-                p.Add(rgb.R);
-                p.Add(rgb.G);
-                p.Add(rgb.B);
-                break;
+                {
+                    p.Add(prefix);
+                    p.Add(2);
+                    p.Add(rgb.R);
+                    p.Add(rgb.G);
+                    p.Add(rgb.B);
+                    break;
+                }
         }
     }
 }

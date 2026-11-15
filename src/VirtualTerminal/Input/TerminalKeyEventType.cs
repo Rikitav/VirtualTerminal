@@ -5,12 +5,18 @@ namespace VirtualTerminal.Input;
 /// </summary>
 public enum TerminalKeyEventType
 {
-    /// <summary>Key press event (value 1 in Kitty protocol).</summary>
+    /// <summary>
+    /// Key press event (value 1 in Kitty protocol).
+    /// </summary>
     Press = 1,
 
-    /// <summary>Key repeat event (value 2 in Kitty protocol).</summary>
+    /// <summary>
+    /// Key repeat event (value 2 in Kitty protocol).
+    /// </summary>
     Repeat = 2,
 
-    /// <summary>Key release event (value 3 in Kitty protocol).</summary>
+    /// <summary>
+    /// Key release event (value 3 in Kitty protocol).
+    /// </summary>
     Release = 3,
 }

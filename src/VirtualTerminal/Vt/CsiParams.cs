@@ -20,26 +20,40 @@ public readonly struct CsiParams
         _count = count;
     }
 
-    /// <summary>Number of stored values (top-level + sub).</summary>
+    /// <summary>
+    /// Number of stored values (top-level + sub).
+    /// </summary>
     public int Length => _count;
 
-    /// <summary>Raw value at <paramref name="index"/> (no bounds check beyond count).</summary>
+    /// <summary>
+    /// Raw value at <paramref name="index"/> (no bounds check beyond count).
+    /// </summary>
     public int this[int index] => index >= 0 && index < _count ? _values[index] : 0;
 
-    /// <summary>Value at <paramref name="index"/>, or <paramref name="defaultValue"/> when absent.</summary>
+    /// <summary>
+    /// Value at <paramref name="index"/>, or <paramref name="defaultValue"/> when absent.
+    /// </summary>
     public int At(int index, int defaultValue) =>
         index >= 0 && index < _count ? _values[index] : defaultValue;
 
-    /// <summary>Whether the value at <paramref name="index"/> is a <c>':'</c> sub-parameter.</summary>
+    /// <summary>
+    /// Whether the value at <paramref name="index"/> is a <c>':'</c> sub-parameter.
+    /// </summary>
     public bool IsSubParam(int index) => index >= 0 && index < _count && _sub[index];
 
-    /// <summary>True when no parameters were supplied (e.g. bare <c>CSI m</c>).</summary>
+    /// <summary>
+    /// True when no parameters were supplied (e.g. bare <c>CSI m</c>).
+    /// </summary>
     public bool IsEmpty => _count == 0;
 
-    /// <summary>Enumerates (index, value, isSubParam).</summary>
+    /// <summary>
+    /// Enumerates (index, value, isSubParam).
+    /// </summary>
     public Enumerator GetEnumerator() => new(this);
 
-    /// <summary>Supports iterating over the parameters of a <see cref="CsiParams"/> value.</summary>
+    /// <summary>
+    /// Supports iterating over the parameters of a <see cref="CsiParams"/> value.
+    /// </summary>
     public ref struct Enumerator
     {
         private readonly CsiParams _p;
@@ -47,11 +61,15 @@ public readonly struct CsiParams
 
         internal Enumerator(CsiParams p) { _p = p; _i = -1; }
 
-        /// <summary>Advances the enumerator to the next parameter.</summary>
+        /// <summary>
+        /// Advances the enumerator to the next parameter.
+        /// </summary>
         /// <returns>true if another parameter is available; otherwise false.</returns>
         public bool MoveNext() { _i++; return _i < _p._count; }
 
-        /// <summary>Gets the current parameter index, value, and sub-parameter flag.</summary>
+        /// <summary>
+        /// Gets the current parameter index, value, and sub-parameter flag.
+        /// </summary>
         public readonly (int Index, int Value, bool IsSubParam) Current => (_i, _p._values[_i], _p._sub[_i]);
     }
 }

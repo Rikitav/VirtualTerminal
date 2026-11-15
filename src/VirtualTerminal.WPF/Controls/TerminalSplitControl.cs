@@ -29,12 +29,16 @@ public class TerminalSplitControl : Grid
     /// </summary>
     public event EventHandler<UIElement>? PaneCloseRequested;
 
-    /// <summary>Initializes a new empty <see cref="TerminalSplitControl"/>.</summary>
+    /// <summary>
+    /// Initializes a new empty <see cref="TerminalSplitControl"/>.
+    /// </summary>
     public TerminalSplitControl() : this(null, null, Orientation.Vertical)
     {
     }
 
-    /// <summary>Initializes a new <see cref="TerminalSplitControl"/> with two child elements and orientation.</summary>
+    /// <summary>
+    /// Initializes a new <see cref="TerminalSplitControl"/> with two child elements and orientation.
+    /// </summary>
     public TerminalSplitControl(UIElement? pane1, UIElement? pane2, Orientation orientation = Orientation.Vertical)
     {
         _orientation = orientation;
@@ -49,21 +53,27 @@ public class TerminalSplitControl : Grid
         SetPanes(pane1, pane2);
     }
 
-    /// <summary>Gets or sets the first pane in the split.</summary>
+    /// <summary>
+    /// Gets or sets the first pane in the split.
+    /// </summary>
     public UIElement? Pane1
     {
         get => _pane1;
         set => SetPanes(value, _pane2);
     }
 
-    /// <summary>Gets or sets the second pane in the split.</summary>
+    /// <summary>
+    /// Gets or sets the second pane in the split.
+    /// </summary>
     public UIElement? Pane2
     {
         get => _pane2;
         set => SetPanes(_pane1, value);
     }
 
-    /// <summary>Gets or sets the split orientation (Vertical = left/right panes, Horizontal = top/bottom panes).</summary>
+    /// <summary>
+    /// Gets or sets the split orientation (Vertical = left/right panes, Horizontal = top/bottom panes).
+    /// </summary>
     public Orientation Orientation
     {
         get => _orientation;
@@ -77,7 +87,9 @@ public class TerminalSplitControl : Grid
         }
     }
 
-    /// <summary>Gets or sets the split ratio between Pane1 and Pane2 (from 0.05 to 0.95, default 0.5).</summary>
+    /// <summary>
+    /// Gets or sets the split ratio between Pane1 and Pane2 (from 0.05 to 0.95, default 0.5).
+    /// </summary>
     public double SplitRatio
     {
         get => _splitRatio;
@@ -88,7 +100,9 @@ public class TerminalSplitControl : Grid
         }
     }
 
-    /// <summary>Gets or sets the thickness of the splitter drag handle.</summary>
+    /// <summary>
+    /// Gets or sets the thickness of the splitter drag handle.
+    /// </summary>
     public double SplitterThickness
     {
         get => _splitterThickness;
@@ -99,7 +113,9 @@ public class TerminalSplitControl : Grid
         }
     }
 
-    /// <summary>Sets both panes simultaneously and updates layout safely.</summary>
+    /// <summary>
+    /// Sets both panes simultaneously and updates layout safely.
+    /// </summary>
     public void SetPanes(UIElement? pane1, UIElement? pane2)
     {
         if (_pane1 != null && !ReferenceEquals(_pane1, pane1) && !ReferenceEquals(_pane1, pane2))
@@ -222,7 +238,7 @@ public class TerminalSplitControl : Grid
             Children.Remove(childToSplit);
             DisconnectFromParent(childToSplit);
             DisconnectFromParent(newPane);
-            var nested = new TerminalSplitControl(childToSplit, newPane, orientation) { SplitRatio = ratio };
+            TerminalSplitControl nested = new TerminalSplitControl(childToSplit, newPane, orientation) { SplitRatio = ratio };
             _pane1 = nested;
             RebuildLayout();
             if (animate)
@@ -237,7 +253,7 @@ public class TerminalSplitControl : Grid
             Children.Remove(childToSplit);
             DisconnectFromParent(childToSplit);
             DisconnectFromParent(newPane);
-            var nested = new TerminalSplitControl(childToSplit, newPane, orientation) { SplitRatio = ratio };
+            TerminalSplitControl nested = new TerminalSplitControl(childToSplit, newPane, orientation) { SplitRatio = ratio };
             _pane2 = nested;
             RebuildLayout();
             if (animate)

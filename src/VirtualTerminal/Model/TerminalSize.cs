@@ -8,13 +8,19 @@ namespace VirtualTerminal.Model;
 /// </summary>
 public readonly struct TerminalSize : IEquatable<TerminalSize>
 {
-    /// <summary>Gets the width.</summary>
+    /// <summary>
+    /// Gets the width.
+    /// </summary>
     public int Width { get; }
 
-    /// <summary>Gets the height.</summary>
+    /// <summary>
+    /// Gets the height.
+    /// </summary>
     public int Height { get; }
 
-    /// <summary>Initializes a new <see cref="TerminalSize"/>.</summary>
+    /// <summary>
+    /// Initializes a new <see cref="TerminalSize"/>.
+    /// </summary>
     public TerminalSize(int width, int height)
     {
         Width = width;
@@ -37,11 +43,15 @@ public readonly struct TerminalSize : IEquatable<TerminalSize>
     public override string ToString()
         => $"{Width}x{Height}";
 
-    /// <summary>Equality operator.</summary>
+    /// <summary>
+    /// Equality operator.
+    /// </summary>
     public static bool operator ==(TerminalSize left, TerminalSize right)
         => left.Equals(right);
 
-    /// <summary>Inequality operator.</summary>
+    /// <summary>
+    /// Inequality operator.
+    /// </summary>
     public static bool operator !=(TerminalSize left, TerminalSize right)
         => !left.Equals(right);
 }

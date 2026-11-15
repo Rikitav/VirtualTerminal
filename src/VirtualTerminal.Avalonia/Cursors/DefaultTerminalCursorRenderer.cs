@@ -1,6 +1,3 @@
-using Avalonia;
-using Avalonia.Media;
-using Avalonia.Threading;
 using VirtualTerminal.Enums;
 using VirtualTerminal.Rendering;
 
@@ -20,7 +17,9 @@ public sealed class DefaultTerminalCursorRenderer : TerminalCursorRenderer
     private Rect _currentRect;
     private bool _blinkOn = true;
 
-    /// <summary>Initializes a new instance of the <see cref="DefaultTerminalCursorRenderer"/> class.</summary>
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DefaultTerminalCursorRenderer"/> class.
+    /// </summary>
     public DefaultTerminalCursorRenderer()
     {
         _blinkTimer = new DispatcherTimer(BlinkInterval, DispatcherPriority.Background, Dispatcher.UIThread, OnBlinkTick);

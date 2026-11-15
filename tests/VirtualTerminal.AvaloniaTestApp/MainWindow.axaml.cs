@@ -1,12 +1,6 @@
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Interactivity;
-using Avalonia.Layout;
-using Avalonia.Media;
 using VirtualTerminal.Controls;
 using VirtualTerminal.Cursors;
 using VirtualTerminal.Interfaces;
-using VirtualTerminal.Session;
 
 namespace VirtualTerminal.AvaloniaTestApp;
 
@@ -96,7 +90,7 @@ public partial class MainWindow : Window
 
     private TerminalControl CreateDemoTerminal(ITerminalSession? session = null)
     {
-        var terminal = new TerminalControl
+        TerminalControl terminal = new TerminalControl
         {
             AllowDirectInput = true,
             Background = Brushes.Black,

@@ -1,6 +1,4 @@
-﻿using System;
-using System.Buffers;
-using System.IO;
+﻿using System.Buffers;
 using System.Text;
 using VirtualTerminal.Extensions;
 using VirtualTerminal.Interfaces;
@@ -145,6 +143,7 @@ public class BufferStreamReader : TextReader
         {
             if (rentedBytes != null)
                 ArrayPool<byte>.Shared.Return(rentedBytes);
+
             if (rentedChars != null)
                 ArrayPool<char>.Shared.Return(rentedChars);
         }
@@ -164,6 +163,7 @@ public class BufferStreamReader : TextReader
         {
             int remaining = _writeIndex - _readIndex;
             Array.Copy(_charBuffer, _readIndex, _charBuffer, 0, remaining);
+
             _readIndex = 0;
             _writeIndex = remaining;
         }

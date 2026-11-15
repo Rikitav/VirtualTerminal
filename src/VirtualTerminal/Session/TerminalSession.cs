@@ -1,7 +1,6 @@
 using System.Buffers;
 using System.IO.Pipelines;
 using System.Text;
-using System.Threading;
 using VirtualTerminal.Buffer;
 using VirtualTerminal.Interfaces;
 using VirtualTerminal.Serialization;

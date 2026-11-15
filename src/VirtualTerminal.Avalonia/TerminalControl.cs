@@ -1,11 +1,3 @@
-using Avalonia;
-using Avalonia.Automation.Peers;
-using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
-using Avalonia.Input;
-using Avalonia.Input.Platform;
-using Avalonia.Media;
-using Avalonia.Threading;
 using System.Diagnostics;
 using System.Text;
 using System.Windows.Input;
@@ -72,43 +64,61 @@ public class TerminalControl : TemplatedControl, IDisposable
     // Scroll-to-bottom indicator hit-test region.
     private Rect _scrollIndicatorRect;
 
-    /// <summary>Raised when the connected program changes the title (OSC 0/1/2).</summary>
+    /// <summary>
+    /// Raised when the connected program changes the title (OSC 0/1/2).
+    /// </summary>
     public event EventHandler<string>? TitleChanged;
 
-    /// <summary>Raised on BEL.</summary>
+    /// <summary>
+    /// Raised on BEL.
+    /// </summary>
     public event EventHandler? Bell;
 
-    /// <summary>Raised when an OSC 9 desktop notification is received.</summary>
+    /// <summary>
+    /// Raised when an OSC 9 desktop notification is received.
+    /// </summary>
     public event EventHandler<string>? NotificationReceived;
 
-    /// <summary>Raised when an OSC 133 shell-integration mark is received.</summary>
+    /// <summary>
+    /// Raised when an OSC 133 shell-integration mark is received.
+    /// </summary>
     public event EventHandler<string>? ShellIntegrationMark;
 
-    /// <summary>Raised when an OSC 1337 iTerm2 annotation is received.</summary>
+    /// <summary>
+    /// Raised when an OSC 1337 iTerm2 annotation is received.
+    /// </summary>
     public event EventHandler<string>? Iterm2Annotation;
 
-    /// <summary>Gets or sets the active terminal session rendered by this control.</summary>
+    /// <summary>
+    /// Gets or sets the active terminal session rendered by this control.
+    /// </summary>
     public ITerminalSession? CurrentSession
     {
         get => GetValue(CurrentSessionProperty);
         set => SetValue(CurrentSessionProperty, value);
     }
 
-    /// <summary>Alias for <see cref="CurrentSession"/> providing cross-platform parity with WPF.</summary>
+    /// <summary>
+    /// Alias for <see cref="CurrentSession"/> providing cross-platform parity with WPF.
+    /// </summary>
     public ITerminalSession? Session
     {
         get => CurrentSession;
         set => CurrentSession = value;
     }
 
-    /// <summary>Gets or sets the terminal font size in device-independent pixels.</summary>
+    /// <summary>
+    /// Gets or sets the terminal font size in device-independent pixels.
+    /// </summary>
     public double TerminalFontSize
     {
         get => GetValue(TerminalFontSizeProperty);
         set => SetValue(TerminalFontSizeProperty, value);
     }
 
-    /// <summary>Gets or sets the terminal font family name.</summary>
+    /// <summary>
+    /// Gets or sets the terminal font family name.
+    /// </summary>
     public string TerminalFontFamily
     {
         get => GetValue(TerminalFontFamilyProperty);
@@ -166,54 +176,74 @@ public class TerminalControl : TemplatedControl, IDisposable
         set => SetValue(ScrollDownVisibleProperty, value);
     }
 
-    /// <summary>Gets or sets the maximum number of scrollback lines retained.</summary>
+    /// <summary>
+    /// Gets or sets the maximum number of scrollback lines retained.
+    /// </summary>
     public int ScrollbackLines
     {
         get => GetValue(ScrollbackLinesProperty);
         set => SetValue(ScrollbackLinesProperty, value);
     }
 
-    /// <summary>Gets or sets the line height multiplier (1.0 = default).</summary>
+    /// <summary>
+    /// Gets or sets the line height multiplier (1.0 = default).
+    /// </summary>
     public double LineHeight
     {
         get => GetValue(LineHeightProperty);
         set => SetValue(LineHeightProperty, value);
     }
 
-    /// <summary>Gets the terminal options instance used by the underlying decoder.</summary>
+    /// <summary>
+    /// Gets the terminal options instance used by the underlying decoder.
+    /// </summary>
     public TerminalOptions Options => _options;
 
-    /// <summary>Gets the current screen buffer, or <c>null</c> if no session is attached.</summary>
+    /// <summary>
+    /// Gets the current screen buffer, or <c>null</c> if no session is attached.
+    /// </summary>
     public TerminalScreenBuffer? CurrentBuffer => _decoder?.Buffer;
 
-    /// <summary>Gets the current cursor position in buffer coordinates.</summary>
+    /// <summary>
+    /// Gets the current cursor position in buffer coordinates.
+    /// </summary>
     public Point CursorPosition => _decoder is null ? default : new Point(_decoder.State.CursorX, _decoder.State.CursorY);
 
-    /// <summary>Copies the current selection to the clipboard.</summary>
+    /// <summary>
+    /// Copies the current selection to the clipboard.
+    /// </summary>
     public static readonly TerminalCommand CopyCommand = new(
         "Copy",
         static c => _ = c.CopySelectionToClipboardAsync(),
         static c => c._selection is not null);
 
-    /// <summary>Pastes the clipboard content into the session.</summary>
+    /// <summary>
+    /// Pastes the clipboard content into the session.
+    /// </summary>
     public static readonly TerminalCommand PasteCommand = new(
         "Paste",
         static c => _ = c.PasteFromClipboardAsync(),
         static c => c.CurrentSession is not null);
 
-    /// <summary>Selects the whole visible screen.</summary>
+    /// <summary>
+    /// Selects the whole visible screen.
+    /// </summary>
     public static readonly TerminalCommand SelectAllCommand = new(
         "Select All",
         static c => c.SelectAll(),
         static c => c._decoder is not null);
 
-    /// <summary>Clears the terminal screen and scrollback.</summary>
+    /// <summary>
+    /// Clears the terminal screen and scrollback.
+    /// </summary>
     public static readonly TerminalCommand ClearCommand = new(
         "Clear",
         static c => c.Clear(),
         static c => c._decoder is not null);
 
-    /// <summary>Initializes a new instance of the <see cref="TerminalControl"/> class and creates render and resize timers.</summary>
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TerminalControl"/> class and creates render and resize timers.
+    /// </summary>
     public TerminalControl()
     {
         _renderTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Background, Dispatcher.CurrentDispatcher, DispatcherRenderHandler);
@@ -226,14 +256,18 @@ public class TerminalControl : TemplatedControl, IDisposable
     protected override AutomationPeer OnCreateAutomationPeer()
         => new TerminalControlAutomationPeer(this);
 
-    /// <summary>Sends a clear-screen + home escape sequence to the active session.</summary>
+    /// <summary>
+    /// Sends a clear-screen + home escape sequence to the active session.
+    /// </summary>
     public void Clear()
     {
         // Standard "clear screen + home" via escape sequences (decoded, not a direct buffer wipe).
         _decoder?.Write("\x1b[2J\x1b[H"u8);
     }
 
-    /// <summary>Selects the entire visible screen.</summary>
+    /// <summary>
+    /// Selects the entire visible screen.
+    /// </summary>
     public void SelectAll()
     {
         if (_decoder is null)
@@ -926,7 +960,9 @@ public class TerminalControl : TemplatedControl, IDisposable
         e.Handled = true;
     }
 
-    /// <summary>Scrolls the viewport by <paramref name="lines"/> (positive = up into history).</summary>
+    /// <summary>
+    /// Scrolls the viewport by <paramref name="lines"/> (positive = up into history).
+    /// </summary>
     /// <param name="lines">Number of lines to scroll. Positive values scroll up into history, negative scroll down toward the live bottom.</param>
     public void ScrollBy(int lines)
     {
@@ -943,7 +979,9 @@ public class TerminalControl : TemplatedControl, IDisposable
         InvalidateVisual();
     }
 
-    /// <summary>Snaps the viewport back to the live bottom of the buffer.</summary>
+    /// <summary>
+    /// Snaps the viewport back to the live bottom of the buffer.
+    /// </summary>
     public void ScrollToBottom()
     {
         if (_scrollOffset == 0)
@@ -953,10 +991,14 @@ public class TerminalControl : TemplatedControl, IDisposable
         InvalidateVisual();
     }
 
-    /// <summary>Current scrollback offset (0 = live). Exposed for future scrollbar UI.</summary>
+    /// <summary>
+    /// Current scrollback offset (0 = live). Exposed for future scrollbar UI.
+    /// </summary>
     public int ScrollOffset => _scrollOffset;
 
-    /// <summary>Gets the cell position under the specified pointer event, or (-1,-1) if outside the terminal surface.</summary>
+    /// <summary>
+    /// Gets the cell position under the specified pointer event, or (-1,-1) if outside the terminal surface.
+    /// </summary>
 
     private Point GetCellPosition(PointerEventArgs e)
     {
@@ -1082,7 +1124,9 @@ public class TerminalControl : TemplatedControl, IDisposable
     }
 
     // ---- Dispose ----
-    /// <summary>Stops timers, detaches from the decoder and releases rendering resources.</summary>
+    /// <summary>
+    /// Stops timers, detaches from the decoder and releases rendering resources.
+    /// </summary>
     public void Dispose()
     {
         _renderTimer.Stop();
@@ -1106,13 +1150,17 @@ public class TerminalControl : TemplatedControl, IDisposable
         GC.SuppressFinalize(this);
     }
 
-    /// <summary>Reusable ICommand implementation that forwards Execute/CanExecute to a <see cref="TerminalControl"/>.</summary>
+    /// <summary>
+    /// Reusable ICommand implementation that forwards Execute/CanExecute to a <see cref="TerminalControl"/>.
+    /// </summary>
     public sealed class TerminalCommand : ICommand
     {
         private readonly Action<TerminalControl> _execute;
         private readonly Func<TerminalControl, bool> _canExecute;
 
-        /// <summary>Initializes a new command.</summary>
+        /// <summary>
+        /// Initializes a new command.
+        /// </summary>
         /// <param name="name">Display name of the command.</param>
         /// <param name="execute">Action invoked when the command executes.</param>
         /// <param name="canExecute">Predicate that determines whether the command can execute.</param>
@@ -1123,7 +1171,9 @@ public class TerminalControl : TemplatedControl, IDisposable
             _canExecute = canExecute;
         }
 
-        /// <summary>Gets the display name of the command.</summary>
+        /// <summary>
+        /// Gets the display name of the command.
+        /// </summary>
         public string Name { get; }
 
         /// <inheritdoc/>
@@ -1140,41 +1190,59 @@ public class TerminalControl : TemplatedControl, IDisposable
         /// <inheritdoc/>
         public event EventHandler? CanExecuteChanged;
 
-        /// <summary>Raises <see cref="CanExecuteChanged"/>.</summary>
+        /// <summary>
+        /// Raises <see cref="CanExecuteChanged"/>.
+        /// </summary>
         public void InvalidateCanExecute()
             => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
     }
 
     // ---- StyledProperty registrations ----
-    /// <summary>Defines the <see cref="CurrentSession"/> styled property.</summary>
+    /// <summary>
+    /// Defines the <see cref="CurrentSession"/> styled property.
+    /// </summary>
     public static readonly StyledProperty<ITerminalSession?> CurrentSessionProperty =
         AvaloniaProperty.Register<TerminalControl, ITerminalSession?>(nameof(CurrentSession), null);
 
-    /// <summary>Defines the <see cref="CursorVisible"/> styled property.</summary>
+    /// <summary>
+    /// Defines the <see cref="CursorVisible"/> styled property.
+    /// </summary>
     public static readonly StyledProperty<bool> CursorVisibleProperty =
         AvaloniaProperty.Register<TerminalControl, bool>(nameof(CursorVisible), true);
 
-    /// <summary>Defines the <see cref="AllowDirectInput"/> styled property.</summary>
+    /// <summary>
+    /// Defines the <see cref="AllowDirectInput"/> styled property.
+    /// </summary>
     public static readonly StyledProperty<bool> AllowDirectInputProperty =
         AvaloniaProperty.Register<TerminalControl, bool>(nameof(AllowDirectInput), true);
 
-    /// <summary>Defines the <see cref="ScrollDownVisible"/> styled property.</summary>
+    /// <summary>
+    /// Defines the <see cref="ScrollDownVisible"/> styled property.
+    /// </summary>
     public static readonly StyledProperty<bool> ScrollDownVisibleProperty =
         AvaloniaProperty.Register<TerminalControl, bool>(nameof(ScrollDownVisible), true);
 
-    /// <summary>Defines the <see cref="TerminalFontSize"/> styled property.</summary>
+    /// <summary>
+    /// Defines the <see cref="TerminalFontSize"/> styled property.
+    /// </summary>
     public static readonly StyledProperty<double> TerminalFontSizeProperty =
         AvaloniaProperty.Register<TerminalControl, double>(nameof(TerminalFontSize), 14);
 
-    /// <summary>Defines the <see cref="TerminalFontFamily"/> styled property.</summary>
+    /// <summary>
+    /// Defines the <see cref="TerminalFontFamily"/> styled property.
+    /// </summary>
     public static readonly StyledProperty<string> TerminalFontFamilyProperty =
         AvaloniaProperty.Register<TerminalControl, string>(nameof(TerminalFontFamily), "Cascadia Code");
 
-    /// <summary>Defines the <see cref="ScrollbackLines"/> styled property.</summary>
+    /// <summary>
+    /// Defines the <see cref="ScrollbackLines"/> styled property.
+    /// </summary>
     public static readonly StyledProperty<int> ScrollbackLinesProperty =
         AvaloniaProperty.Register<TerminalControl, int>(nameof(ScrollbackLines), 10000);
 
-    /// <summary>Defines the <see cref="LineHeight"/> styled property.</summary>
+    /// <summary>
+    /// Defines the <see cref="LineHeight"/> styled property.
+    /// </summary>
     public static readonly StyledProperty<double> LineHeightProperty =
         AvaloniaProperty.Register<TerminalControl, double>(nameof(LineHeight), 1.0);
 }

@@ -1,6 +1,3 @@
-using Avalonia.Controls;
-using Avalonia.Layout;
-
 namespace VirtualTerminal.Controls;
 
 /// <summary>
@@ -11,7 +8,9 @@ public class TerminalMultiplexerControl : MultiplexerControl
 {
     private Func<TerminalControl>? _terminalControlFactory;
 
-    /// <summary>Factory method to create new <see cref="TerminalControl"/> instances when splitting.</summary>
+    /// <summary>
+    /// Factory method to create new <see cref="TerminalControl"/> instances when splitting.
+    /// </summary>
     public Func<TerminalControl>? TerminalControlFactory
     {
         get => _terminalControlFactory;
@@ -22,16 +21,22 @@ public class TerminalMultiplexerControl : MultiplexerControl
         }
     }
 
-    /// <summary>Gets the currently active / focused <see cref="TerminalControl"/>.</summary>
+    /// <summary>
+    /// Gets the currently active / focused <see cref="TerminalControl"/>.
+    /// </summary>
     public TerminalControl? ActiveTerminal => ActiveControl as TerminalControl;
 
-    /// <summary>Initializes a new instance of <see cref="TerminalMultiplexerControl"/>.</summary>
+    /// <summary>
+    /// Initializes a new instance of <see cref="TerminalMultiplexerControl"/>.
+    /// </summary>
     public TerminalMultiplexerControl()
     {
         TerminalControlFactory = () => new TerminalControl();
     }
 
-    /// <summary>Splits the currently active terminal pane horizontally or vertically.</summary>
+    /// <summary>
+    /// Splits the currently active terminal pane horizontally or vertically.
+    /// </summary>
     /// <param name="orientation">Vertical for side-by-side panes, Horizontal for stacked panes.</param>
     /// <returns>The newly created <see cref="TerminalControl"/>.</returns>
     public TerminalControl? SplitActivePane(Orientation orientation)
@@ -43,6 +48,8 @@ public class TerminalMultiplexerControl : MultiplexerControl
         return null;
     }
 
-    /// <summary>Closes the currently active terminal pane.</summary>
+    /// <summary>
+    /// Closes the currently active terminal pane.
+    /// </summary>
     public void CloseActivePane() => CloseActive();
 }

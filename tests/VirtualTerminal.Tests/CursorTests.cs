@@ -1,8 +1,6 @@
-using VirtualTerminal.Buffer;
 using VirtualTerminal.Enums;
 using VirtualTerminal.Serialization;
 using VirtualTerminal.Tests.Harness;
-using Xunit;
 
 namespace VirtualTerminal.Tests;
 
@@ -18,7 +16,7 @@ public sealed class CursorTests
     [InlineData(6, CursorShape.Bar, false)]
     public void Decscusr_SetsCursorShapeAndBlink(int param, CursorShape expectedShape, bool expectedBlink)
     {
-        var t = new EscTestDriver();
+        EscTestDriver t = new EscTestDriver();
         t.Write($"\x1b[{param} q");
 
         Assert.Equal(expectedShape, t.Decoder.State.Modes.CursorShape);
@@ -28,7 +26,7 @@ public sealed class CursorTests
     [Fact]
     public void Decrqss_QueriesCursorStyle()
     {
-        var t = new EscTestDriver();
+        EscTestDriver t = new EscTestDriver();
 
         // Set steady underline (4)
         t.Write("\x1b[4 q");
@@ -44,8 +42,8 @@ public sealed class CursorTests
     [Fact]
     public void Snapshot_PreservesCursorShape_JsonAndBinary()
     {
-        var buffer = new TerminalScreenBuffer(80, 24);
-        var state = new TerminalState();
+        TerminalScreenBuffer buffer = new TerminalScreenBuffer(80, 24);
+        TerminalState state = new TerminalState();
         state.Modes.CursorShape = CursorShape.Bar;
         state.Modes.CursorBlink = false;
 
@@ -65,7 +63,7 @@ public sealed class CursorTests
     [Fact]
     public void Modes_Clone_PreservesCursorShape()
     {
-        var modes = new TerminalModes
+        TerminalModes modes = new TerminalModes
         {
             CursorShape = CursorShape.Underline,
             CursorBlink = false,

@@ -1,5 +1,3 @@
-using Avalonia.Media;
-using Avalonia.Media.Fonts.Tables.Cmap;
 using System.Text;
 
 namespace VirtualTerminal.Rendering;
@@ -26,35 +24,55 @@ public sealed class GlyphCache : IDisposable
     private double _strikePos;
     private double _strikeThickness;
 
-    /// <summary>Gets a value indicating whether the cache has been configured with a primary typeface.</summary>
+    /// <summary>
+    /// Gets a value indicating whether the cache has been configured with a primary typeface.
+    /// </summary>
     public bool IsValid => _primary is not null;
 
-    /// <summary>Gets the width of a single terminal cell in pixels.</summary>
+    /// <summary>
+    /// Gets the width of a single terminal cell in pixels.
+    /// </summary>
     public double CellWidth => _cellWidth;
 
-    /// <summary>Gets the height of a single terminal cell in pixels.</summary>
+    /// <summary>
+    /// Gets the height of a single terminal cell in pixels.
+    /// </summary>
     public double CellHeight => _cellHeight;
 
-    /// <summary>Gets the font ascent above the baseline in pixels.</summary>
+    /// <summary>
+    /// Gets the font ascent above the baseline in pixels.
+    /// </summary>
     public double Ascent => _ascent;
 
-    /// <summary>Gets the underline position relative to the baseline in pixels.</summary>
+    /// <summary>
+    /// Gets the underline position relative to the baseline in pixels.
+    /// </summary>
     public double UnderlinePosition => _underlinePos;
 
-    /// <summary>Gets the underline thickness in pixels.</summary>
+    /// <summary>
+    /// Gets the underline thickness in pixels.
+    /// </summary>
     public double UnderlineThickness => _underlineThickness;
 
-    /// <summary>Gets the strikethrough position relative to the baseline in pixels.</summary>
+    /// <summary>
+    /// Gets the strikethrough position relative to the baseline in pixels.
+    /// </summary>
     public double StrikethroughPosition => _strikePos;
 
-    /// <summary>Gets the strikethrough thickness in pixels.</summary>
+    /// <summary>
+    /// Gets the strikethrough thickness in pixels.
+    /// </summary>
     public double StrikethroughThickness => _strikeThickness;
 
-    /// <summary>Gets the primary configured <see cref="GlyphTypeface"/>.</summary>
+    /// <summary>
+    /// Gets the primary configured <see cref="GlyphTypeface"/>.
+    /// </summary>
     /// <exception cref="InvalidOperationException">Thrown when the cache has not been configured.</exception>
     public GlyphTypeface Primary => _primary ?? throw new InvalidOperationException("GlyphCache not configured.");
 
-    /// <summary>Rebuilds the cache for the given primary family, size, line-height, and fallbacks.</summary>
+    /// <summary>
+    /// Rebuilds the cache for the given primary family, size, line-height, and fallbacks.
+    /// </summary>
     public void Configure(string family, double emSize, double lineHeight, IReadOnlyList<string>? fallback)
     {
         foreach (GlyphTypeface fb in _fallbacks)
@@ -117,7 +135,9 @@ public sealed class GlyphCache : IDisposable
         _strikeThickness = Math.Max(1, m.StrikethroughThickness * _scale);
     }
 
-    /// <summary>Resolves the (typeface, glyph) for a codepoint, trying fallbacks when absent.</summary>
+    /// <summary>
+    /// Resolves the (typeface, glyph) for a codepoint, trying fallbacks when absent.
+    /// </summary>
     public (GlyphTypeface Tf, ushort Glyph) GetGlyph(Rune rune)
     {
         uint cp = (uint)rune.Value;
@@ -146,7 +166,9 @@ public sealed class GlyphCache : IDisposable
         return result;
     }
 
-    /// <summary>Weight/style variant of the primary typeface for bold/italic runs.</summary>
+    /// <summary>
+    /// Weight/style variant of the primary typeface for bold/italic runs.
+    /// </summary>
     public GlyphTypeface GetVariant(FontWeight weight, FontStyle style)
         => ResolveTypeface(Primary.FamilyName, weight, style, FontStretch.Normal);
 
@@ -159,7 +181,9 @@ public sealed class GlyphCache : IDisposable
     private static ushort GetRawGlyph(GlyphTypeface tf, char c)
         => GetRawGlyph(tf, (uint)c);
 
-    /// <summary>Releases the primary and fallback typefaces and clears the glyph cache.</summary>
+    /// <summary>
+    /// Releases the primary and fallback typefaces and clears the glyph cache.
+    /// </summary>
     public void Dispose()
     {
         _primary?.Dispose();

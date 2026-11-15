@@ -8,13 +8,19 @@ namespace VirtualTerminal.Model;
 /// </summary>
 public readonly struct TerminalPoint : IEquatable<TerminalPoint>
 {
-    /// <summary>Gets the X coordinate.</summary>
+    /// <summary>
+    /// Gets the X coordinate.
+    /// </summary>
     public int X { get; }
 
-    /// <summary>Gets the Y coordinate.</summary>
+    /// <summary>
+    /// Gets the Y coordinate.
+    /// </summary>
     public int Y { get; }
 
-    /// <summary>Initializes a new <see cref="TerminalPoint"/>.</summary>
+    /// <summary>
+    /// Initializes a new <see cref="TerminalPoint"/>.
+    /// </summary>
     public TerminalPoint(int x, int y)
     {
         X = x;
@@ -37,11 +43,15 @@ public readonly struct TerminalPoint : IEquatable<TerminalPoint>
     public override string ToString()
         => $"({X}, {Y})";
 
-    /// <summary>Equality operator.</summary>
+    /// <summary>
+    /// Equality operator.
+    /// </summary>
     public static bool operator ==(TerminalPoint left, TerminalPoint right)
         => left.Equals(right);
 
-    /// <summary>Inequality operator.</summary>
+    /// <summary>
+    /// Inequality operator.
+    /// </summary>
     public static bool operator !=(TerminalPoint left, TerminalPoint right)
         => !left.Equals(right);
 }

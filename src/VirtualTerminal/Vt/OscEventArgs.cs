@@ -1,5 +1,3 @@
-using System;
-
 namespace VirtualTerminal.Vt;
 
 /// <summary>
@@ -18,12 +16,18 @@ public sealed class ClipboardRequestEventArgs : EventArgs
         Data = data;
     }
 
-    /// <summary>The clipboard selection identifier.</summary>
+    /// <summary>
+    /// The clipboard selection identifier.
+    /// </summary>
     public string Selection { get; }
 
-    /// <summary>The base64-encoded data to write, or <see langword="null"/> for a query.</summary>
+    /// <summary>
+    /// The base64-encoded data to write, or <see langword="null"/> for a query.
+    /// </summary>
     public string? Data { get; }
 
-    /// <summary><see langword="true"/> when the terminal is asking for the current clipboard contents.</summary>
+    /// <summary>
+    /// <see langword="true"/> when the terminal is asking for the current clipboard contents.
+    /// </summary>
     public bool IsQuery => Data is null;
 }

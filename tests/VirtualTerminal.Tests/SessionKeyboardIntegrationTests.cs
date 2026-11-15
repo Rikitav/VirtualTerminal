@@ -1,5 +1,4 @@
 using System.Text;
-using VirtualTerminal.Buffer;
 using VirtualTerminal.Input;
 using VirtualTerminal.Interfaces;
 using VirtualTerminal.Session;

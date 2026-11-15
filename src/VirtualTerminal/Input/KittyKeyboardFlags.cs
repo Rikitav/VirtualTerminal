@@ -6,7 +6,9 @@ namespace VirtualTerminal.Input;
 [Flags]
 public enum KittyKeyboardFlags
 {
-    /// <summary>No enhancements active (standard legacy encoding).</summary>
+    /// <summary>
+    /// No enhancements active (standard legacy encoding).
+    /// </summary>
     None = 0,
 
     /// <summary>

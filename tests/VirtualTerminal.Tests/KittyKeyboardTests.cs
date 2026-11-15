@@ -1,4 +1,3 @@
-using VirtualTerminal.Buffer;
 using VirtualTerminal.Input;
 using VirtualTerminal.Tests.Harness;
 

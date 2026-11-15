@@ -10,10 +10,14 @@ public sealed class TerminalPalette
 
     private readonly TerminalColor[] _colors = new TerminalColor[256];
 
-    /// <summary>Initializes a new instance with the standard xterm 256-color palette.</summary>
+    /// <summary>
+    /// Initializes a new instance with the standard xterm 256-color palette.
+    /// </summary>
     public TerminalPalette() => LoadXtermDefaults();
 
-    /// <summary>Gets or sets the color at the given ANSI index (0–255).</summary>
+    /// <summary>
+    /// Gets or sets the color at the given ANSI index (0–255).
+    /// </summary>
     public TerminalColor this[int index]
     {
         get
@@ -30,11 +34,15 @@ public sealed class TerminalPalette
         }
     }
 
-    /// <summary>Returns the underlying palette colors as a span.</summary>
+    /// <summary>
+    /// Returns the underlying palette colors as a span.
+    /// </summary>
     /// <returns>A span over the 256-entry palette.</returns>
     public Span<TerminalColor> AsSpan() => _colors.AsSpan();
 
-    /// <summary>Resolves an ANSI index to its <see cref="TerminalColor"/> (clamped to 0–255).</summary>
+    /// <summary>
+    /// Resolves an ANSI index to its <see cref="TerminalColor"/> (clamped to 0–255).
+    /// </summary>
     public TerminalColor GetColor(int index)
     {
         if (index < 0)
@@ -46,13 +54,17 @@ public sealed class TerminalPalette
         return _colors[index];
     }
 
-    /// <summary>Sets the color at the given ANSI index.</summary>
+    /// <summary>
+    /// Sets the color at the given ANSI index.
+    /// </summary>
     /// <param name="index">The ANSI color index (0–255).</param>
     /// <param name="color">The color to assign.</param>
     public void SetAnsiColor(int index, TerminalColor color)
         => this[index] = color;
 
-    /// <summary>Loads the standard xterm palette: 16 system colors, 6×6×6 cube, 24 grays.</summary>
+    /// <summary>
+    /// Loads the standard xterm palette: 16 system colors, 6×6×6 cube, 24 grays.
+    /// </summary>
     public void LoadXtermDefaults()
     {
         _colors[0] = TerminalColor.FromArgb(0x00, 0x00, 0x00);

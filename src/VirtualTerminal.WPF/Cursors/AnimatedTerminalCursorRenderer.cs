@@ -49,7 +49,9 @@ public sealed class AnimatedTerminalCursorRenderer : TerminalCursorRenderer
     private Color _brushSource;
     private SolidColorBrush? _brush;
 
-    /// <summary>Initializes a new instance of the <see cref="AnimatedTerminalCursorRenderer"/> class.</summary>
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AnimatedTerminalCursorRenderer"/> class.
+    /// </summary>
     public AnimatedTerminalCursorRenderer()
     {
         _timer = new DispatcherTimer(FrameInterval, DispatcherPriority.Background, OnTick, Dispatcher.CurrentDispatcher);
@@ -193,10 +195,12 @@ public sealed class AnimatedTerminalCursorRenderer : TerminalCursorRenderer
         context.DrawRectangle(brush, null, shapeRect);
     }
 
-    /// <summary>Fills the quadrilateral swept between the A and B cursor rectangles.</summary>
+    /// <summary>
+    /// Fills the quadrilateral swept between the A and B cursor rectangles.
+    /// </summary>
     private static void DrawQuadrilateral(DrawingContext context, Rect a, Rect b, Brush brush)
     {
-        var geometry = new StreamGeometry();
+        StreamGeometry geometry = new StreamGeometry();
         using (StreamGeometryContext ctx = geometry.Open())
         {
             if (b.X >= a.X)

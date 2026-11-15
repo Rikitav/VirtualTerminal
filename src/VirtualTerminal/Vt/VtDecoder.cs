@@ -1,8 +1,5 @@
-using System;
 using System.Buffers;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Text;
 
 namespace VirtualTerminal.Vt;
@@ -74,13 +71,17 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
     private State _state = State.Ground;
     private bool _disposed;
 
-    /// <summary>Gets the encoding used by this decoder (always UTF-8).</summary>
+    /// <summary>
+    /// Gets the encoding used by this decoder (always UTF-8).
+    /// </summary>
     public Encoding Encoding
     {
         get => Encoding.UTF8;
     }
 
-    /// <summary>Feeds a raw byte stream through the state machine.</summary>
+    /// <summary>
+    /// Feeds a raw byte stream through the state machine.
+    /// </summary>
     public void Write(ReadOnlySpan<byte> data)
     {
         int i = 0;
@@ -136,36 +137,48 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
             case State.Ground:
                 ProcessGround(b);
                 break;
+            
             case State.Escape:
                 ProcessEscape(b);
                 break;
+            
             case State.EscapeIntermediate:
                 ProcessEscapeIntermediate(b);
                 break;
+            
+
             case State.CsiEntry:
                 ProcessCsiEntry(b);
                 break;
+            
             case State.CsiParam:
                 ProcessCsiParam(b);
                 break;
+            
             case State.CsiIntermediate:
                 ProcessCsiIntermediate(b);
                 break;
+            
             case State.OscString:
                 ProcessOscString(b);
                 break;
+            
             case State.DcsEntry:
                 ProcessDcsEntry(b);
                 break;
+            
             case State.DcsParam:
                 ProcessDcsParam(b);
                 break;
+            
             case State.DcsIntermediate:
                 ProcessDcsIntermediate(b);
                 break;
+            
             case State.DcsPassthrough:
                 ProcessDcsPassthrough(b);
                 break;
+            
             case State.SosPmApcString:
                 ProcessSosPmApc(b);
                 break;
@@ -192,7 +205,11 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
 
         // Printable or multibyte continuation: accumulate and decode.
         _utf8Carry[_utf8CarryLen++] = b;
-        OperationStatus status = Rune.DecodeFromUtf8(_utf8Carry.AsSpan(0, _utf8CarryLen), out Rune rune, out int n);
+        OperationStatus status = Rune.DecodeFromUtf8(
+            _utf8Carry.AsSpan(0, _utf8CarryLen),
+            out Rune rune,
+            out int n);
+
         if (status == OperationStatus.Done)
         {
             _utf8CarryLen = 0;
@@ -210,41 +227,64 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
     {
         switch (b)
         {
+            case ESC:
+                {
+                    // Nested escape: restart.
+                    return;
+                }
+
             case (byte)'[':
-                BeginCsi();
-                _state = State.CsiEntry;
-                return;
+                {
+                    BeginCsi();
+                    _state = State.CsiEntry;
+                    return;
+                }
+            
             case (byte)']':
-                BeginString();
-                _state = State.OscString;
-                return;
+                {
+                    BeginString();
+                    _state = State.OscString;
+                    return;
+                }
+            
             case (byte)'P':
-                BeginCsi();
-                _state = State.DcsEntry;
-                return;
+                {
+                    BeginCsi();
+                    _state = State.DcsEntry;
+                    return;
+                }
+            
             case (byte)'X':  // SOS
             case (byte)'^':  // PM
             case (byte)'_':  // APC
-                BeginString();
-                _dcsFinal = b;  // reuse as the introducer kind for SosPmApcDispatch
-                _state = State.SosPmApcString;
-                return;
-            case ESC:
-                // Nested escape: restart.
-                return;
+                {
+                    BeginString();
+                    _dcsFinal = b;  // reuse as the introducer kind for SosPmApcDispatch
+                    _state = State.SosPmApcString;
+                    return;
+                }
+            
             case >= 0x20 and <= 0x2F:
-                PushIntermediate(b);
-                _state = State.EscapeIntermediate;
-                return;
+                {
+                    PushIntermediate(b);
+                    _state = State.EscapeIntermediate;
+                    return;
+                }
+            
             case >= 0x30 and <= 0x7E:
-                _handler.EscDispatch(b, IntermediatesSpan());
-                ResetToGround();
-                return;
+                {
+                    _handler.EscDispatch(b, IntermediatesSpan());
+                    ResetToGround();
+                    return;
+                }
+            
             default:
-                if (b < 0x20)
-                    _handler.Execute(b);  // C0 executes even mid-escape
-                // else ignore
-                return;
+                {
+                    if (b < 0x20)
+                        _handler.Execute(b);  // C0 executes even mid-escape
+                                              // else ignore
+                    return;
+                }
         }
     }
 
@@ -256,17 +296,22 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
                 ResetToGround();
                 _state = State.Escape;
                 return;
+            
             case >= 0x20 and <= 0x2F:
                 PushIntermediate(b);
                 return;
+            
             case >= 0x30 and <= 0x7E:
                 _handler.EscDispatch(b, IntermediatesSpan());
                 ResetToGround();
                 return;
+            
             default:
-                if (b < 0x20)
-                    _handler.Execute(b);
-                return;
+                {
+                    if (b < 0x20)
+                        _handler.Execute(b);
+                    return;
+                }
         }
     }
 
@@ -279,37 +324,44 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
             _state = State.CsiParam;
             return;
         }
+        
         if (b is (byte)';' or (byte)':')
         {
             OnSeparator(b);
             _state = State.CsiParam;
             return;
         }
+        
         if (b is >= 0x3C and <= 0x3F)  // < = > ?  (private markers)
         {
             _privateMarker = (char)b;
             _state = State.CsiParam;
             return;
         }
+        
         if (b is >= 0x20 and <= 0x2F)
         {
             PushIntermediate(b);
             _state = State.CsiIntermediate;
             return;
         }
+        
         if (b is >= 0x40 and <= 0x7E)
         {
             DispatchCsi(b);
             return;
         }
+        
         if (b == ESC)
         {
             ResetToGround();
             _state = State.Escape;
             return;
         }
+
         if (b < 0x20)
             _handler.Execute(b);
+        
         // else ignore unknown
     }
 
@@ -320,28 +372,33 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
             AccumulateDigit(b);
             return;
         }
+
         if (b is (byte)';' or (byte)':')
         {
             OnSeparator(b);
             return;
         }
+
         if (b is >= 0x20 and <= 0x2F)
         {
             PushIntermediate(b);
             _state = State.CsiIntermediate;
             return;
         }
+
         if (b is >= 0x40 and <= 0x7E)
         {
             DispatchCsi(b);
             return;
         }
+
         if (b == ESC)
         {
             ResetToGround();
             _state = State.Escape;
             return;
         }
+
         if (b < 0x20)
             _handler.Execute(b);
     }
@@ -353,17 +410,20 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
             PushIntermediate(b);
             return;
         }
+
         if (b is >= 0x40 and <= 0x7E)
         {
             DispatchCsi(b);
             return;
         }
+
         if (b == ESC)
         {
             ResetToGround();
             _state = State.Escape;
             return;
         }
+
         if (b < 0x20)
             _handler.Execute(b);
     }
@@ -387,9 +447,11 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
                 ResetToGround();
                 return;
             }
+
             // ESC was the start of a new sequence; terminate OSC and reprocess from Escape.
             _handler.OscDispatch(StringSpan());
             ResetToGround();
+
             _state = State.Escape;
             ProcessEscape(b);
             return;
@@ -420,29 +482,34 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
             _state = State.DcsParam;
             return;
         }
+
         if (b is (byte)';' or (byte)':')
         {
             OnSeparator(b);
             _state = State.DcsParam;
             return;
         }
+
         if (b is >= 0x3C and <= 0x3F)
         {
             _privateMarker = (char)b;
             _state = State.DcsParam;
             return;
         }
+
         if (b is >= 0x20 and <= 0x2F)
         {
             PushIntermediate(b);
             _state = State.DcsIntermediate;
             return;
         }
+
         if (b is >= 0x40 and <= 0x7E)
         {
             EnterDcsPassthrough(b);
             return;
         }
+
         if (b == ESC)
         {
             ResetToGround();
@@ -457,22 +524,26 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
             AccumulateDigit(b);
             return;
         }
+
         if (b is (byte)';' or (byte)':')
         {
             OnSeparator(b);
             return;
         }
+
         if (b is >= 0x20 and <= 0x2F)
         {
             PushIntermediate(b);
             _state = State.DcsIntermediate;
             return;
         }
+
         if (b is >= 0x40 and <= 0x7E)
         {
             EnterDcsPassthrough(b);
             return;
         }
+
         if (b == ESC)
         {
             ResetToGround();
@@ -487,11 +558,13 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
             PushIntermediate(b);
             return;
         }
+
         if (b is >= 0x40 and <= 0x7E)
         {
             EnterDcsPassthrough(b);
             return;
         }
+
         if (b == ESC)
         {
             ResetToGround();
@@ -504,6 +577,7 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
         PushTrailingParam();
         _dcsFinal = final;
         _handler.DcsHook(final, IntermediatesSpan(), new CsiParams(_paramValues, _paramSub, _paramCount), _privateMarker);
+
         BeginString();
         _state = State.DcsPassthrough;
     }
@@ -519,9 +593,11 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
                 ResetToGround();
                 return;
             }
+
             // ESC begins a new sequence; end DCS, reprocess.
             _handler.DcsUnhook();
             ResetToGround();
+
             _state = State.Escape;
             ProcessEscape(b);
             return;
@@ -548,8 +624,10 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
                 ResetToGround();
                 return;
             }
+
             _handler.SosPmApcDispatch(_dcsFinal, StringSpan());
             ResetToGround();
+
             _state = State.Escape;
             ProcessEscape(b);
             return;
@@ -572,7 +650,8 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
     }
 
     // ---- Accumulation helpers ----
-    private static bool IsDigit(byte b) => b >= 0x30 && b <= 0x39;
+    private static bool IsDigit(byte b)
+        => b >= 0x30 && b <= 0x39;
 
     private void AccumulateDigit(byte b)
     {
@@ -618,11 +697,12 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
     {
         if (_interCount >= _intermediates.Length)
             Array.Resize(ref _intermediates, _intermediates.Length * 2);
+
         _intermediates[_interCount++] = b;
     }
 
-    private ReadOnlySpan<byte> IntermediatesSpan() =>
-        _interCount > 0 ? _intermediates.AsSpan(0, _interCount) : ReadOnlySpan<byte>.Empty;
+    private ReadOnlySpan<byte> IntermediatesSpan()
+        => _interCount > 0 ? _intermediates.AsSpan(0, _interCount) : ReadOnlySpan<byte>.Empty;
 
     private void BeginCsi()
     {
@@ -641,8 +721,8 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
         _stringSawEsc = false;
     }
 
-    private ReadOnlySpan<byte> StringSpan() =>
-        _stringLength > 0 ? _stringBuf!.AsSpan(0, _stringLength) : ReadOnlySpan<byte>.Empty;
+    private ReadOnlySpan<byte> StringSpan()
+        => _stringLength > 0 ? _stringBuf!.AsSpan(0, _stringLength) : ReadOnlySpan<byte>.Empty;
 
     private void AddStringByte(byte b)
     {
@@ -717,12 +797,14 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
                 _utf8Carry[_utf8CarryLen++] = run[0];
                 run = run[1..];
                 OperationStatus s = Rune.DecodeFromUtf8(_utf8Carry.AsSpan(0, _utf8CarryLen), out Rune r, out int n);
+                
                 if (s == OperationStatus.Done)
                 {
                     _utf8CarryLen = 0;
                     _handler.Print(r);
                     break;
                 }
+
                 if (s == OperationStatus.InvalidData)
                 {
                     _utf8CarryLen = 0;
@@ -748,6 +830,7 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
     {
         int maxRunes = buffer.Length;
         const int StackAllocRuneLimit = 128;
+
         Rune[]? rented = null;
         Span<Rune> runes = maxRunes <= StackAllocRuneLimit
             ? stackalloc Rune[maxRunes]
@@ -799,6 +882,7 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
             OperationStatus status = Rune.DecodeFromUtf8(buffer, out Rune rune, out int n);
             if (n <= 0)
                 n = 1;
+
             if (status != OperationStatus.Done)
                 rune = new Rune(0xFFFD);
 
@@ -809,14 +893,18 @@ public sealed class VtDecoder(IVtHandler handler) : IDisposable
         _utf8CarryLen = 0;
     }
 
-    /// <summary>Resets the parser to <see cref="State.Ground"/> and discards any in-flight sequence.</summary>
+    /// <summary>
+    /// Resets the parser to <see cref="State.Ground"/> and discards any in-flight sequence.
+    /// </summary>
     public void Reset()
     {
         FlushUtf8();
         ResetToGround();
     }
 
-    /// <summary>Releases resources used by the decoder and resets the parser state.</summary>
+    /// <summary>
+    /// Releases resources used by the decoder and resets the parser state.
+    /// </summary>
     public void Dispose()
     {
         if (_disposed)

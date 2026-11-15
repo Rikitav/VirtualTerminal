@@ -1,7 +1,5 @@
 using System.Text;
-using VirtualTerminal.Buffer;
 using VirtualTerminal.Model;
-using Xunit;
 
 namespace VirtualTerminal.Tests.Harness;
 
@@ -20,10 +18,14 @@ public sealed class EscTestDriver
     public int Columns => Buffer.Columns;
     public int Rows => Buffer.Rows;
 
-    /// <summary>Current 1-based cursor row (matching VT/DEC 1-based indexing).</summary>
+    /// <summary>
+    /// Current 1-based cursor row (matching VT/DEC 1-based indexing).
+    /// </summary>
     public int CursorRow => Decoder.State.CursorY + 1;
 
-    /// <summary>Current 1-based cursor column (matching VT/DEC 1-based indexing).</summary>
+    /// <summary>
+    /// Current 1-based cursor column (matching VT/DEC 1-based indexing).
+    /// </summary>
     public int CursorCol => Decoder.State.CursorX + 1;
 
     public EscTestDriver(int columns = 80, int rows = 24, int maxScrollback = 1000)
@@ -41,7 +43,9 @@ public sealed class EscTestDriver
         }
     }
 
-    /// <summary>Sends a raw escape or text sequence to the terminal decoder.</summary>
+    /// <summary>
+    /// Sends a raw escape or text sequence to the terminal decoder.
+    /// </summary>
     public EscTestDriver Write(string sequence)
     {
         byte[] bytes = Encoding.UTF8.GetBytes(sequence);
@@ -49,14 +53,18 @@ public sealed class EscTestDriver
         return this;
     }
 
-    /// <summary>Sends raw bytes to the terminal decoder.</summary>
+    /// <summary>
+    /// Sends raw bytes to the terminal decoder.
+    /// </summary>
     public EscTestDriver Write(ReadOnlySpan<byte> bytes)
     {
         Decoder.Write(bytes);
         return this;
     }
 
-    /// <summary>Retrieves all response bytes sent by the terminal since the last check, clearing the response buffer.</summary>
+    /// <summary>
+    /// Retrieves all response bytes sent by the terminal since the last check, clearing the response buffer.
+    /// </summary>
     public string ReadResponse()
     {
         lock (_responseLock)
@@ -67,21 +75,27 @@ public sealed class EscTestDriver
         }
     }
 
-    /// <summary>Asserts that the terminal emitted the expected response string.</summary>
+    /// <summary>
+    /// Asserts that the terminal emitted the expected response string.
+    /// </summary>
     public void AssertResponse(string expectedResponse)
     {
         string actual = ReadResponse();
         Assert.Equal(expectedResponse, actual);
     }
 
-    /// <summary>Asserts that the terminal emitted a response containing the expected substring.</summary>
+    /// <summary>
+    /// Asserts that the terminal emitted a response containing the expected substring.
+    /// </summary>
     public void AssertResponseContains(string expectedSubstring)
     {
         string actual = ReadResponse();
         Assert.Contains(expectedSubstring, actual);
     }
 
-    /// <summary>Asserts that the cursor is located at the specified 1-based (row, col) coordinates.</summary>
+    /// <summary>
+    /// Asserts that the cursor is located at the specified 1-based (row, col) coordinates.
+    /// </summary>
     public void AssertCursor(int expectedRow, int expectedCol)
     {
         Assert.True(
@@ -89,7 +103,9 @@ public sealed class EscTestDriver
             $"Expected cursor at ({expectedRow}, {expectedCol}), but was at ({CursorRow}, {CursorCol}).");
     }
 
-    /// <summary>Retrieves the character text for the given 1-based row.</summary>
+    /// <summary>
+    /// Retrieves the character text for the given 1-based row.
+    /// </summary>
     public string GetLineText(int row, bool trimTrailing = true)
     {
         if (row < 1 || row > Rows)
@@ -106,7 +122,9 @@ public sealed class EscTestDriver
         return trimTrailing ? line.TrimEnd() : line;
     }
 
-    /// <summary>Retrieves a cell by 1-based (row, col) coordinates.</summary>
+    /// <summary>
+    /// Retrieves a cell by 1-based (row, col) coordinates.
+    /// </summary>
     public TerminalCellInfo GetCell(int row, int col)
     {
         if (row < 1 || row > Rows)
@@ -117,14 +135,18 @@ public sealed class EscTestDriver
         return Buffer.GetCell(row - 1, col - 1);
     }
 
-    /// <summary>Asserts that a 1-based row matches the expected string.</summary>
+    /// <summary>
+    /// Asserts that a 1-based row matches the expected string.
+    /// </summary>
     public void AssertLine(int row, string expectedText, bool trimTrailing = true)
     {
         string actual = GetLineText(row, trimTrailing);
         Assert.Equal(expectedText, actual);
     }
 
-    /// <summary>Asserts that the screen starting from row 1 matches the provided expected lines.</summary>
+    /// <summary>
+    /// Asserts that the screen starting from row 1 matches the provided expected lines.
+    /// </summary>
     public void AssertScreen(params string[] expectedLines)
     {
         for (int i = 0; i < expectedLines.Length; i++)

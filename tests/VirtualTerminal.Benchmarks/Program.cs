@@ -1,5 +1,3 @@
-using BenchmarkDotNet.Running;
-
 namespace VirtualTerminal.Benchmarks;
 
 public static class Program

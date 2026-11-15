@@ -10,10 +10,14 @@ namespace VirtualTerminal.Controls;
 /// </summary>
 public sealed class MultiplexerPaneEventArgs : EventArgs
 {
-    /// <summary>Gets the pane associated with the event.</summary>
+    /// <summary>
+    /// Gets the pane associated with the event.
+    /// </summary>
     public UIElement Pane { get; }
 
-    /// <summary>Initializes a new instance of <see cref="MultiplexerPaneEventArgs"/>.</summary>
+    /// <summary>
+    /// Initializes a new instance of <see cref="MultiplexerPaneEventArgs"/>.
+    /// </summary>
     public MultiplexerPaneEventArgs(UIElement pane) => Pane = pane;
 }
 
@@ -28,43 +32,69 @@ public class MultiplexerControl : Grid
     private UIElement? _activeControl;
     private readonly ContentPresenter _rootHost;
 
-    /// <summary>Event raised when the currently active pane changes.</summary>
+    /// <summary>
+    /// Event raised when the currently active pane changes.
+    /// </summary>
     public event EventHandler<UIElement?>? ActiveControlChanged;
 
-    /// <summary>Event raised when a pane is opened / added to the multiplexer.</summary>
+    /// <summary>
+    /// Event raised when a pane is opened / added to the multiplexer.
+    /// </summary>
     public event EventHandler<MultiplexerPaneEventArgs>? PaneOpened;
 
-    /// <summary>Event raised when a pane is closed / removed from the multiplexer.</summary>
+    /// <summary>
+    /// Event raised when a pane is closed / removed from the multiplexer.
+    /// </summary>
     public event EventHandler<MultiplexerPaneEventArgs>? PaneClosed;
 
-    /// <summary>Factory to generate a new pane when commands (like Split) are invoked without an explicit element.</summary>
+    /// <summary>
+    /// Factory to generate a new pane when commands (like Split) are invoked without an explicit element.
+    /// </summary>
     public Func<UIElement>? NewPaneFactory { get; set; }
 
-    /// <summary>Gets or sets whether smooth expansion animation is enabled when splitting panes (default true).</summary>
+    /// <summary>
+    /// Gets or sets whether smooth expansion animation is enabled when splitting panes (default true).
+    /// </summary>
     public bool IsAnimationEnabled { get; set; } = true;
 
-    /// <summary>Gets or sets the duration of the split opening animation (default 180ms).</summary>
+    /// <summary>
+    /// Gets or sets the duration of the split opening animation (default 180ms).
+    /// </summary>
     public TimeSpan AnimationDuration { get; set; } = TimeSpan.FromMilliseconds(180);
 
-    /// <summary>Gets or sets the default split ratio when splitting (default 0.5).</summary>
+    /// <summary>
+    /// Gets or sets the default split ratio when splitting (default 0.5).
+    /// </summary>
     public double DefaultSplitRatio { get; set; } = 0.5;
 
-    /// <summary>Command to split the active pane vertically.</summary>
+    /// <summary>
+    /// Command to split the active pane vertically.
+    /// </summary>
     public ICommand SplitVerticalCommand { get; }
 
-    /// <summary>Command to split the active pane horizontally.</summary>
+    /// <summary>
+    /// Command to split the active pane horizontally.
+    /// </summary>
     public ICommand SplitHorizontalCommand { get; }
 
-    /// <summary>Command to close the currently active pane.</summary>
+    /// <summary>
+    /// Command to close the currently active pane.
+    /// </summary>
     public ICommand CloseActiveCommand { get; }
 
-    /// <summary>Command to move focus to the next pane.</summary>
+    /// <summary>
+    /// Command to move focus to the next pane.
+    /// </summary>
     public ICommand FocusNextCommand { get; }
 
-    /// <summary>Command to move focus to the previous pane.</summary>
+    /// <summary>
+    /// Command to move focus to the previous pane.
+    /// </summary>
     public ICommand FocusPreviousCommand { get; }
 
-    /// <summary>Initializes a new instance of <see cref="MultiplexerControl"/>.</summary>
+    /// <summary>
+    /// Initializes a new instance of <see cref="MultiplexerControl"/>.
+    /// </summary>
     public MultiplexerControl()
     {
         _rootHost = new ContentPresenter
@@ -92,7 +122,9 @@ public class MultiplexerControl : Grid
         AddHandler(UIElement.GotFocusEvent, new RoutedEventHandler(OnDescendantGotFocus));
     }
 
-    /// <summary>Gets or sets the root element of the multiplexer split tree.</summary>
+    /// <summary>
+    /// Gets or sets the root element of the multiplexer split tree.
+    /// </summary>
     public UIElement? Root
     {
         get => _root;
@@ -114,7 +146,9 @@ public class MultiplexerControl : Grid
         }
     }
 
-    /// <summary>Gets or sets the currently active / focused pane element.</summary>
+    /// <summary>
+    /// Gets or sets the currently active / focused pane element.
+    /// </summary>
     public UIElement? ActiveControl
     {
         get => _activeControl;
@@ -128,12 +162,14 @@ public class MultiplexerControl : Grid
         }
     }
 
-    /// <summary>Gets the list of all active leaf panes currently in the multiplexer.</summary>
+    /// <summary>
+    /// Gets the list of all active leaf panes currently in the multiplexer.
+    /// </summary>
     public IReadOnlyList<UIElement> Panes
     {
         get
         {
-            var list = new List<UIElement>();
+            List<UIElement> list = new List<UIElement>();
             if (_root is TerminalSplitControl split)
                 split.CollectLeaves(list);
             else if (_root != null)
@@ -143,7 +179,9 @@ public class MultiplexerControl : Grid
         }
     }
 
-    /// <summary>Gets the number of active leaf panes in the multiplexer.</summary>
+    /// <summary>
+    /// Gets the number of active leaf panes in the multiplexer.
+    /// </summary>
     public int PaneCount => Panes.Count;
 
     /// <summary>
@@ -184,7 +222,7 @@ public class MultiplexerControl : Grid
             _rootHost.Content = null;
             TerminalSplitControl.DisconnectFromParent(existing);
 
-            var newSplit = new TerminalSplitControl(existing, newControl, orientation) { SplitRatio = ratio };
+            TerminalSplitControl newSplit = new TerminalSplitControl(existing, newControl, orientation) { SplitRatio = ratio };
             Root = newSplit;
 
             if (useAnimation)
@@ -209,7 +247,7 @@ public class MultiplexerControl : Grid
             // Fallback: wrap entire root
             _rootHost.Content = null;
             TerminalSplitControl.DisconnectFromParent(rootSplit);
-            var newSplit = new TerminalSplitControl(rootSplit, newControl, orientation) { SplitRatio = ratio };
+            TerminalSplitControl newSplit = new TerminalSplitControl(rootSplit, newControl, orientation) { SplitRatio = ratio };
             Root = newSplit;
 
             if (useAnimation)
@@ -224,7 +262,9 @@ public class MultiplexerControl : Grid
         return false;
     }
 
-    /// <summary>Closes the currently active pane.</summary>
+    /// <summary>
+    /// Closes the currently active pane.
+    /// </summary>
     public bool CloseActive()
     {
         if (ActiveControl == null)
@@ -233,7 +273,9 @@ public class MultiplexerControl : Grid
         return Close(ActiveControl);
     }
 
-    /// <summary>Closes the specified pane and collapses the parent split tree.</summary>
+    /// <summary>
+    /// Closes the specified pane and collapses the parent split tree.
+    /// </summary>
     public bool Close(UIElement controlToClose)
     {
         if (_root == null)
@@ -268,7 +310,9 @@ public class MultiplexerControl : Grid
         return false;
     }
 
-    /// <summary>Moves focus to the next pane in layout sequence.</summary>
+    /// <summary>
+    /// Moves focus to the next pane in layout sequence.
+    /// </summary>
     public void FocusNext()
     {
         var panes = Panes;
@@ -281,7 +325,9 @@ public class MultiplexerControl : Grid
         FocusControl(panes[nextIdx]);
     }
 
-    /// <summary>Moves focus to the previous pane in layout sequence.</summary>
+    /// <summary>
+    /// Moves focus to the previous pane in layout sequence.
+    /// </summary>
     public void FocusPrevious()
     {
         var panes = Panes;
@@ -294,7 +340,9 @@ public class MultiplexerControl : Grid
         FocusControl(panes[prevIdx]);
     }
 
-    /// <summary>Swaps two pane controls in the layout tree.</summary>
+    /// <summary>
+    /// Swaps two pane controls in the layout tree.
+    /// </summary>
     public bool SwapActiveWith(UIElement other)
     {
         if (ActiveControl == null || ReferenceEquals(ActiveControl, other))
@@ -303,7 +351,7 @@ public class MultiplexerControl : Grid
         if (_root is TerminalSplitControl rootSplit)
         {
             // Create a temp placeholder
-            var placeholder = new Border();
+            Border placeholder = new Border();
             rootSplit.ReplaceChild(ActiveControl, placeholder);
             rootSplit.ReplaceChild(other, ActiveControl);
             rootSplit.ReplaceChild(placeholder, other);
@@ -313,7 +361,9 @@ public class MultiplexerControl : Grid
         return false;
     }
 
-    /// <summary>Clears all panes from the multiplexer.</summary>
+    /// <summary>
+    /// Clears all panes from the multiplexer.
+    /// </summary>
     public void Clear()
     {
         if (_root != null)
@@ -325,7 +375,9 @@ public class MultiplexerControl : Grid
         }
     }
 
-    /// <summary>Captures a serializable snapshot of the current multiplexer layout tree.</summary>
+    /// <summary>
+    /// Captures a serializable snapshot of the current multiplexer layout tree.
+    /// </summary>
     public MultiplexerLayoutNode? GetLayoutState(Func<UIElement, string>? idSelector = null)
     {
         if (_root == null)
@@ -334,7 +386,9 @@ public class MultiplexerControl : Grid
         return BuildNode(_root, idSelector);
     }
 
-    /// <summary>Restores the multiplexer layout tree from a saved state using a control factory.</summary>
+    /// <summary>
+    /// Restores the multiplexer layout tree from a saved state using a control factory.
+    /// </summary>
     public bool RestoreLayoutState(MultiplexerLayoutNode layout, Func<string, UIElement> controlFactory)
     {
         Clear();

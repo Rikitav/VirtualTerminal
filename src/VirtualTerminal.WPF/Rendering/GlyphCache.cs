@@ -30,34 +30,54 @@ public sealed class GlyphCache : IDisposable
     private double _strikePos;
     private double _strikeThickness;
 
-    /// <summary>Gets a value indicating whether the cache has been configured with a valid primary typeface.</summary>
+    /// <summary>
+    /// Gets a value indicating whether the cache has been configured with a valid primary typeface.
+    /// </summary>
     public bool IsValid => _primary is not null;
 
-    /// <summary>Gets the advance width of a single cell in pixels.</summary>
+    /// <summary>
+    /// Gets the advance width of a single cell in pixels.
+    /// </summary>
     public double CellWidth => _cellWidth;
 
-    /// <summary>Gets the height of a single cell in pixels.</summary>
+    /// <summary>
+    /// Gets the height of a single cell in pixels.
+    /// </summary>
     public double CellHeight => _cellHeight;
 
-    /// <summary>Gets the typographic ascent used to position glyphs within the cell.</summary>
+    /// <summary>
+    /// Gets the typographic ascent used to position glyphs within the cell.
+    /// </summary>
     public double Ascent => _ascent;
 
-    /// <summary>Gets the underline offset from the baseline.</summary>
+    /// <summary>
+    /// Gets the underline offset from the baseline.
+    /// </summary>
     public double UnderlinePosition => _underlinePos;
 
-    /// <summary>Gets the recommended underline thickness.</summary>
+    /// <summary>
+    /// Gets the recommended underline thickness.
+    /// </summary>
     public double UnderlineThickness => _underlineThickness;
 
-    /// <summary>Gets the strikethrough offset from the baseline.</summary>
+    /// <summary>
+    /// Gets the strikethrough offset from the baseline.
+    /// </summary>
     public double StrikethroughPosition => _strikePos;
 
-    /// <summary>Gets the recommended strikethrough thickness.</summary>
+    /// <summary>
+    /// Gets the recommended strikethrough thickness.
+    /// </summary>
     public double StrikethroughThickness => _strikeThickness;
 
-    /// <summary>Gets the primary glyph typeface used for rendering.</summary>
+    /// <summary>
+    /// Gets the primary glyph typeface used for rendering.
+    /// </summary>
     public GlyphTypeface Primary => _primary ?? throw new InvalidOperationException("GlyphCache not configured.");
 
-    /// <summary>Rebuilds the cache for the given primary family, size, line-height, and fallbacks.</summary>
+    /// <summary>
+    /// Rebuilds the cache for the given primary family, size, line-height, and fallbacks.
+    /// </summary>
     public void Configure(string family, double emSize, double lineHeight, IReadOnlyList<string>? fallback)
     {
         _fallbacks.Clear();
@@ -117,7 +137,9 @@ public sealed class GlyphCache : IDisposable
         _strikeThickness = Math.Max(1, tf.StrikethroughThickness * _scale);
     }
 
-    /// <summary>Resolves the (typeface, glyph) for a codepoint, trying fallbacks when absent.</summary>
+    /// <summary>
+    /// Resolves the (typeface, glyph) for a codepoint, trying fallbacks when absent.
+    /// </summary>
     public (GlyphTypeface Tf, ushort Glyph) GetGlyph(Rune rune)
     {
         int cp = rune.Value;
@@ -155,7 +177,9 @@ public sealed class GlyphCache : IDisposable
         return result;
     }
 
-    /// <summary>Weight/style variant of the primary typeface for bold/italic runs.</summary>
+    /// <summary>
+    /// Weight/style variant of the primary typeface for bold/italic runs.
+    /// </summary>
     public GlyphTypeface GetVariant(FontWeight weight, FontStyle style)
         => ResolveTypeface(_fontFamily, weight, style, FontStretches.Normal);
 
@@ -170,7 +194,9 @@ public sealed class GlyphCache : IDisposable
         return 0;
     }
 
-    /// <summary>Releases the glyph cache resources.</summary>
+    /// <summary>
+    /// Releases the glyph cache resources.
+    /// </summary>
     public void Dispose()
     {
         _primary = null;

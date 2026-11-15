@@ -56,7 +56,9 @@ public sealed class LandingTerminalCursorRenderer : TerminalCursorRenderer
     private Color _brushSource;
     private SolidColorBrush? _brush;
 
-    /// <summary>Initializes a new instance of the <see cref="LandingTerminalCursorRenderer"/> class.</summary>
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LandingTerminalCursorRenderer"/> class.
+    /// </summary>
     public LandingTerminalCursorRenderer()
     {
         _timer = new DispatcherTimer(FrameInterval, DispatcherPriority.Background, OnTick, Dispatcher.CurrentDispatcher);

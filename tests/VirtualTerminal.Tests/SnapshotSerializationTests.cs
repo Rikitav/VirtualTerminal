@@ -1,7 +1,5 @@
-using VirtualTerminal.Buffer;
 using VirtualTerminal.Input;
 using VirtualTerminal.Model;
-using VirtualTerminal.Serialization;
 using VirtualTerminal.Session;
 
 namespace VirtualTerminal.Tests;

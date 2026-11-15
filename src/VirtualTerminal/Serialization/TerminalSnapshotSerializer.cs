@@ -1,4 +1,3 @@
-using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -20,7 +19,9 @@ public static class TerminalSnapshotSerializer
 
     #region Binary Serialization
 
-    /// <summary>Serializes the terminal buffer and state into a byte array in compact binary format.</summary>
+    /// <summary>
+    /// Serializes the terminal buffer and state into a byte array in compact binary format.
+    /// </summary>
     public static byte[] SerializeBinary(TerminalScreenBuffer buffer, TerminalState state)
     {
         using MemoryStream ms = new();
@@ -28,7 +29,9 @@ public static class TerminalSnapshotSerializer
         return ms.ToArray();
     }
 
-    /// <summary>Serializes the terminal buffer and state into the specified stream in compact binary format.</summary>
+    /// <summary>
+    /// Serializes the terminal buffer and state into the specified stream in compact binary format.
+    /// </summary>
     public static void SerializeBinary(TerminalScreenBuffer buffer, TerminalState state, Stream stream)
     {
         ArgumentNullException.ThrowIfNull(buffer);
@@ -95,14 +98,18 @@ public static class TerminalSnapshotSerializer
         }
     }
 
-    /// <summary>Deserializes terminal buffer and state from a byte span in binary format.</summary>
+    /// <summary>
+    /// Deserializes terminal buffer and state from a byte span in binary format.
+    /// </summary>
     public static (TerminalScreenBuffer Buffer, TerminalState State) DeserializeBinary(ReadOnlySpan<byte> data)
     {
         using MemoryStream ms = new(data.ToArray());
         return DeserializeBinary(ms);
     }
 
-    /// <summary>Deserializes terminal buffer and state from a stream in binary format.</summary>
+    /// <summary>
+    /// Deserializes terminal buffer and state from a stream in binary format.
+    /// </summary>
     public static (TerminalScreenBuffer Buffer, TerminalState State) DeserializeBinary(Stream stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
@@ -174,7 +181,9 @@ public static class TerminalSnapshotSerializer
         return (buffer, state);
     }
 
-    /// <summary>Restores an existing buffer and state in-place from a binary snapshot span.</summary>
+    /// <summary>
+    /// Restores an existing buffer and state in-place from a binary snapshot span.
+    /// </summary>
     public static void RestoreBinary(ReadOnlySpan<byte> data, TerminalScreenBuffer targetBuffer, TerminalState targetState)
     {
         var (deserializedBuffer, deserializedState) = DeserializeBinary(data);
@@ -185,7 +194,9 @@ public static class TerminalSnapshotSerializer
 
     #region JSON Serialization
 
-    /// <summary>Serializes the terminal buffer and state into a human-readable JSON string.</summary>
+    /// <summary>
+    /// Serializes the terminal buffer and state into a human-readable JSON string.
+    /// </summary>
     public static string SerializeJson(TerminalScreenBuffer buffer, TerminalState state, bool indented = false)
     {
         TerminalSnapshotModel model = ToModel(buffer, state);
@@ -194,7 +205,9 @@ public static class TerminalSnapshotSerializer
             : JsonSerializer.Serialize(model, TerminalSnapshotJsonContext.Default.TerminalSnapshotModel);
     }
 
-    /// <summary>Deserializes terminal buffer and state from a JSON string.</summary>
+    /// <summary>
+    /// Deserializes terminal buffer and state from a JSON string.
+    /// </summary>
     public static (TerminalScreenBuffer Buffer, TerminalState State) DeserializeJson(string json)
     {
         TerminalSnapshotModel? model = JsonSerializer.Deserialize(
@@ -207,7 +220,9 @@ public static class TerminalSnapshotSerializer
         return FromModel(model);
     }
 
-    /// <summary>Restores an existing buffer and state in-place from a JSON string.</summary>
+    /// <summary>
+    /// Restores an existing buffer and state in-place from a JSON string.
+    /// </summary>
     public static void RestoreJson(string json, TerminalScreenBuffer targetBuffer, TerminalState targetState)
     {
         var (deserializedBuffer, deserializedState) = DeserializeJson(json);
@@ -622,121 +637,215 @@ internal sealed partial class TerminalSnapshotIndentedJsonContext : JsonSerializ
 /// <summary>Root model for JSON serialization of terminal state snapshots.</summary>
 public sealed class TerminalSnapshotModel
 {
-    /// <summary>Column count.</summary>
+    /// <summary>
+    /// Column count.
+    /// </summary>
     public int Columns { get; set; }
-    /// <summary>Row count.</summary>
+    /// <summary>
+    /// Row count.
+    /// </summary>
     public int Rows { get; set; }
-    /// <summary>Max scrollback capacity.</summary>
+    /// <summary>
+    /// Max scrollback capacity.
+    /// </summary>
     public int ScrollbackMax { get; set; }
-    /// <summary>Whether alternate screen is currently active.</summary>
+    /// <summary>
+    /// Whether alternate screen is currently active.
+    /// </summary>
     public bool IsAlternate { get; set; }
-    /// <summary>Scroll top margin.</summary>
+    /// <summary>
+    /// Scroll top margin.
+    /// </summary>
     public int ScrollTop { get; set; }
-    /// <summary>Scroll bottom margin.</summary>
+    /// <summary>
+    /// Scroll bottom margin.
+    /// </summary>
     public int ScrollBottom { get; set; }
-    /// <summary>Left margin.</summary>
+    /// <summary>
+    /// Left margin.
+    /// </summary>
     public int ScrollLeft { get; set; }
-    /// <summary>Right margin.</summary>
+    /// <summary>
+    /// Right margin.
+    /// </summary>
     public int ScrollRight { get; set; }
 
-    /// <summary>Primary grid lines.</summary>
+    /// <summary>
+    /// Primary grid lines.
+    /// </summary>
     public List<RowSnapshotModel> PrimaryGrid { get; set; } = new();
-    /// <summary>Alternate grid lines (when active).</summary>
+    /// <summary>
+    /// Alternate grid lines (when active).
+    /// </summary>
     public List<RowSnapshotModel>? AltGrid { get; set; }
-    /// <summary>Scrollback history lines.</summary>
+    /// <summary>
+    /// Scrollback history lines.
+    /// </summary>
     public List<RowSnapshotModel> Scrollback { get; set; } = new();
 
-    /// <summary>Terminal decoder cursor and mode state.</summary>
+    /// <summary>
+    /// Terminal decoder cursor and mode state.
+    /// </summary>
     public StateSnapshotModel State { get; set; } = new();
 }
 
 /// <summary>Model representing a single terminal grid line.</summary>
 public sealed class RowSnapshotModel
 {
-    /// <summary>Whether this row wraps to the next line.</summary>
+    /// <summary>
+    /// Whether this row wraps to the next line.
+    /// </summary>
     public bool Wrapped { get; set; }
-    /// <summary>Cells in this row.</summary>
+    /// <summary>
+    /// Cells in this row.
+    /// </summary>
     public List<CellSnapshotModel> Cells { get; set; } = new();
 }
 
 /// <summary>Model representing a single cell's rune and render style.</summary>
 public sealed class CellSnapshotModel
 {
-    /// <summary>Codepoint.</summary>
+    /// <summary>
+    /// Codepoint.
+    /// </summary>
     public int Rune { get; set; }
-    /// <summary>Foreground ARGB.</summary>
+    /// <summary>
+    /// Foreground ARGB.
+    /// </summary>
     public uint Fg { get; set; }
-    /// <summary>Background ARGB.</summary>
+    /// <summary>
+    /// Background ARGB.
+    /// </summary>
     public uint Bg { get; set; }
-    /// <summary>Underline ARGB.</summary>
+    /// <summary>
+    /// Underline ARGB.
+    /// </summary>
     public uint Ul { get; set; }
-    /// <summary>Style flags.</summary>
+    /// <summary>
+    /// Style flags.
+    /// </summary>
     public uint Flags { get; set; }
-    /// <summary>Underline style enum.</summary>
+    /// <summary>
+    /// Underline style enum.
+    /// </summary>
     public byte Underline { get; set; }
-    /// <summary>Hyperlink ID.</summary>
+    /// <summary>
+    /// Hyperlink ID.
+    /// </summary>
     public byte Hyperlink { get; set; }
 }
 
 /// <summary>Model representing terminal cursor and modes.</summary>
 public sealed class StateSnapshotModel
 {
-    /// <summary>Cursor column.</summary>
+    /// <summary>
+    /// Cursor column.
+    /// </summary>
     public int CursorX { get; set; }
-    /// <summary>Cursor row.</summary>
+    /// <summary>
+    /// Cursor row.
+    /// </summary>
     public int CursorY { get; set; }
-    /// <summary>Pending wrap flag.</summary>
+    /// <summary>
+    /// Pending wrap flag.
+    /// </summary>
     public bool WrapPending { get; set; }
-    /// <summary>Saved cursor column.</summary>
+    /// <summary>
+    /// Saved cursor column.
+    /// </summary>
     public int SavedCursorX { get; set; }
-    /// <summary>Saved cursor row.</summary>
+    /// <summary>
+    /// Saved cursor row.
+    /// </summary>
     public int SavedCursorY { get; set; }
-    /// <summary>Saved origin mode.</summary>
+    /// <summary>
+    /// Saved origin mode.
+    /// </summary>
     public bool SavedOriginMode { get; set; }
-    /// <summary>Saved wrap pending flag.</summary>
+    /// <summary>
+    /// Saved wrap pending flag.
+    /// </summary>
     public bool SavedWrapPending { get; set; }
-    /// <summary>Mode flags.</summary>
+    /// <summary>
+    /// Mode flags.
+    /// </summary>
     public ModesSnapshotModel Modes { get; set; } = new();
 }
 
 /// <summary>Model representing terminal mode flags.</summary>
 public sealed class ModesSnapshotModel
 {
-    /// <summary>Auto-wrap mode.</summary>
+    /// <summary>
+    /// Auto-wrap mode.
+    /// </summary>
     public bool AutoWrap { get; set; }
-    /// <summary>Origin mode.</summary>
+    /// <summary>
+    /// Origin mode.
+    /// </summary>
     public bool OriginMode { get; set; }
-    /// <summary>Application cursor keys.</summary>
+    /// <summary>
+    /// Application cursor keys.
+    /// </summary>
     public bool ApplicationCursorKeys { get; set; }
-    /// <summary>Insert mode.</summary>
+    /// <summary>
+    /// Insert mode.
+    /// </summary>
     public bool InsertMode { get; set; }
-    /// <summary>Cursor blink.</summary>
+    /// <summary>
+    /// Cursor blink.
+    /// </summary>
     public bool CursorBlink { get; set; }
-    /// <summary>Cursor visible.</summary>
+    /// <summary>
+    /// Cursor visible.
+    /// </summary>
     public bool CursorVisible { get; set; }
-    /// <summary>Reverse video.</summary>
+    /// <summary>
+    /// Reverse video.
+    /// </summary>
     public bool ReverseVideo { get; set; }
-    /// <summary>Application keypad.</summary>
+    /// <summary>
+    /// Application keypad.
+    /// </summary>
     public bool ApplicationKeypad { get; set; }
-    /// <summary>Backspace sends Control-H.</summary>
+    /// <summary>
+    /// Backspace sends Control-H.
+    /// </summary>
     public bool BackspaceSendsControlH { get; set; }
-    /// <summary>Left/right margin mode.</summary>
+    /// <summary>
+    /// Left/right margin mode.
+    /// </summary>
     public bool LeftRightMarginMode { get; set; }
-    /// <summary>Line feed new line.</summary>
+    /// <summary>
+    /// Line feed new line.
+    /// </summary>
     public bool LineFeedNewLine { get; set; }
-    /// <summary>Bracketed paste.</summary>
+    /// <summary>
+    /// Bracketed paste.
+    /// </summary>
     public bool BracketedPaste { get; set; }
-    /// <summary>Synchronized output.</summary>
+    /// <summary>
+    /// Synchronized output.
+    /// </summary>
     public bool SynchronizedOutput { get; set; }
-    /// <summary>Focus reporting.</summary>
+    /// <summary>
+    /// Focus reporting.
+    /// </summary>
     public bool FocusReporting { get; set; }
-    /// <summary>Mouse tracking mode.</summary>
+    /// <summary>
+    /// Mouse tracking mode.
+    /// </summary>
     public int MouseTracking { get; set; }
-    /// <summary>SGR mouse encoding.</summary>
+    /// <summary>
+    /// SGR mouse encoding.
+    /// </summary>
     public bool SgrMouseEncoding { get; set; }
-    /// <summary>Kitty Keyboard Protocol flags.</summary>
+    /// <summary>
+    /// Kitty Keyboard Protocol flags.
+    /// </summary>
     public int KittyKeyboardFlags { get; set; }
-    /// <summary>Cursor shape (Block, Underline, Bar).</summary>
+    /// <summary>
+    /// Cursor shape (Block, Underline, Bar).
+    /// </summary>
     public int CursorShape { get; set; }
 }
 

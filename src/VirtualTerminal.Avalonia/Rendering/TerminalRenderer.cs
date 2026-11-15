@@ -1,9 +1,5 @@
-using Avalonia;
-using Avalonia.Media;
 using System.Diagnostics;
 using System.Text;
-using VirtualTerminal.Buffer;
-using VirtualTerminal.Enums;
 using VirtualTerminal.Model;
 using VirtualTerminal.Options;
 using AvaloniaColor = Avalonia.Media.Color;
@@ -27,22 +23,34 @@ public sealed class TerminalRenderer : IDisposable
     private TerminalOptions _options = new();
     private double _emSize = 14;
 
-    /// <summary>Gets a value indicating whether the renderer has been configured with a valid font.</summary>
+    /// <summary>
+    /// Gets a value indicating whether the renderer has been configured with a valid font.
+    /// </summary>
     public bool IsValid => _glyphs.IsValid;
 
-    /// <summary>Gets the size of one terminal cell in device-independent pixels.</summary>
+    /// <summary>
+    /// Gets the size of one terminal cell in device-independent pixels.
+    /// </summary>
     public Size CellSize => new Size(_glyphs.CellWidth, _glyphs.CellHeight);
 
-    /// <summary>Gets the baseline offset within a cell.</summary>
+    /// <summary>
+    /// Gets the baseline offset within a cell.
+    /// </summary>
     public double Baseline => _glyphs.Ascent;
 
-    /// <summary>Gets the width of one terminal cell.</summary>
+    /// <summary>
+    /// Gets the width of one terminal cell.
+    /// </summary>
     public double CellWidth => _glyphs.CellWidth;
 
-    /// <summary>Gets the height of one terminal cell.</summary>
+    /// <summary>
+    /// Gets the height of one terminal cell.
+    /// </summary>
     public double CellHeight => _glyphs.CellHeight;
 
-    /// <summary>Configures the renderer with the specified font family, size, and terminal options.</summary>
+    /// <summary>
+    /// Configures the renderer with the specified font family, size, and terminal options.
+    /// </summary>
     public void Configure(string family, double emSize, TerminalOptions options)
     {
         _options = options;
@@ -52,11 +60,15 @@ public sealed class TerminalRenderer : IDisposable
         _brushes.Clear();
     }
 
-    /// <summary>Releases the renderer resources.</summary>
+    /// <summary>
+    /// Releases the renderer resources.
+    /// </summary>
     public void Dispose()
         => _glyphs.Dispose();
 
-    /// <summary>Renders a single row into <paramref name="drawingContext"/> (local origin = row top-left).</summary>
+    /// <summary>
+    /// Renders a single row into <paramref name="drawingContext"/> (local origin = row top-left).
+    /// </summary>
     public void RenderRow(DrawingContext drawingContext, Span<TerminalCellInfo> row, TerminalSelection? selection, int rowIndex)
     {
         double cellW = _glyphs.CellWidth;
@@ -246,40 +258,40 @@ public sealed class TerminalRenderer : IDisposable
                 drawingContext.DrawLine(penDbl, new Point(x, y - thickness - 1), new Point(x + width, y - thickness - 1));
             }
             else switch (style.UnderlineStyle)
-            {
+                {
 
-                case Enums.Underline.Curly:
-                    PathGeometry wave = new();
-                    PathFigure fig = new() { StartPoint = new Point(x, y), IsClosed = false };
-                    double waveLen = Math.Max(4, _glyphs.CellWidth / 2);
-                    double amplitude = Math.Max(1.5, thickness * 1.2);
-                    for (double wx = x; wx < x + width; wx += waveLen)
-                    {
-                        double segW = Math.Min(waveLen, x + width - wx);
-                        Point p1 = new(wx + segW * 0.25, y - amplitude);
-                        Point p2 = new(wx + segW * 0.75, y + amplitude);
-                        Point p3 = new(wx + segW, y);
-                        fig.Segments?.Add(new BezierSegment { Point1 = p1, Point2 = p2, Point3 = p3 });
-                    }
-                    wave.Figures?.Add(fig);
-                    drawingContext.DrawGeometry(null, new Pen(decoBrush, thickness), wave);
-                    break;
+                    case Enums.Underline.Curly:
+                        PathGeometry wave = new();
+                        PathFigure fig = new() { StartPoint = new Point(x, y), IsClosed = false };
+                        double waveLen = Math.Max(4, _glyphs.CellWidth / 2);
+                        double amplitude = Math.Max(1.5, thickness * 1.2);
+                        for (double wx = x; wx < x + width; wx += waveLen)
+                        {
+                            double segW = Math.Min(waveLen, x + width - wx);
+                            Point p1 = new(wx + segW * 0.25, y - amplitude);
+                            Point p2 = new(wx + segW * 0.75, y + amplitude);
+                            Point p3 = new(wx + segW, y);
+                            fig.Segments?.Add(new BezierSegment { Point1 = p1, Point2 = p2, Point3 = p3 });
+                        }
+                        wave.Figures?.Add(fig);
+                        drawingContext.DrawGeometry(null, new Pen(decoBrush, thickness), wave);
+                        break;
 
-                case Enums.Underline.Dotted:
-                    Pen penDot = new(decoBrush, thickness, DashStyle.Dot, PenLineCap.Round);
-                    drawingContext.DrawLine(penDot, new Point(x, y), new Point(x + width, y));
-                    break;
+                    case Enums.Underline.Dotted:
+                        Pen penDot = new(decoBrush, thickness, DashStyle.Dot, PenLineCap.Round);
+                        drawingContext.DrawLine(penDot, new Point(x, y), new Point(x + width, y));
+                        break;
 
-                case Enums.Underline.Dashed:
-                    Pen penDash = new(decoBrush, thickness, DashStyle.Dash);
-                    drawingContext.DrawLine(penDash, new Point(x, y), new Point(x + width, y));
-                    break;
+                    case Enums.Underline.Dashed:
+                        Pen penDash = new(decoBrush, thickness, DashStyle.Dash);
+                        drawingContext.DrawLine(penDash, new Point(x, y), new Point(x + width, y));
+                        break;
 
-                default: // Single
-                    Pen penSingle = new(decoBrush, thickness);
-                    drawingContext.DrawLine(penSingle, new Point(x, y), new Point(x + width, y));
-                    break;
-            }
+                    default: // Single
+                        Pen penSingle = new(decoBrush, thickness);
+                        drawingContext.DrawLine(penSingle, new Point(x, y), new Point(x + width, y));
+                        break;
+                }
         }
 
         if (style.Strikethrough)

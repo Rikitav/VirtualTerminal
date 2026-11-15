@@ -44,7 +44,7 @@ public static partial class Win32ProcessFactory
     {
         STARTUPINFOEX startupInfo = ConfigureProcessThread(pcHandle);
         PROCESS_INFORMATION ProcInfo = new PROCESS_INFORMATION();
-        
+
         SECURITY_ATTRIBUTES lpProcessAttributes = new SECURITY_ATTRIBUTES() { nLength = Marshal.SizeOf<SECURITY_ATTRIBUTES>() };
         SECURITY_ATTRIBUTES lpThreadAttributes = new SECURITY_ATTRIBUTES() { nLength = Marshal.SizeOf<SECURITY_ATTRIBUTES>() };
 

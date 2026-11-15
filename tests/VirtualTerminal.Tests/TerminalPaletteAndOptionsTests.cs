@@ -1,4 +1,3 @@
-using VirtualTerminal.Buffer;
 using VirtualTerminal.Model;
 using VirtualTerminal.Options;
 

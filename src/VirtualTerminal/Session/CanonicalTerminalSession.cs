@@ -21,13 +21,19 @@ public class CanonicalTerminalSession : TerminalSession
     private int _historyCursor;                     // == _history.Count means "the new line being typed"
     private int _cursor;
 
-    /// <summary>Gets or sets the prompt displayed before user input.</summary>
+    /// <summary>
+    /// Gets or sets the prompt displayed before user input.
+    /// </summary>
     public string ShellPrompt { get; set; } = "> ";
 
-    /// <summary>Gets a <see cref="TextWriter"/> that feeds output into this session.</summary>
+    /// <summary>
+    /// Gets a <see cref="TextWriter"/> that feeds output into this session.
+    /// </summary>
     public TextWriter Writer { get; }
 
-    /// <summary>Gets a <see cref="TextReader"/> that reads from this session.</summary>
+    /// <summary>
+    /// Gets a <see cref="TextReader"/> that reads from this session.
+    /// </summary>
     public TextReader Reader { get; }
 
     /// <summary>
@@ -42,7 +48,9 @@ public class CanonicalTerminalSession : TerminalSession
         PrintPrompt();
     }
 
-    /// <summary>Completes when the user submits a line while a caller is awaiting input.</summary>
+    /// <summary>
+    /// Completes when the user submits a line while a caller is awaiting input.
+    /// </summary>
     public Task<string> ReadLineAsync()
     {
         ThrowIfDisposed();
@@ -176,7 +184,9 @@ public class CanonicalTerminalSession : TerminalSession
         }
     }
 
-    /// <summary>Reprints the active prompt + current input, clears the trailing tail, and positions the caret.</summary>
+    /// <summary>
+    /// Reprints the active prompt + current input, clears the trailing tail, and positions the caret.
+    /// </summary>
     private void RedrawLine()
     {
         StringBuilder sb = new StringBuilder();
@@ -193,7 +203,9 @@ public class CanonicalTerminalSession : TerminalSession
         FeedOutput(sb.ToString());
     }
 
-    /// <summary>Resets the input line and prints a fresh prompt.</summary>
+    /// <summary>
+    /// Resets the input line and prints a fresh prompt.
+    /// </summary>
     public void PrintPrompt()
     {
         ResetInput();

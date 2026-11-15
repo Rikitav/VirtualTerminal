@@ -6,7 +6,9 @@ namespace VirtualTerminal.Session;
 /// </summary>
 public sealed class DummyTerminalSession : TerminalSession
 {
-    /// <summary>Gets the session title.</summary>
+    /// <summary>
+    /// Gets the session title.
+    /// </summary>
     public override string Title => "Dummy :P";
 
     /// <inheritdoc />

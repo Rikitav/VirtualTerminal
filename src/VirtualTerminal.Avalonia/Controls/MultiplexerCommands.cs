@@ -10,7 +10,9 @@ public sealed class MultiplexerRelayCommand : ICommand
     private readonly Action<object?> _execute;
     private readonly Func<object?, bool>? _canExecute;
 
-    /// <summary>Initializes a new instance of <see cref="MultiplexerRelayCommand"/>.</summary>
+    /// <summary>
+    /// Initializes a new instance of <see cref="MultiplexerRelayCommand"/>.
+    /// </summary>
     public MultiplexerRelayCommand(Action<object?> execute, Func<object?, bool>? canExecute = null)
     {
         _execute = execute;
@@ -26,6 +28,8 @@ public sealed class MultiplexerRelayCommand : ICommand
     /// <inheritdoc/>
     public event EventHandler? CanExecuteChanged;
 
-    /// <summary>Raises the <see cref="CanExecuteChanged"/> event.</summary>
+    /// <summary>
+    /// Raises the <see cref="CanExecuteChanged"/> event.
+    /// </summary>
     public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
 }

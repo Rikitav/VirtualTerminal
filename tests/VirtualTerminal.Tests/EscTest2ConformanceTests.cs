@@ -1,7 +1,4 @@
-using VirtualTerminal.Buffer;
-using VirtualTerminal.Model;
 using VirtualTerminal.Tests.Harness;
-using Xunit;
 
 namespace VirtualTerminal.Tests;
 

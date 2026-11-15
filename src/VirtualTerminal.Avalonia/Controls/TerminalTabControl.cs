@@ -1,11 +1,4 @@
 using System.Collections.ObjectModel;
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Controls.Presenters;
-using Avalonia.Controls.Primitives;
-using Avalonia.Input;
-using Avalonia.Layout;
-using Avalonia.Media;
 
 namespace VirtualTerminal.Controls;
 
@@ -14,13 +7,19 @@ namespace VirtualTerminal.Controls;
 /// </summary>
 public class TerminalTabItem
 {
-    /// <summary>Gets or sets the display title of the tab.</summary>
+    /// <summary>
+    /// Gets or sets the display title of the tab.
+    /// </summary>
     public string Title { get; set; } = "Terminal";
 
-    /// <summary>Gets or sets the content element (such as a <see cref="TerminalControl"/> or <see cref="TerminalSplitControl"/>).</summary>
+    /// <summary>
+    /// Gets or sets the content element (such as a <see cref="TerminalControl"/> or <see cref="TerminalSplitControl"/>).
+    /// </summary>
     public Control? Content { get; set; }
 
-    /// <summary>Gets or sets custom user data associated with the tab.</summary>
+    /// <summary>
+    /// Gets or sets custom user data associated with the tab.
+    /// </summary>
     public object? Tag { get; set; }
 }
 
@@ -35,22 +34,34 @@ public class TerminalTabControl : Grid
     private readonly ObservableCollection<TerminalTabItem> _tabs = new();
     private TerminalTabItem? _selectedTab;
 
-    /// <summary>Event raised when the active selected tab changes.</summary>
+    /// <summary>
+    /// Event raised when the active selected tab changes.
+    /// </summary>
     public event EventHandler<TerminalTabItem?>? SelectedTabChanged;
 
-    /// <summary>Event raised when a tab is closed.</summary>
+    /// <summary>
+    /// Event raised when a tab is closed.
+    /// </summary>
     public event EventHandler<TerminalTabItem>? TabClosed;
 
-    /// <summary>Event raised when a new tab is added.</summary>
+    /// <summary>
+    /// Event raised when a new tab is added.
+    /// </summary>
     public event EventHandler<TerminalTabItem>? TabAdded;
 
-    /// <summary>Factory method invoked when the user clicks the '+' button to generate new tab content.</summary>
+    /// <summary>
+    /// Factory method invoked when the user clicks the '+' button to generate new tab content.
+    /// </summary>
     public Func<Control>? NewTabContentFactory { get; set; }
 
-    /// <summary>Gets the collection of tabs.</summary>
+    /// <summary>
+    /// Gets the collection of tabs.
+    /// </summary>
     public ReadOnlyObservableCollection<TerminalTabItem> Tabs { get; }
 
-    /// <summary>Initializes a new instance of <see cref="TerminalTabControl"/>.</summary>
+    /// <summary>
+    /// Initializes a new instance of <see cref="TerminalTabControl"/>.
+    /// </summary>
     public TerminalTabControl()
     {
         Tabs = new ReadOnlyObservableCollection<TerminalTabItem>(_tabs);
@@ -99,7 +110,7 @@ public class TerminalTabControl : Grid
             Cursor = new Cursor(StandardCursorType.Hand),
             FontSize = 16,
             FontWeight = FontWeight.SemiBold,
-            
+
         };
         _addTabButton.Click += (s, e) => AddNewTab();
         ToolTip.SetTip(_addTabButton, "New Terminal");
@@ -120,7 +131,9 @@ public class TerminalTabControl : Grid
         Children.Add(_contentArea);
     }
 
-    /// <summary>Gets or sets the currently selected tab.</summary>
+    /// <summary>
+    /// Gets or sets the currently selected tab.
+    /// </summary>
     public TerminalTabItem? SelectedTab
     {
         get => _selectedTab;
@@ -136,7 +149,9 @@ public class TerminalTabControl : Grid
         }
     }
 
-    /// <summary>Updates the content of a tab and synchronizes the content area safely.</summary>
+    /// <summary>
+    /// Updates the content of a tab and synchronizes the content area safely.
+    /// </summary>
     public void SetTabContent(TerminalTabItem tab, Control? content)
     {
         if (ReferenceEquals(_selectedTab, tab))
@@ -150,19 +165,23 @@ public class TerminalTabControl : Grid
         }
     }
 
-    /// <summary>Refreshes the content displayed in the content area for the currently selected tab.</summary>
+    /// <summary>
+    /// Refreshes the content displayed in the content area for the currently selected tab.
+    /// </summary>
     public void RefreshContent()
     {
         _contentArea.Content = _selectedTab?.Content;
     }
 
-    /// <summary>Adds a new tab with optional title and content.</summary>
+    /// <summary>
+    /// Adds a new tab with optional title and content.
+    /// </summary>
     public TerminalTabItem AddTab(string? title = null, Control? content = null)
     {
         content ??= NewTabContentFactory?.Invoke() ?? new TerminalControl();
         title ??= $"Terminal {_tabs.Count + 1}";
 
-        var item = new TerminalTabItem
+        TerminalTabItem item = new TerminalTabItem
         {
             Title = title,
             Content = content,
@@ -175,7 +194,9 @@ public class TerminalTabControl : Grid
         return item;
     }
 
-    /// <summary>Closes the specified tab.</summary>
+    /// <summary>
+    /// Closes the specified tab.
+    /// </summary>
     public void CloseTab(TerminalTabItem tab)
     {
         int index = _tabs.IndexOf(tab);
@@ -254,7 +275,7 @@ public class TerminalTabControl : Grid
             FontSize = 14,
             VerticalContentAlignment = VerticalAlignment.Center,
             HorizontalContentAlignment = HorizontalAlignment.Center,
-            
+
         };
         ToolTip.SetTip(closeButton, "Close Tab");
         closeButton.Click += (s, e) =>

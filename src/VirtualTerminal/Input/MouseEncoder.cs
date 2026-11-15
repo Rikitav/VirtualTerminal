@@ -7,7 +7,9 @@ namespace VirtualTerminal.Input;
 /// </summary>
 public static class MouseEncoder
 {
-    /// <summary>Encodes a button event using SGR (1006) if enabled, else the legacy form.</summary>
+    /// <summary>
+    /// Encodes a button event using SGR (1006) if enabled, else the legacy form.
+    /// </summary>
     public static string EncodeButton(
         TerminalMouseButton button,
         bool pressed,
@@ -39,7 +41,9 @@ public static class MouseEncoder
             : LegacyEncode(code, x, y);
     }
 
-    /// <summary>Encodes a mouse-wheel event.</summary>
+    /// <summary>
+    /// Encodes a mouse-wheel event.
+    /// </summary>
     public static string EncodeWheel(bool up, int x, int y, TerminalModifier modifiers, bool sgrEncoding)
     {
         int code = (up ? 64 : 65) | ModifierFlags(modifiers);

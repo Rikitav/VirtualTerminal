@@ -1,8 +1,3 @@
-using Avalonia.Automation;
-using Avalonia.Automation.Peers;
-using Avalonia.Automation.Provider;
-using Avalonia.Threading;
-
 namespace VirtualTerminal.Automation;
 
 /// <summary>

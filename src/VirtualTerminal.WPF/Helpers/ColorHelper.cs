@@ -8,11 +8,15 @@ namespace VirtualTerminal.Helpers;
 /// </summary>
 public static class ColorHelper
 {
-    /// <summary>Converts a core <see cref="TerminalColor"/> to a WPF <see cref="WindowsColor"/>.</summary>
+    /// <summary>
+    /// Converts a core <see cref="TerminalColor"/> to a WPF <see cref="WindowsColor"/>.
+    /// </summary>
     public static WindowsColor ToWindowsMediaColor(this TerminalColor color)
         => WindowsColor.FromArgb(color.A, color.R, color.G, color.B);
 
-    /// <summary>Converts a WPF <see cref="WindowsColor"/> to a core <see cref="TerminalColor"/>.</summary>
+    /// <summary>
+    /// Converts a WPF <see cref="WindowsColor"/> to a core <see cref="TerminalColor"/>.
+    /// </summary>
     public static TerminalColor ToTerminalColor(this WindowsColor color)
         => TerminalColor.FromArgb(color.A, color.R, color.G, color.B);
 

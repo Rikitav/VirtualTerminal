@@ -1,4 +1,3 @@
-using System;
 using System.Globalization;
 using System.Text;
 using VirtualTerminal.Model;
@@ -35,8 +34,10 @@ internal static class OscDispatcher
             case 0:
             case 1:
             case 2: // set title (and icon name)
-                d.SetTitle(DecodeUtf8(rest));
-                break;
+                {
+                    d.SetTitle(DecodeUtf8(rest));
+                    break;
+                }
 
             case 4: // set/query palette entry: 4 ; c ; spec
                 {
@@ -51,6 +52,7 @@ internal static class OscDispatcher
                                 TerminalColor col = d.Options.Palette[c];
                                 d.Respond($"\x1b]4;{c};rgb:{col.R:x2}{col.R:x2}/{col.G:x2}{col.G:x2}/{col.B:x2}{col.B:x2}\x1b\\");
                             }
+
                             break;
                         }
 
@@ -58,6 +60,7 @@ internal static class OscDispatcher
                         if (colParsed.HasValue && c >= 0 && c < 256)
                             d.Options.Palette[c] = colParsed.Value;
                     }
+
                     break;
                 }
 
@@ -76,24 +79,36 @@ internal static class OscDispatcher
                                 11 => d.Options.DefaultBackground,
                                 _ => d.Options.DefaultForeground,
                             };
+                    
                             d.Respond($"\x1b]{command};rgb:{col.R:x2}{col.R:x2}/{col.G:x2}{col.G:x2}/{col.B:x2}{col.B:x2}\x1b\\");
                         }
+                        
                         break;
                     }
 
                     TerminalColor? colParsed = ParseColorSpec(spec);
                     if (!colParsed.HasValue)
                         break;
-                    if (command == 10) d.Options.DefaultForeground = colParsed.Value;
-                    else if (command == 11) d.Options.DefaultBackground = colParsed.Value;
+                    
+                    if (command == 10)
+                        d.Options.DefaultForeground = colParsed.Value;
+                    else if (command == 11)
+                        d.Options.DefaultBackground = colParsed.Value;
+                    
                     break;
                 }
 
             case 8: // hyperlink: 8 ; params ; uri
                 {
                     int semi = rest.IndexOf((byte)';');
-                    string uri = semi < 0 ? DecodeUtf8(rest) : DecodeUtf8(rest.Slice(semi + 1));
-                    d.State.Attributes.HyperlinkId = string.IsNullOrEmpty(uri) ? (byte)0 : d.RegisterHyperlink(uri);
+                    string uri = semi < 0
+                        ? DecodeUtf8(rest)
+                        : DecodeUtf8(rest.Slice(semi + 1));
+
+                    d.State.Attributes.HyperlinkId = string.IsNullOrEmpty(uri)
+                        ? (byte)0
+                        : d.RegisterHyperlink(uri);
+
                     break;
                 }
 
@@ -102,6 +117,7 @@ internal static class OscDispatcher
                     string message = DecodeUtf8(rest);
                     if (!string.IsNullOrEmpty(message))
                         d.RaiseNotification(message);
+
                     break;
                 }
 
@@ -113,6 +129,7 @@ internal static class OscDispatcher
                     int semi = rest.IndexOf((byte)';');
                     string selection = semi < 0 ? "c" : DecodeUtf8(rest.Slice(0, semi));
                     string clipData = semi < 0 ? DecodeUtf8(rest) : DecodeUtf8(rest.Slice(semi + 1));
+
                     d.RaiseClipboardRequested(selection, string.IsNullOrEmpty(clipData) ? null : clipData);
                     break;
                 }
@@ -137,7 +154,9 @@ internal static class OscDispatcher
     private static string DecodeUtf8(ReadOnlySpan<byte> data)
         => data.IsEmpty ? string.Empty : Encoding.UTF8.GetString(data);
 
-    /// <summary>Parses an XParseColor-style spec: <c>#RRGGBB</c>, <c>#RGB</c>, or <c>rgb:RR/GG/BB</c>.</summary>
+    /// <summary>
+    /// Parses an XParseColor-style spec: <c>#RRGGBB</c>, <c>#RGB</c>, or <c>rgb:RR/GG/BB</c>.
+    /// </summary>
     internal static TerminalColor? ParseColorSpec(string spec)
     {
         if (string.IsNullOrWhiteSpace(spec))
@@ -162,6 +181,7 @@ internal static class OscDispatcher
             string[] parts = spec[4..].Split('/', ':');
             if (parts.Length != 3)
                 return null;
+
             return TerminalColor.FromArgb(ScaledByte(parts[0]), ScaledByte(parts[1]), ScaledByte(parts[2]));
         }
 

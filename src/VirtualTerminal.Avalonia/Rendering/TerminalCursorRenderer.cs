@@ -1,5 +1,3 @@
-using Avalonia;
-using Avalonia.Media;
 using VirtualTerminal.Enums;
 
 namespace VirtualTerminal.Rendering;
@@ -15,7 +13,9 @@ namespace VirtualTerminal.Rendering;
 /// </summary>
 public abstract class TerminalCursorRenderer
 {
-    /// <summary>Gets the control this renderer is attached to, or <c>null</c> when detached.</summary>
+    /// <summary>
+    /// Gets the control this renderer is attached to, or <c>null</c> when detached.
+    /// </summary>
     public TerminalControl? TerminalControl { get; protected set; }
 
     /// <summary>
@@ -45,18 +45,26 @@ public abstract class TerminalCursorRenderer
     /// </summary>
     public Color BackgroundColor { get; set; } = Colors.Black;
 
-    /// <summary>Called when the renderer is attached to a control (control attached to the visual tree).</summary>
+    /// <summary>
+    /// Called when the renderer is attached to a control (control attached to the visual tree).
+    /// </summary>
     /// <param name="control">The owning terminal control.</param>
     public virtual void Attach(TerminalControl control) => TerminalControl = control;
 
-    /// <summary>Called when the renderer is detached from its control (control detached from the visual tree).</summary>
+    /// <summary>
+    /// Called when the renderer is detached from its control (control detached from the visual tree).
+    /// </summary>
     public virtual void Detach() => TerminalControl = null;
 
-    /// <summary>Notifies the renderer that the cursor target cell changed to <paramref name="cellRect"/>.</summary>
+    /// <summary>
+    /// Notifies the renderer that the cursor target cell changed to <paramref name="cellRect"/>.
+    /// </summary>
     /// <param name="cellRect">The cursor cell rectangle in control coordinates (padding included).</param>
     public abstract void MoveTo(Rect cellRect);
 
-    /// <summary>Draws the cursor into <paramref name="context"/> for the current state.</summary>
+    /// <summary>
+    /// Draws the cursor into <paramref name="context"/> for the current state.
+    /// </summary>
     /// <param name="context">The drawing context, in un-transformed control coordinates.</param>
     public abstract void Render(DrawingContext context);
 }

@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.IO;
-using System.Text;
 using VirtualTerminal.Extensions;
 using VirtualTerminal.Interop;
 using VirtualTerminal.Session;
