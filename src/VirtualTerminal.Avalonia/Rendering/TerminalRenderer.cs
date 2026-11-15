@@ -1,3 +1,5 @@
+using Avalonia;
+using Avalonia.Media;
 using System.Diagnostics;
 using System.Text;
 using VirtualTerminal.Model;

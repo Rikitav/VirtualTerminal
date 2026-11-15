@@ -1,3 +1,9 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
+using Avalonia.Input;
+using Avalonia.Layout;
+using Avalonia.VisualTree;
 using System.Windows.Input;
 
 namespace VirtualTerminal.Controls;
@@ -99,6 +105,7 @@ public class MultiplexerControl : Grid
             HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Stretch,
         };
+
         Children.Add(_rootHost);
 
         // Command initializations
@@ -183,7 +190,7 @@ public class MultiplexerControl : Grid
         if (newControl == null)
             return false;
 
-        var target = ActiveControl ?? FindFirstLeaf(_root);
+        Control? target = ActiveControl ?? FindFirstLeaf(_root);
         return Split(target, newControl, orientation, ratio, animate);
     }
 
@@ -208,7 +215,7 @@ public class MultiplexerControl : Grid
         if (target == null || ReferenceEquals(_root, target))
         {
             // Root is a single leaf; wrap it in a new split
-            var existing = _root;
+            Control existing = _root;
             _rootHost.Content = null;
             TerminalSplitControl.DisconnectFromParent(existing);
 
@@ -283,14 +290,14 @@ public class MultiplexerControl : Grid
 
         if (_root is TerminalSplitControl rootSplit)
         {
-            var remaining = rootSplit.CloseChild(controlToClose);
+            Control? remaining = rootSplit.CloseChild(controlToClose);
             if (remaining != null && !ReferenceEquals(remaining, rootSplit))
             {
                 TerminalSplitControl.DisconnectFromParent(remaining);
                 Root = remaining;
             }
 
-            var next = FindFirstLeaf(_root);
+            Control? next = FindFirstLeaf(_root);
             ActiveControl = next;
             next?.Focus();
             PaneClosed?.Invoke(this, new MultiplexerPaneEventArgs(controlToClose));
@@ -305,7 +312,7 @@ public class MultiplexerControl : Grid
     /// </summary>
     public void FocusNext()
     {
-        var panes = Panes;
+        IReadOnlyList<Control> panes = Panes;
         if (panes.Count <= 1)
             return;
 
@@ -320,7 +327,7 @@ public class MultiplexerControl : Grid
     /// </summary>
     public void FocusPrevious()
     {
-        var panes = Panes;
+        IReadOnlyList<Control> panes = Panes;
         if (panes.Count <= 1)
             return;
 
@@ -340,7 +347,7 @@ public class MultiplexerControl : Grid
 
         if (_root is TerminalSplitControl rootSplit)
         {
-            var placeholder = new Border();
+            Border placeholder = new Border();
             rootSplit.ReplaceChild(ActiveControl, placeholder);
             rootSplit.ReplaceChild(other, ActiveControl);
             rootSplit.ReplaceChild(placeholder, other);
@@ -381,7 +388,7 @@ public class MultiplexerControl : Grid
     public bool RestoreLayoutState(MultiplexerLayoutNode layout, Func<string, Control> controlFactory)
     {
         Clear();
-        var reconstructed = RestoreNode(layout, controlFactory);
+        Control? reconstructed = RestoreNode(layout, controlFactory);
         if (reconstructed != null)
         {
             Root = reconstructed;
@@ -416,8 +423,8 @@ public class MultiplexerControl : Grid
     {
         if (node.IsSplit)
         {
-            var c1 = node.Child1 != null ? RestoreNode(node.Child1, controlFactory) : null;
-            var c2 = node.Child2 != null ? RestoreNode(node.Child2, controlFactory) : null;
+            Control? c1 = node.Child1 != null ? RestoreNode(node.Child1, controlFactory) : null;
+            Control? c2 = node.Child2 != null ? RestoreNode(node.Child2, controlFactory) : null;
             return new TerminalSplitControl(c1, c2, node.Orientation) { SplitRatio = node.SplitRatio };
         }
 
@@ -428,7 +435,7 @@ public class MultiplexerControl : Grid
     {
         if (e.Source is Visual vis)
         {
-            var leaf = FindLeafAncestor(vis);
+            Control? leaf = FindLeafAncestor(vis);
             if (leaf != null)
                 ActiveControl = leaf;
         }
@@ -436,7 +443,7 @@ public class MultiplexerControl : Grid
 
     private Control? FindLeafAncestor(Visual? current)
     {
-        var panes = Panes;
+        IReadOnlyList<Control> panes = Panes;
         while (current != null)
         {
             if (current is Control c && Contains(panes, c))
@@ -444,14 +451,21 @@ public class MultiplexerControl : Grid
 
             current = current.GetVisualParent();
         }
+
         return null;
     }
 
     private static int IndexOf(IReadOnlyList<Control> list, Control? item)
     {
-        if (item == null) return -1;
+        if (item == null)
+            return -1;
+        
         for (int i = 0; i < list.Count; i++)
-            if (ReferenceEquals(list[i], item)) return i;
+        {
+            if (ReferenceEquals(list[i], item))
+                return i;
+        }
+        
         return -1;
     }
 
@@ -472,8 +486,8 @@ public class MultiplexerControl : Grid
 
         if (root is TerminalSplitControl split)
         {
-            return (split.Pane1 != null && ContainsPane(split.Pane1, target)) ||
-                   (split.Pane2 != null && ContainsPane(split.Pane2, target));
+            return (split.Pane1 != null && ContainsPane(split.Pane1, target))
+                || (split.Pane2 != null && ContainsPane(split.Pane2, target));
         }
 
         return false;

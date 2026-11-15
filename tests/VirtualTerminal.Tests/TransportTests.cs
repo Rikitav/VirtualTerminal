@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.IO.Pipelines;
 using System.Text;
 using VirtualTerminal.Interfaces;
 using VirtualTerminal.Session;
@@ -17,14 +18,14 @@ public class TransportTests
     [Fact]
     public async Task CreateInMemoryPair_AllowsBidirectionalCommunication()
     {
-        var ct = TestContext.Current.CancellationToken;
-        var (client, server) = StreamTerminalTransport.CreateInMemoryPair();
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        (StreamTerminalTransport? client, StreamTerminalTransport? server) = StreamTerminalTransport.CreateInMemoryPair();
 
         byte[] payload = "Hello Transport"u8.ToArray();
         await client.Output.WriteAsync(payload, ct);
         await client.Output.FlushAsync(ct);
 
-        var readResult = await server.Input.ReadAsync(ct);
+        ReadResult readResult = await server.Input.ReadAsync(ct);
         Assert.Equal(payload, BuffersExtensions.ToArray(readResult.Buffer));
         server.Input.AdvanceTo(readResult.Buffer.End);
 
@@ -35,8 +36,8 @@ public class TransportTests
     [Fact]
     public async Task Session_WithAttachedTransport_IngestsStreamDirectlyIntoBuffer()
     {
-        var ct = TestContext.Current.CancellationToken;
-        var (client, server) = StreamTerminalTransport.CreateInMemoryPair();
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        (StreamTerminalTransport? client, StreamTerminalTransport? server) = StreamTerminalTransport.CreateInMemoryPair();
         using TestSession session = new(client);
 
         bool updated = false;
@@ -64,13 +65,13 @@ public class TransportTests
     [Fact]
     public async Task Session_Write_SendsBytesToAttachedTransportOutput()
     {
-        var ct = TestContext.Current.CancellationToken;
-        var (client, server) = StreamTerminalTransport.CreateInMemoryPair();
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        (StreamTerminalTransport? client, StreamTerminalTransport? server) = StreamTerminalTransport.CreateInMemoryPair();
         using TestSession session = new(client);
 
         session.Write("User Input"u8);
 
-        var readResult = await server.Input.ReadAsync(ct);
+        ReadResult readResult = await server.Input.ReadAsync(ct);
         Assert.Equal("User Input", Encoding.UTF8.GetString(BuffersExtensions.ToArray(readResult.Buffer)));
         server.Input.AdvanceTo(readResult.Buffer.End);
 
@@ -80,8 +81,8 @@ public class TransportTests
     [Fact]
     public async Task Session_DetachTransport_StopsPipelinePumpCleanly()
     {
-        var ct = TestContext.Current.CancellationToken;
-        var (client, server) = StreamTerminalTransport.CreateInMemoryPair();
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        (StreamTerminalTransport? client, StreamTerminalTransport? server) = StreamTerminalTransport.CreateInMemoryPair();
         using TestSession session = new();
 
         await session.AttachTransportAsync(client, ct);
@@ -97,7 +98,7 @@ public class TransportTests
     [Fact]
     public async Task Session_TransportDisconnect_RaisesDisconnectedEvent()
     {
-        var (client, server) = StreamTerminalTransport.CreateInMemoryPair();
+        (StreamTerminalTransport? client, StreamTerminalTransport? server) = StreamTerminalTransport.CreateInMemoryPair();
         using TestSession session = new(client);
 
         bool disconnected = false;

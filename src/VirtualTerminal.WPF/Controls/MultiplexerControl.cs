@@ -193,7 +193,7 @@ public class MultiplexerControl : Grid
         if (newControl == null)
             return false;
 
-        var target = ActiveControl ?? FindFirstLeaf(_root);
+        UIElement? target = ActiveControl ?? FindFirstLeaf(_root);
         return Split(target, newControl, orientation, ratio, animate);
     }
 
@@ -218,7 +218,7 @@ public class MultiplexerControl : Grid
         if (target == null || ReferenceEquals(_root, target))
         {
             // Root is a single leaf; wrap it in a new split
-            var existing = _root;
+            UIElement existing = _root;
             _rootHost.Content = null;
             TerminalSplitControl.DisconnectFromParent(existing);
 
@@ -293,14 +293,14 @@ public class MultiplexerControl : Grid
 
         if (_root is TerminalSplitControl rootSplit)
         {
-            var remaining = rootSplit.CloseChild(controlToClose);
+            UIElement? remaining = rootSplit.CloseChild(controlToClose);
             if (remaining != null && !ReferenceEquals(remaining, rootSplit))
             {
                 TerminalSplitControl.DisconnectFromParent(remaining);
                 Root = remaining;
             }
 
-            var next = FindFirstLeaf(_root);
+            UIElement? next = FindFirstLeaf(_root);
             ActiveControl = next;
             FocusControl(next);
             PaneClosed?.Invoke(this, new MultiplexerPaneEventArgs(controlToClose));
@@ -315,7 +315,7 @@ public class MultiplexerControl : Grid
     /// </summary>
     public void FocusNext()
     {
-        var panes = Panes;
+        IReadOnlyList<UIElement> panes = Panes;
         if (panes.Count <= 1)
             return;
 
@@ -330,7 +330,7 @@ public class MultiplexerControl : Grid
     /// </summary>
     public void FocusPrevious()
     {
-        var panes = Panes;
+        IReadOnlyList<UIElement> panes = Panes;
         if (panes.Count <= 1)
             return;
 
@@ -392,7 +392,7 @@ public class MultiplexerControl : Grid
     public bool RestoreLayoutState(MultiplexerLayoutNode layout, Func<string, UIElement> controlFactory)
     {
         Clear();
-        var reconstructed = RestoreNode(layout, controlFactory);
+        UIElement? reconstructed = RestoreNode(layout, controlFactory);
         if (reconstructed != null)
         {
             Root = reconstructed;
@@ -427,8 +427,8 @@ public class MultiplexerControl : Grid
     {
         if (node.IsSplit)
         {
-            var c1 = node.Child1 != null ? RestoreNode(node.Child1, controlFactory) : null;
-            var c2 = node.Child2 != null ? RestoreNode(node.Child2, controlFactory) : null;
+            UIElement? c1 = node.Child1 != null ? RestoreNode(node.Child1, controlFactory) : null;
+            UIElement? c2 = node.Child2 != null ? RestoreNode(node.Child2, controlFactory) : null;
             return new TerminalSplitControl(c1, c2, node.Orientation) { SplitRatio = node.SplitRatio };
         }
 
@@ -439,7 +439,7 @@ public class MultiplexerControl : Grid
     {
         if (e.OriginalSource is DependencyObject dep)
         {
-            var leaf = FindLeafAncestor(dep);
+            UIElement? leaf = FindLeafAncestor(dep);
             if (leaf != null)
                 ActiveControl = leaf;
         }
@@ -447,7 +447,7 @@ public class MultiplexerControl : Grid
 
     private UIElement? FindLeafAncestor(DependencyObject? current)
     {
-        var panes = Panes;
+        IReadOnlyList<UIElement> panes = Panes;
         while (current != null)
         {
             if (current is UIElement ue && Contains(panes, ue))

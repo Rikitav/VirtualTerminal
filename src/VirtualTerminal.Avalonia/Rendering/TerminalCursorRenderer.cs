@@ -1,3 +1,5 @@
+using Avalonia;
+using Avalonia.Media;
 using VirtualTerminal.Enums;
 
 namespace VirtualTerminal.Rendering;

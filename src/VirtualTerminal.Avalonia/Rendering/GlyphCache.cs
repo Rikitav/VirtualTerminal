@@ -1,3 +1,5 @@
+using Avalonia.Media;
+using Avalonia.Media.Fonts.Tables.Cmap;
 using System.Text;
 
 namespace VirtualTerminal.Rendering;

@@ -77,7 +77,7 @@ public class TerminalDecoderTests
 
         decoder.Write(Encoding.UTF8.GetBytes("\x1b[38;2;255;128;64mA"));
 
-        var style = decoder.Buffer.GetCell(0, 0).Style;
+        CellRenderStyle style = decoder.Buffer.GetCell(0, 0).Style;
         Assert.Equal(255, style.Foreground.R);
         Assert.Equal(128, style.Foreground.G);
         Assert.Equal(64, style.Foreground.B);

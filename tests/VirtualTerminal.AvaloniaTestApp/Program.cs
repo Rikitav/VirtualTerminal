@@ -1,3 +1,5 @@
+using Avalonia;
+
 namespace VirtualTerminal.AvaloniaTestApp;
 
 internal class Program

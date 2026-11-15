@@ -1,6 +1,13 @@
+using Avalonia;
+using Avalonia.Automation.Peers;
+using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Input;
+using Avalonia.Input.Platform;
+using Avalonia.Media;
+using Avalonia.Threading;
 using System.Diagnostics;
 using System.Text;
-using System.Windows.Input;
 using VirtualTerminal.Automation;
 using VirtualTerminal.Buffer;
 using VirtualTerminal.Cursors;
@@ -12,7 +19,6 @@ using VirtualTerminal.Model;
 using VirtualTerminal.Options;
 using VirtualTerminal.Rendering;
 using VirtualTerminal.Vt;
-using AvaloniaColor = Avalonia.Media.Color;
 using Color = VirtualTerminal.Model.TerminalColor;
 
 namespace VirtualTerminal;
@@ -22,19 +28,29 @@ namespace VirtualTerminal;
 /// via a <see cref="TerminalRenderer"/> (GlyphRun), feeds keyboard/mouse through xterm encoders, supports
 /// text selection, and exposes cursor/palette/scrollback customization via StyledProperties.
 /// </summary>
-public class TerminalControl : TemplatedControl, IDisposable
+public partial class TerminalControl : TemplatedControl, IDisposable
 {
+    // Sanity limits for the terminal grid. Sizes below this (especially 1 column)
+    // make ConPTY and most shells behave badly (reset/crash).
+    private const int MinimumColumns = 10;
+    private const int MinimumRows = 3;
+    private const int ScrollWheelLines = 3;
+
+    // After a resize, suppress intermediate renders for a short time so ConPTY's
+    // reflow output can accumulate and we show the final frame instead of partial/blank states.
+    private static readonly TimeSpan ResizeRenderSuppression = TimeSpan.FromMilliseconds(100);
+
     private readonly TerminalRenderer _renderer = new TerminalRenderer();
     private readonly TerminalOptions _options = new TerminalOptions();
-    private TerminalCursorRenderer _cursorRenderer = new DefaultTerminalCursorRenderer();
-
     private readonly DispatcherTimer _renderTimer;
     private readonly DispatcherTimer _resizeTimer;
 
+    private TerminalCursorRenderer _cursorRenderer = new DefaultTerminalCursorRenderer();
     private TerminalDecoder? _decoder;
+    private bool _rendererConfigured;
+
     private int _lastCursorX = -1;
     private int _lastCursorY = -1;
-    private bool _rendererConfigured;
 
     // Text selection (mouse drag).
     private TerminalSelection? _selection;
@@ -49,20 +65,11 @@ public class TerminalControl : TemplatedControl, IDisposable
 
     // Scrollback navigation (mouse wheel). 0 = live at the bottom; >0 = rows scrolled back into history.
     private int _scrollOffset;
-    private const int ScrollWheelLines = 3;
 
-    // Sanity limits for the terminal grid. Sizes below this (especially 1 column)
-    // make ConPTY and most shells behave badly (reset/crash).
-    private const int MinimumColumns = 10;
-    private const int MinimumRows = 3;
-
-    // After a resize, suppress intermediate renders for a short time so ConPTY's
-    // reflow output can accumulate and we show the final frame instead of partial/blank states.
     private DateTime _suppressRenderUntil = DateTime.MinValue;
-    private static readonly TimeSpan ResizeRenderSuppression = TimeSpan.FromMilliseconds(100);
 
-    // Scroll-to-bottom indicator hit-test region.
-    private Rect _scrollIndicatorRect;
+    // 1 while a redraw is already queued on the UI thread; see RequestRender.
+    private int _renderPosted;
 
     /// <summary>
     /// Raised when the connected program changes the title (OSC 0/1/2).
@@ -167,16 +174,6 @@ public class TerminalControl : TemplatedControl, IDisposable
     }
 
     /// <summary>
-    /// Gets or sets a value indicating whether the floating "scroll to bottom" indicator is shown
-    /// when the viewport is scrolled back into history.
-    /// </summary>
-    public bool ScrollDownVisible
-    {
-        get => GetValue(ScrollDownVisibleProperty);
-        set => SetValue(ScrollDownVisibleProperty, value);
-    }
-
-    /// <summary>
     /// Gets or sets the maximum number of scrollback lines retained.
     /// </summary>
     public int ScrollbackLines
@@ -209,6 +206,7 @@ public class TerminalControl : TemplatedControl, IDisposable
     /// </summary>
     public Point CursorPosition => _decoder is null ? default : new Point(_decoder.State.CursorX, _decoder.State.CursorY);
 
+    // ---- Commands ----
     /// <summary>
     /// Copies the current selection to the clipboard.
     /// </summary>
@@ -240,6 +238,23 @@ public class TerminalControl : TemplatedControl, IDisposable
         "Clear",
         static c => c.Clear(),
         static c => c._decoder is not null);
+
+    /// <summary>
+    /// Clears the terminal screen and scrollback.
+    /// </summary>
+    public static readonly TerminalCommand ScrollToBottomCommand = new(
+        "ScrollToBottom",
+        static c => c.ScrollToBottom(),
+        static c => c._decoder is not null);
+
+    private static void InvalidateCommandState()
+    {
+        CopyCommand.InvalidateCanExecute();
+        PasteCommand.InvalidateCanExecute();
+        SelectAllCommand.InvalidateCanExecute();
+        ClearCommand.InvalidateCanExecute();
+        ScrollToBottomCommand.InvalidateCanExecute();
+    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TerminalControl"/> class and creates render and resize timers.
@@ -276,14 +291,6 @@ public class TerminalControl : TemplatedControl, IDisposable
         _selection = new TerminalSelection(0, 0, _decoder.Buffer.Columns - 1, _decoder.Buffer.Rows - 1);
         InvalidateCommandState();
         InvalidateVisual();
-    }
-
-    private static void InvalidateCommandState()
-    {
-        CopyCommand.InvalidateCanExecute();
-        PasteCommand.InvalidateCanExecute();
-        SelectAllCommand.InvalidateCanExecute();
-        ClearCommand.InvalidateCanExecute();
     }
 
     // ---- Property change handling ----
@@ -335,8 +342,7 @@ public class TerminalControl : TemplatedControl, IDisposable
             ResizeSessionToBounds();
             InvalidateVisual();
         }
-
-        if (change.Property == TerminalFontSizeProperty
+        else if (change.Property == TerminalFontSizeProperty
             || change.Property == TerminalFontFamilyProperty
             || change.Property == LineHeightProperty
             || change.Property == ScrollbackLinesProperty)
@@ -344,14 +350,12 @@ public class TerminalControl : TemplatedControl, IDisposable
             SyncOptionsToDecoder();
             ReconfigureRenderer();
         }
-
-        if (change.Property == ForegroundProperty || change.Property == BackgroundProperty)
+        else if (change.Property == ForegroundProperty || change.Property == BackgroundProperty)
         {
             SyncOptionsToDecoder();
             InvalidateVisual();
         }
-
-        if (change.Property == PaddingProperty)
+        else if (change.Property == PaddingProperty)
         {
             InvalidateVisual();
         }
@@ -541,52 +545,47 @@ public class TerminalControl : TemplatedControl, IDisposable
             for (int i = 0; i < buf.Rows; i++)
                 buf.MarkRowClean(i);
         }
-
-        RenderScrollToBottomIndicator(context);
     }
 
-    private void RenderScrollToBottomIndicator(DrawingContext context)
-    {
-        _scrollIndicatorRect = default;
-        if (!ScrollDownVisible || _scrollOffset <= 0)
-            return;
-
-        double size = 32;
-        double padding = 10;
-        double x = Math.Max(0, Bounds.Width - size - padding);
-        double y = Math.Max(0, Bounds.Height - size - padding);
-        _scrollIndicatorRect = new Rect(x, y, size, size);
-
-        SolidColorBrush brush = new SolidColorBrush(AvaloniaColor.Parse("#333333"));
-        context.DrawRectangle(brush, null, _scrollIndicatorRect, size / 2, size / 2);
-
-        StreamGeometry arrow = new StreamGeometry();
-        using (StreamGeometryContext ctx = arrow.Open())
-        {
-            ctx.BeginFigure(new Point(x + size * 0.3, y + size * 0.35), false);
-            ctx.LineTo(new Point(x + size * 0.5, y + size * 0.65));
-            ctx.LineTo(new Point(x + size * 0.7, y + size * 0.35));
-        }
-
-        context.DrawGeometry(new SolidColorBrush(Colors.White), null, arrow);
-    }
-
+    // Polls for buffer writes that arrive without a BufferUpdated notification (direct decoder
+    // writes such as Clear) and recovers the frame that resize suppression deliberately dropped.
+    // The timer never drives a repaint by itself, so an idle control stays idle.
     private void DispatcherRenderHandler(object? sender, EventArgs e)
     {
-        if (DateTime.UtcNow < _suppressRenderUntil)
+        TerminalScreenBuffer? buf = _decoder?.Buffer;
+        if (buf is null)
             return;
 
-        TerminalDecoder? dec = _decoder;
-        if (dec is null)
-            return;
-
-        TerminalScreenBuffer buf = dec.Buffer;
         bool dirty;
         lock (buf.SyncRoot)
             dirty = buf.HasDirtyRows;
 
-        if (dirty || _selection is not null)
-            Dispatcher.UIThread.Post(InvalidateVisual, DispatcherPriority.Render);
+        if (dirty)
+            RequestRender();
+    }
+
+    /// <summary>
+    /// Queues a redraw on the UI thread, coalescing bursts of buffer updates into a single render
+    /// pass. Safe to call from any thread; both the redraw and the automation text notification
+    /// run on the UI thread.
+    /// </summary>
+    private void RequestRender()
+    {
+        if (DateTime.UtcNow < _suppressRenderUntil)
+            return;
+
+        if (Interlocked.Exchange(ref _renderPosted, 1) != 0)
+            return;
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            Volatile.Write(ref _renderPosted, 0);
+
+            InvalidateVisual();
+
+            if (ControlAutomationPeer.FromElement(this) is TerminalControlAutomationPeer peer)
+                peer.NotifyTextChanged();
+        }, DispatcherPriority.Render);
     }
 
     private void RenderCursorVisual(DrawingContext context)
@@ -731,13 +730,60 @@ public class TerminalControl : TemplatedControl, IDisposable
         TerminalModifier result = TerminalModifier.None;
         if ((modifiers & KeyModifiers.Shift) != 0)
             result |= TerminalModifier.Shift;
+        
         if ((modifiers & KeyModifiers.Alt) != 0)
             result |= TerminalModifier.Alt;
+        
         if ((modifiers & KeyModifiers.Control) != 0)
             result |= TerminalModifier.Control;
+        
         if ((modifiers & KeyModifiers.Meta) != 0)
             result |= TerminalModifier.Meta;
+        
         return result;
+    }
+
+    /// <inheritdoc/>
+    protected override void OnTextInput(TextInputEventArgs e)
+    {
+        base.OnTextInput(e);
+
+        if (string.IsNullOrEmpty(e.Text) || _decoder is null || !AllowDirectInput)
+            return;
+
+        if (_selection is not null)
+        {
+            _selection = null;
+            InvalidateCommandState();
+            InvalidateVisual();
+        }
+
+        if (_scrollOffset > 0)
+            ScrollToBottom();
+
+        CurrentSession?.Append(e.Text);
+        e.Handled = true;
+    }
+
+    // ---- Pointer helpers ----
+    /// <summary>
+    /// Gets the cell position under the specified pointer event, or (-1,-1) if outside the terminal surface.
+    /// </summary>
+    private Point GetCellPosition(PointerEventArgs e)
+    {
+        if (_decoder is null || !_rendererConfigured)
+            return new Point(-1, -1);
+
+        Size cell = _renderer.CellSize;
+        if (cell.Width <= 0 || cell.Height <= 0)
+            return new Point(-1, -1);
+
+        Point pt = e.GetPosition(this);
+        double x = (pt.X - Padding.Left) / cell.Width;
+        double y = (pt.Y - Padding.Top) / cell.Height;
+        int col = (int)Math.Clamp(Math.Floor(x), 0, _decoder.Buffer.Columns - 1);
+        int row = (int)Math.Clamp(Math.Floor(y), 0, _decoder.Buffer.Rows - 1);
+        return new Point(col, row);
     }
 
     // ---- Mouse forwarding (xterm mouse tracking) ----
@@ -767,28 +813,6 @@ public class TerminalControl : TemplatedControl, IDisposable
         return mode == MouseTrackingMode.AnyEvent || (mode == MouseTrackingMode.ButtonEvent && _trackedButton is not null);
     }
 
-    /// <inheritdoc/>
-    protected override void OnTextInput(TextInputEventArgs e)
-    {
-        base.OnTextInput(e);
-
-        if (string.IsNullOrEmpty(e.Text) || _decoder is null || !AllowDirectInput)
-            return;
-
-        if (_selection is not null)
-        {
-            _selection = null;
-            InvalidateCommandState();
-            InvalidateVisual();
-        }
-
-        if (_scrollOffset > 0)
-            ScrollToBottom();
-
-        CurrentSession?.Append(e.Text);
-        e.Handled = true;
-    }
-
     // ---- Mouse selection ----
     /// <inheritdoc/>
     protected override void OnPointerPressed(PointerPressedEventArgs e)
@@ -798,17 +822,10 @@ public class TerminalControl : TemplatedControl, IDisposable
         // Ensure the terminal surface has focus so keyboard input is routed here.
         Focus();
 
-        if (ScrollDownVisible && _scrollOffset > 0 && _scrollIndicatorRect.Contains(e.GetPosition(this)))
-        {
-            ScrollToBottom();
-            e.Handled = true;
-            return;
-        }
-
         if (_decoder is null)
             return;
 
-        var update = e.GetCurrentPoint(this).Properties.PointerUpdateKind;
+        PointerUpdateKind update = e.GetCurrentPoint(this).Properties.PointerUpdateKind;
         KeyModifiers modifiers = e.KeyModifiers;
         TerminalMouseButton mappedButton = MapMouseButton(update);
 
@@ -821,6 +838,7 @@ public class TerminalControl : TemplatedControl, IDisposable
             _trackedButton = mappedButton;
             CurrentSession?.Append(MouseEncoder.EncodeButton(mappedButton, pressed: true, (int)cell.X, (int)cell.Y,
                 ToTerminalModifier(modifiers), _decoder.State.Modes.SgrMouseEncoding));
+
             e.Handled = true;
             return;
         }
@@ -878,6 +896,7 @@ public class TerminalControl : TemplatedControl, IDisposable
 
             CurrentSession?.Append(MouseEncoder.EncodeMotion(_trackedButton, (int)cell.X, (int)cell.Y,
                 ToTerminalModifier(modifiers), _decoder.State.Modes.SgrMouseEncoding));
+
             e.Handled = true;
             return;
         }
@@ -910,6 +929,7 @@ public class TerminalControl : TemplatedControl, IDisposable
                 CurrentSession?.Append(MouseEncoder.EncodeButton(releasedButton, pressed: false, x, y,
                     ToTerminalModifier(e.KeyModifiers), _decoder.State.Modes.SgrMouseEncoding));
             }
+
             _trackedButton = null;
             e.Handled = true;
             return;
@@ -950,8 +970,11 @@ public class TerminalControl : TemplatedControl, IDisposable
         {
             Point cell = GetCellPosition(e);
             if (cell.X >= 0)
+            {
                 CurrentSession?.Append(MouseEncoder.EncodeWheel(up: direction > 0, (int)cell.X, (int)cell.Y,
                     ToTerminalModifier(e.KeyModifiers), _decoder.State.Modes.SgrMouseEncoding));
+            }
+
             e.Handled = true;
             return;
         }
@@ -995,27 +1018,6 @@ public class TerminalControl : TemplatedControl, IDisposable
     /// Current scrollback offset (0 = live). Exposed for future scrollbar UI.
     /// </summary>
     public int ScrollOffset => _scrollOffset;
-
-    /// <summary>
-    /// Gets the cell position under the specified pointer event, or (-1,-1) if outside the terminal surface.
-    /// </summary>
-
-    private Point GetCellPosition(PointerEventArgs e)
-    {
-        if (_decoder is null || !_rendererConfigured)
-            return new Point(-1, -1);
-
-        Size cell = _renderer.CellSize;
-        if (cell.Width <= 0 || cell.Height <= 0)
-            return new Point(-1, -1);
-
-        Point pt = e.GetPosition(this);
-        double x = (pt.X - Padding.Left) / cell.Width;
-        double y = (pt.Y - Padding.Top) / cell.Height;
-        int col = (int)Math.Clamp(Math.Floor(x), 0, _decoder.Buffer.Columns - 1);
-        int row = (int)Math.Clamp(Math.Floor(y), 0, _decoder.Buffer.Rows - 1);
-        return new Point(col, row);
-    }
 
     private Span<TerminalCellInfo> GetRowCells(TerminalScreenBuffer buf, IReadOnlyList<TerminalRow>? scrollback, int viewportRow)
     {
@@ -1070,7 +1072,7 @@ public class TerminalControl : TemplatedControl, IDisposable
         if (string.IsNullOrEmpty(text))
             return;
 
-        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        IClipboard? clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
         if (clipboard is not null)
             await clipboard.SetTextAsync(text);
     }
@@ -1080,7 +1082,7 @@ public class TerminalControl : TemplatedControl, IDisposable
         if (CurrentSession is null)
             return;
 
-        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        IClipboard? clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
         if (clipboard is null)
             return;
 
@@ -1096,19 +1098,7 @@ public class TerminalControl : TemplatedControl, IDisposable
     }
 
     // ---- Session events ----
-    private void OnSessionBufferUpdated(object? sender, EventArgs e)
-    {
-        if (DateTime.UtcNow < _suppressRenderUntil)
-            return;
-
-        Dispatcher.UIThread.Post(() =>
-        {
-            InvalidateVisual();
-
-            if (ControlAutomationPeer.FromElement(this) is TerminalControlAutomationPeer peer)
-                peer.NotifyTextChanged();
-        }, DispatcherPriority.Render);
-    }
+    private void OnSessionBufferUpdated(object? sender, EventArgs e) => RequestRender();
 
     /// <summary>
     /// Returns the full accessible text (scrollback + visible screen) for UI Automation.
@@ -1150,77 +1140,12 @@ public class TerminalControl : TemplatedControl, IDisposable
         GC.SuppressFinalize(this);
     }
 
-    /// <summary>
-    /// Reusable ICommand implementation that forwards Execute/CanExecute to a <see cref="TerminalControl"/>.
-    /// </summary>
-    public sealed class TerminalCommand : ICommand
-    {
-        private readonly Action<TerminalControl> _execute;
-        private readonly Func<TerminalControl, bool> _canExecute;
-
-        /// <summary>
-        /// Initializes a new command.
-        /// </summary>
-        /// <param name="name">Display name of the command.</param>
-        /// <param name="execute">Action invoked when the command executes.</param>
-        /// <param name="canExecute">Predicate that determines whether the command can execute.</param>
-        public TerminalCommand(string name, Action<TerminalControl> execute, Func<TerminalControl, bool> canExecute)
-        {
-            Name = name;
-            _execute = execute;
-            _canExecute = canExecute;
-        }
-
-        /// <summary>
-        /// Gets the display name of the command.
-        /// </summary>
-        public string Name { get; }
-
-        /// <inheritdoc/>
-        public bool CanExecute(object? parameter)
-            => parameter is TerminalControl control && _canExecute(control);
-
-        /// <inheritdoc/>
-        public void Execute(object? parameter)
-        {
-            if (parameter is TerminalControl control)
-                _execute(control);
-        }
-
-        /// <inheritdoc/>
-        public event EventHandler? CanExecuteChanged;
-
-        /// <summary>
-        /// Raises <see cref="CanExecuteChanged"/>.
-        /// </summary>
-        public void InvalidateCanExecute()
-            => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
-    }
-
     // ---- StyledProperty registrations ----
     /// <summary>
     /// Defines the <see cref="CurrentSession"/> styled property.
     /// </summary>
     public static readonly StyledProperty<ITerminalSession?> CurrentSessionProperty =
         AvaloniaProperty.Register<TerminalControl, ITerminalSession?>(nameof(CurrentSession), null);
-
-    /// <summary>
-    /// Defines the <see cref="CursorVisible"/> styled property.
-    /// </summary>
-    public static readonly StyledProperty<bool> CursorVisibleProperty =
-        AvaloniaProperty.Register<TerminalControl, bool>(nameof(CursorVisible), true);
-
-    /// <summary>
-    /// Defines the <see cref="AllowDirectInput"/> styled property.
-    /// </summary>
-    public static readonly StyledProperty<bool> AllowDirectInputProperty =
-        AvaloniaProperty.Register<TerminalControl, bool>(nameof(AllowDirectInput), true);
-
-    /// <summary>
-    /// Defines the <see cref="ScrollDownVisible"/> styled property.
-    /// </summary>
-    public static readonly StyledProperty<bool> ScrollDownVisibleProperty =
-        AvaloniaProperty.Register<TerminalControl, bool>(nameof(ScrollDownVisible), true);
 
     /// <summary>
     /// Defines the <see cref="TerminalFontSize"/> styled property.
@@ -1233,6 +1158,18 @@ public class TerminalControl : TemplatedControl, IDisposable
     /// </summary>
     public static readonly StyledProperty<string> TerminalFontFamilyProperty =
         AvaloniaProperty.Register<TerminalControl, string>(nameof(TerminalFontFamily), "Cascadia Code");
+
+    /// <summary>
+    /// Defines the <see cref="CursorVisible"/> styled property.
+    /// </summary>
+    public static readonly StyledProperty<bool> CursorVisibleProperty =
+        AvaloniaProperty.Register<TerminalControl, bool>(nameof(CursorVisible), true);
+
+    /// <summary>
+    /// Defines the <see cref="AllowDirectInput"/> styled property.
+    /// </summary>
+    public static readonly StyledProperty<bool> AllowDirectInputProperty =
+        AvaloniaProperty.Register<TerminalControl, bool>(nameof(AllowDirectInput), true);
 
     /// <summary>
     /// Defines the <see cref="ScrollbackLines"/> styled property.

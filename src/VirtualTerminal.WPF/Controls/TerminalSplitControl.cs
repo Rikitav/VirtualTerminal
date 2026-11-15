@@ -213,7 +213,7 @@ public class TerminalSplitControl : Grid
             }
         }
 
-        var visualParent = VisualTreeHelper.GetParent(element);
+        DependencyObject visualParent = VisualTreeHelper.GetParent(element);
         if (visualParent is Panel vPanel)
         {
             vPanel.Children.Remove(element);
@@ -309,7 +309,7 @@ public class TerminalSplitControl : Grid
 
         if (ReferenceEquals(_pane1, childToClose))
         {
-            var remaining = _pane2;
+            UIElement? remaining = _pane2;
             Children.Clear();
             _pane1 = null;
             _pane2 = null;
@@ -320,7 +320,7 @@ public class TerminalSplitControl : Grid
 
         if (ReferenceEquals(_pane2, childToClose))
         {
-            var remaining = _pane1;
+            UIElement? remaining = _pane1;
             Children.Clear();
             _pane1 = null;
             _pane2 = null;
@@ -379,7 +379,7 @@ public class TerminalSplitControl : Grid
         {
             if (element is TerminalSplitControl sc)
             {
-                var active = Search(sc._pane1);
+                UIElement? active = Search(sc._pane1);
                 if (active != null) return active;
                 active = Search(sc._pane2);
                 if (active != null) return active;
@@ -413,7 +413,7 @@ public class TerminalSplitControl : Grid
             }
             else if (element is TerminalSplitControl sc)
             {
-                var active = Search(sc._pane1);
+                TerminalControl? active = Search(sc._pane1);
                 if (active != null)
                     return active;
                 active = Search(sc._pane2);

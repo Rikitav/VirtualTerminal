@@ -1,3 +1,8 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Interactivity;
+using Avalonia.Layout;
+using Avalonia.Media;
 using VirtualTerminal.Controls;
 using VirtualTerminal.Cursors;
 using VirtualTerminal.Interfaces;
@@ -23,7 +28,7 @@ public partial class MainWindow : Window
         string? autoCmd = App.AutoStartCommand;
         if (!string.IsNullOrEmpty(autoCmd))
         {
-            var term = CreateDemoTerminal(new CommandLineSession(autoCmd));
+            TerminalControl term = CreateDemoTerminal(new CommandLineSession(autoCmd));
             PART_Multiplexer.Root = term;
         }
     }
@@ -36,15 +41,15 @@ public partial class MainWindow : Window
         PART_Multiplexer.PaneClosed += (s, e) => UpdateStatus();
 
         // 1. Initial primary pane: PowerShell terminal
-        var shell = CreateDemoTerminal();
+        TerminalControl shell = CreateDemoTerminal();
         PART_Multiplexer.Root = shell;
 
         // 2. Split vertically with TUI Menu terminal
-        var tui = CreateDemoTerminal(new SimpleTuiDemoSession());
+        TerminalControl tui = CreateDemoTerminal(new SimpleTuiDemoSession());
         PART_Multiplexer.Split(shell, tui, Orientation.Vertical, 0.5, animate: false);
 
         // 3. Split the right pane horizontally with a generic non-terminal Avalonia control
-        var genericControl = CreateGenericAvaloniaControl("Editor & Inspector Pane");
+        Control genericControl = CreateGenericAvaloniaControl("Editor & Inspector Pane");
         PART_Multiplexer.Split(tui, genericControl, Orientation.Horizontal, 0.5, animate: false);
 
         UpdateStatus();
@@ -53,12 +58,12 @@ public partial class MainWindow : Window
         if (Environment.GetCommandLineArgs().Contains("--test-splits"))
         {
             // Test 1: Split vertical on active pane
-            var term1 = CreateDemoTerminal();
+            TerminalControl term1 = CreateDemoTerminal();
             if (!PART_Multiplexer.SplitActive(term1, Orientation.Vertical, animate: false))
                 throw new InvalidOperationException("Failed to split vertical");
 
             // Test 2: Split horizontal on active pane
-            var term2 = CreateGenericAvaloniaControl("Test Pane 2");
+            Control term2 = CreateGenericAvaloniaControl("Test Pane 2");
             if (!PART_Multiplexer.SplitActive(term2, Orientation.Horizontal, animate: false))
                 throw new InvalidOperationException("Failed to split horizontal");
 
@@ -71,7 +76,7 @@ public partial class MainWindow : Window
             PART_Multiplexer.FocusPrevious();
 
             // Test 5: Layout state capture and restore
-            var layout = PART_Multiplexer.GetLayoutState(c => c is TerminalControl ? "Terminal" : "Generic");
+            MultiplexerLayoutNode? layout = PART_Multiplexer.GetLayoutState(c => c is TerminalControl ? "Terminal" : "Generic");
             if (layout == null)
                 throw new InvalidOperationException("Failed to capture layout state");
 
@@ -183,13 +188,13 @@ public partial class MainWindow : Window
 
     private void Button_AddCustomControl_Click(object? sender, RoutedEventArgs e)
     {
-        var custom = CreateGenericAvaloniaControl($"Custom Pane #{PART_Multiplexer.PaneCount + 1}");
+        Control custom = CreateGenericAvaloniaControl($"Custom Pane #{PART_Multiplexer.PaneCount + 1}");
         PART_Multiplexer.SplitActive(custom, Orientation.Vertical);
     }
 
     private void Button_AddTuiTerminal_Click(object? sender, RoutedEventArgs e)
     {
-        var tui = CreateDemoTerminal(new SimpleTuiDemoSession());
+        TerminalControl tui = CreateDemoTerminal(new SimpleTuiDemoSession());
         PART_Multiplexer.SplitActive(tui, Orientation.Horizontal);
     }
 

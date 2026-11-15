@@ -60,7 +60,7 @@ public class SnapshotSerializationTests
         Assert.Equal('S', restored.Buffer.GetCell(1, 0).Character.Value);
 
         // Verify scrollback
-        var restoredSb = restored.Buffer.GetScrollback();
+        IReadOnlyList<TerminalRow> restoredSb = restored.Buffer.GetScrollback();
         Assert.Single(restoredSb);
         Assert.True(restoredSb[0].Wrapped);
         Assert.Equal('H', restoredSb[0][0].Character.Value);

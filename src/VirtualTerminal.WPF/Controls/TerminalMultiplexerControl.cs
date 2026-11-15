@@ -43,7 +43,7 @@ public class TerminalMultiplexerControl : MultiplexerControl
     /// <returns>The newly created <see cref="TerminalControl"/>.</returns>
     public TerminalControl? SplitActivePane(Orientation orientation)
     {
-        var term = TerminalControlFactory?.Invoke() ?? new TerminalControl();
+        TerminalControl term = TerminalControlFactory?.Invoke() ?? new TerminalControl();
         if (SplitActive(term, orientation))
             return term;
 

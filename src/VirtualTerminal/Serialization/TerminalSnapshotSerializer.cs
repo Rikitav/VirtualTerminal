@@ -81,7 +81,7 @@ public static class TerminalSnapshotSerializer
             }
 
             // Scrollback
-            var scrollback = buffer.GetScrollback();
+            IReadOnlyList<TerminalRow> scrollback = buffer.GetScrollback();
             writer.Write(scrollback.Count);
             foreach (TerminalRow row in scrollback)
             {
@@ -186,7 +186,7 @@ public static class TerminalSnapshotSerializer
     /// </summary>
     public static void RestoreBinary(ReadOnlySpan<byte> data, TerminalScreenBuffer targetBuffer, TerminalState targetState)
     {
-        var (deserializedBuffer, deserializedState) = DeserializeBinary(data);
+        (TerminalScreenBuffer? deserializedBuffer, TerminalState? deserializedState) = DeserializeBinary(data);
         ApplyBufferAndState(deserializedBuffer, deserializedState, targetBuffer, targetState);
     }
 
@@ -225,7 +225,7 @@ public static class TerminalSnapshotSerializer
     /// </summary>
     public static void RestoreJson(string json, TerminalScreenBuffer targetBuffer, TerminalState targetState)
     {
-        var (deserializedBuffer, deserializedState) = DeserializeJson(json);
+        (TerminalScreenBuffer? deserializedBuffer, TerminalState? deserializedState) = DeserializeJson(json);
         ApplyBufferAndState(deserializedBuffer, deserializedState, targetBuffer, targetState);
     }
 

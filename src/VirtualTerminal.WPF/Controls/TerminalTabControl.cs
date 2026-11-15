@@ -233,9 +233,9 @@ public class TerminalTabControl : Grid
     {
         _tabHeadersPanel.Children.Clear();
 
-        foreach (var tab in _tabs)
+        foreach (TerminalTabItem tab in _tabs)
         {
-            var header = CreateTabHeaderControl(tab);
+            FrameworkElement header = CreateTabHeaderControl(tab);
             _tabHeadersPanel.Children.Add(header);
         }
 

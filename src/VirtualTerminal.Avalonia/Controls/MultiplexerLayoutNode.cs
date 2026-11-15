@@ -1,3 +1,5 @@
+using Avalonia.Layout;
+
 namespace VirtualTerminal.Controls;
 
 /// <summary>

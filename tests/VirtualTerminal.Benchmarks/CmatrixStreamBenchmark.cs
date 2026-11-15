@@ -1,3 +1,4 @@
+using BenchmarkDotNet.Attributes;
 using System.Text;
 using VirtualTerminal.Buffer;
 

@@ -49,13 +49,13 @@ public sealed class CursorTests
 
         // JSON
         string json = TerminalSnapshotSerializer.SerializeJson(buffer, state);
-        var (bJson, sJson) = TerminalSnapshotSerializer.DeserializeJson(json);
+        (TerminalScreenBuffer? bJson, TerminalState? sJson) = TerminalSnapshotSerializer.DeserializeJson(json);
         Assert.Equal(CursorShape.Bar, sJson.Modes.CursorShape);
         Assert.False(sJson.Modes.CursorBlink);
 
         // Binary
         byte[] bin = TerminalSnapshotSerializer.SerializeBinary(buffer, state);
-        var (bBin, sBin) = TerminalSnapshotSerializer.DeserializeBinary(bin);
+        (TerminalScreenBuffer? bBin, TerminalState? sBin) = TerminalSnapshotSerializer.DeserializeBinary(bin);
         Assert.Equal(CursorShape.Bar, sBin.Modes.CursorShape);
         Assert.False(sBin.Modes.CursorBlink);
     }
@@ -69,7 +69,7 @@ public sealed class CursorTests
             CursorBlink = false,
         };
 
-        var clone = modes.Clone();
+        TerminalModes clone = modes.Clone();
         Assert.Equal(CursorShape.Underline, clone.CursorShape);
         Assert.False(clone.CursorBlink);
     }

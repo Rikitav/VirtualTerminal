@@ -131,7 +131,7 @@ public sealed class TerminalModes
             KittyKeyboardFlags = KittyKeyboardFlags,
         };
 
-        foreach (var flag in KittyKeyboardStack.Reverse())
+        foreach (KittyKeyboardFlags flag in KittyKeyboardStack.Reverse())
             clone.KittyKeyboardStack.Push(flag);
 
         return clone;

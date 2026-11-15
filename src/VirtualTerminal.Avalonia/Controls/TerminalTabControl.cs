@@ -1,3 +1,10 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
+using Avalonia.Controls.Primitives;
+using Avalonia.Input;
+using Avalonia.Layout;
+using Avalonia.Media;
 using System.Collections.ObjectModel;
 
 namespace VirtualTerminal.Controls;
@@ -70,7 +77,7 @@ public class TerminalTabControl : Grid
         RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
         // Tab strip header container
-        var headerBorder = new Border
+        Border headerBorder = new Border
         {
             Background = new SolidColorBrush(Color.FromRgb(37, 37, 38)),
             BorderBrush = new SolidColorBrush(Color.FromRgb(45, 45, 48)),
@@ -78,11 +85,11 @@ public class TerminalTabControl : Grid
             MinHeight = 32,
         };
 
-        var headerGrid = new Grid();
+        Grid headerGrid = new Grid();
         headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var scrollViewer = new ScrollViewer
+        ScrollViewer scrollViewer = new ScrollViewer
         {
             HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
             VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
@@ -93,6 +100,7 @@ public class TerminalTabControl : Grid
         {
             Orientation = Orientation.Horizontal,
         };
+
         scrollViewer.Content = _tabHeadersPanel;
         SetColumn(scrollViewer, 0);
         headerGrid.Children.Add(scrollViewer);
@@ -112,6 +120,7 @@ public class TerminalTabControl : Grid
             FontWeight = FontWeight.SemiBold,
 
         };
+
         _addTabButton.Click += (s, e) => AddNewTab();
         ToolTip.SetTip(_addTabButton, "New Terminal");
         SetColumn(_addTabButton, 1);
@@ -231,9 +240,9 @@ public class TerminalTabControl : Grid
     {
         _tabHeadersPanel.Children.Clear();
 
-        foreach (var tab in _tabs)
+        foreach (TerminalTabItem tab in _tabs)
         {
-            var header = CreateTabHeaderControl(tab);
+            Control header = CreateTabHeaderControl(tab);
             _tabHeadersPanel.Children.Add(header);
         }
 
@@ -242,7 +251,7 @@ public class TerminalTabControl : Grid
 
     private Control CreateTabHeaderControl(TerminalTabItem tab)
     {
-        var border = new Border
+        Border border = new Border
         {
             Tag = tab,
             Padding = new Thickness(10, 4, 6, 4),
@@ -251,9 +260,9 @@ public class TerminalTabControl : Grid
             CornerRadius = new CornerRadius(3, 3, 0, 0),
         };
 
-        var sp = new StackPanel { Orientation = Orientation.Horizontal };
+        StackPanel sp = new StackPanel { Orientation = Orientation.Horizontal };
 
-        var titleText = new TextBlock
+        TextBlock titleText = new TextBlock
         {
             Text = tab.Title,
             VerticalAlignment = VerticalAlignment.Center,
@@ -262,7 +271,7 @@ public class TerminalTabControl : Grid
         };
         sp.Children.Add(titleText);
 
-        var closeButton = new Button
+        Button closeButton = new Button
         {
             Content = "×",
             Width = 18,
@@ -288,7 +297,7 @@ public class TerminalTabControl : Grid
         border.Child = sp;
         border.PointerPressed += (s, e) =>
         {
-            var point = e.GetCurrentPoint(border);
+            PointerPoint point = e.GetCurrentPoint(border);
             if (point.Properties.IsLeftButtonPressed)
             {
                 SelectedTab = tab;

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text;
 using System.Windows;
 using System.Windows.Automation.Peers;
@@ -49,8 +48,11 @@ public partial class TerminalControl : Control, IDisposable
     private bool _isSelecting = false;
     private Point _selectStart = new Point(0, 0);
 
-    // When the running app has enabled xterm mouse tracking (e.g. claude in fullscreen
-    // mode), mouse events are forwarded to it instead of being used for local selection
+    private SolidColorBrush _foregroundBrush = new SolidColorBrush(Colors.White);
+    private SolidColorBrush _backgroundBrush = new SolidColorBrush(Colors.Black);
+
+    // When the running app has enabled xterm mouse tracking (e.g. claude in fullscreen mode),
+    // mouse events are forwarded to it instead of being used for local selection
     // and scrollback navigation. Holds the button currently held by the user while
     // forwarding, so motion and release can be reported in button-event mode.
     private TerminalMouseButton? _trackedButton;
@@ -68,6 +70,36 @@ public partial class TerminalControl : Control, IDisposable
     // reflow output can accumulate and we show the final frame instead of partial/blank states.
     private DateTime _suppressRenderUntil = DateTime.MinValue;
     private static readonly TimeSpan ResizeRenderSuppression = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>
+    /// Raised when the connected program changes the title (OSC 0/1/2).
+    /// </summary>
+    public event EventHandler<string>? TitleChanged;
+
+    /// <summary>
+    /// Raised on BEL.
+    /// </summary>
+    public event EventHandler? Bell;
+
+    /// <summary>
+    /// Raised when an OSC 9 desktop notification is received.
+    /// </summary>
+    public event EventHandler<string>? NotificationReceived;
+
+    /// <summary>
+    /// Raised when an OSC 133 shell-integration mark is received.
+    /// </summary>
+    public event EventHandler<string>? ShellIntegrationMark;
+
+    /// <summary>
+    /// Raised when an OSC 1337 iTerm2 annotation is received.
+    /// </summary>
+    public event EventHandler<string>? Iterm2Annotation;
+
+    /// <summary>Raised on the UI thread after the session buffer has been updated with new
+    /// output (same tick that invalidates the visual). Lets the host scan the visible
+    /// screen for sentinels (e.g. a "pregunta pendiente" marker) without polling.</summary>
+    public event EventHandler? ScreenUpdated;
 
     /// <summary>
     /// Copies the current selection to the clipboard.
@@ -89,8 +121,10 @@ public partial class TerminalControl : Control, IDisposable
     /// </summary>
     public static readonly RoutedUICommand ClearCommand = new RoutedUICommand("Clear", "Clear", typeof(TerminalControl));
 
-    private SolidColorBrush _foregroundBrush = new SolidColorBrush(Colors.White);
-    private SolidColorBrush _backgroundBrush = new SolidColorBrush(Colors.Black);
+    /// <summary>
+    /// Clears the terminal screen and scrollback.
+    /// </summary>
+    public static readonly RoutedUICommand ScrollToBottomCommand = new RoutedUICommand("ScrollToBottom", "ScrollToBottom", typeof(TerminalControl));
 
     /// <summary>
     /// Gets or sets the active <see cref="ITerminalSession"/> displayed by this control.
@@ -131,15 +165,6 @@ public partial class TerminalControl : Control, IDisposable
     {
         get => (bool)GetValue(AllowDirectInputProperty);
         set => SetValue(AllowDirectInputProperty, value);
-    }
-
-    /// <summary>
-    /// Gets or sets whether the floating "scroll to bottom" button is enabled.
-    /// </summary>
-    public bool ScrollDownVisible
-    {
-        get => (bool)GetValue(ScrollDownVisibleProperty);
-        set => SetValue(ScrollDownVisibleProperty, value);
     }
 
     /// <summary>
@@ -218,7 +243,6 @@ public partial class TerminalControl : Control, IDisposable
     /// </summary>
     public TerminalControl()
     {
-        Debug.WriteLine($"[{GetType().Name}] Constructor");
         _renderTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Background, DispatcherRenderHandler, Dispatcher);
         _resizeTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(150), DispatcherPriority.Background, (s, e) => { _resizeTimer!.Stop(); ResizeSessionToBounds(); }, Dispatcher);
 
@@ -229,14 +253,21 @@ public partial class TerminalControl : Control, IDisposable
         CommandBindings.Add(new CommandBinding(CopyCommand,
             (s, e) => { _ = CopySelectionToClipboardAsync(); e.Handled = true; },
             (s, e) => { e.CanExecute = _selection is not null; e.Handled = true; }));
+        
         CommandBindings.Add(new CommandBinding(PasteCommand,
             (s, e) => { _ = PasteFromClipboardAsync(); e.Handled = true; },
             (s, e) => { e.CanExecute = Session is not null; e.Handled = true; }));
+        
         CommandBindings.Add(new CommandBinding(SelectAllCommand,
             (s, e) => { SelectAll(); e.Handled = true; },
             (s, e) => { e.CanExecute = _decoder is not null; e.Handled = true; }));
+        
         CommandBindings.Add(new CommandBinding(ClearCommand,
             (s, e) => { Clear(); e.Handled = true; },
+            (s, e) => { e.CanExecute = _decoder is not null; e.Handled = true; }));
+
+        CommandBindings.Add(new CommandBinding(ScrollToBottomCommand,
+            (s, e) => { ScrollToBottom(); e.Handled = true; },
             (s, e) => { e.CanExecute = _decoder is not null; e.Handled = true; }));
 
         _renderTimer.Start();
@@ -254,7 +285,6 @@ public partial class TerminalControl : Control, IDisposable
 
         if (e.Property == SessionProperty)
         {
-            Debug.WriteLine($"[{GetType().Name}] SessionProperty changed: old={e.OldValue?.GetType().Name ?? "null"}, new={e.NewValue?.GetType().Name ?? "null"}, rendererConfigured={_rendererConfigured}");
             if (e.OldValue is ITerminalSession oldSession)
             {
                 oldSession.BufferUpdated -= OnSessionBufferUpdated;
@@ -354,30 +384,12 @@ public partial class TerminalControl : Control, IDisposable
         _options.ScrollbackMaxLines = ScrollbackLines;
         _options.LineHeight = LineHeight;
         _options.DefaultForeground = ScreenForeground.ToTerminalColor();
-        _options.DefaultBackground = ScreenBackground.ToTerminalColor();
-
-        Debug.WriteLine($"[{GetType().Name}] SyncOptionsToDecoder: ScrollbackLines={ScrollbackLines}, ScrollbackMaxLines={_options.ScrollbackMaxLines}");
+        _options.DefaultBackground = ScreenBackground.ToTerminalColor();
         if (_decoder?.Buffer is { } buf)
         {
             buf.SetScrollbackMax(_options.ScrollbackMaxLines);
-            Debug.WriteLine($"[{GetType().Name}] SyncOptionsToDecoder: buffer ScrollbackMax={buf.ScrollbackMax}, ScrollbackCount={buf.ScrollbackCount}");
         }
     }
-
-    private void OnDecoderTitleChanged(object? sender, string title)
-        => TitleChanged?.Invoke(this, title);
-
-    private void OnDecoderBell(object? sender, EventArgs e)
-        => Bell?.Invoke(this, e);
-
-    private void OnDecoderNotification(object? sender, string message)
-        => NotificationReceived?.Invoke(this, message);
-
-    private void OnDecoderShellIntegrationMark(object? sender, string arguments)
-        => ShellIntegrationMark?.Invoke(this, arguments);
-
-    private void OnDecoderIterm2Annotation(object? sender, string arguments)
-        => Iterm2Annotation?.Invoke(this, arguments);
 
     private void OnDecoderClipboardRequested(object? sender, ClipboardRequestEventArgs e)
     {
@@ -405,23 +417,14 @@ public partial class TerminalControl : Control, IDisposable
                 Clipboard.SetText(text);
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            Debug.WriteLine($"[{GetType().Name}] Clipboard request failed: {ex}");
         }
     }
 
     // ---- Lifecycle ----
-    // WPF raises Unloaded whenever the control leaves the visual tree, which is not
-    // necessarily the end of its life: the same instance can be reattached (reparenting,
-    // template re-application, window content swap) and must keep rendering. So Unloaded
-    // only parks the control (stops the dispatcher timers, which is what would otherwise
-    // keep it alive while detached); tearing down the renderer is the owner's job, through
-    // Dispose. Disposing here left _rendererConfigured true with a disposed GlyphCache and
-    // every later OnRender threw "GlyphCache not configured".
     private void OnControlLoaded(object sender, RoutedEventArgs e)
     {
-        Debug.WriteLine($"[{GetType().Name}] Loaded: Actual={ActualWidth}x{ActualHeight}, RenderSize={RenderSize}, disposed={_disposed}");
         if (_disposed)
             return;
 
@@ -431,7 +434,6 @@ public partial class TerminalControl : Control, IDisposable
 
     private void OnControlUnloaded(object sender, RoutedEventArgs e)
     {
-        Debug.WriteLine($"[{GetType().Name}] Unloaded: disposed={_disposed}");
         _renderTimer.Stop();
         _resizeTimer.Stop();
         _cursorRenderer.Detach();
@@ -440,17 +442,8 @@ public partial class TerminalControl : Control, IDisposable
     /// <inheritdoc />
     protected override void OnRender(DrawingContext context)
     {
-        Debug.WriteLine($"[{GetType().Name}] OnRender: decoder={_decoder is not null}, configured={_rendererConfigured}, RenderSize={RenderSize}");
-        try
-        {
-            //base.OnRender(context);
-            DrawTerminal(context);
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[{GetType().Name}] OnRender EXCEPTION: {ex}");
-            throw;
-        }
+        //base.OnRender(context);
+        DrawTerminal(context);
     }
 
     private void DrawTerminal(DrawingContext context)
@@ -570,26 +563,21 @@ public partial class TerminalControl : Control, IDisposable
     {
         try
         {
-            Debug.WriteLine($"[{GetType().Name}] ReconfigureRenderer: font={FontFamily.Source}, size={FontSize}");
             SyncOptionsToDecoder();
             _renderer.Configure(FontFamily.Source, FontSize, _options);
-            _rendererConfigured = true;
-            Debug.WriteLine($"[{GetType().Name}] ReconfigureRenderer succeeded");
-
+            _rendererConfigured = true;
             ResizeSessionToBounds();
             InvalidateVisual();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             _rendererConfigured = false;
-            Debug.WriteLine($"[{GetType().Name}] ReconfigureRenderer failed: {ex.Message}");
         }
     }
 
     /// <inheritdoc />
     protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
     {
-        Debug.WriteLine($"[{GetType().Name}] OnRenderSizeChanged: old={sizeInfo.PreviousSize}, new={sizeInfo.NewSize}, Actual={ActualWidth}x{ActualHeight}, rendererConfigured={_rendererConfigured}");
         base.OnRenderSizeChanged(sizeInfo);
 
         // Debounce rapid resize events. ConPTY reflow is expensive and produces garbage
@@ -601,32 +589,26 @@ public partial class TerminalControl : Control, IDisposable
     private void ResizeSessionToBounds()
     {
         Size renderSize = RenderSize;
-        Debug.WriteLine($"[{GetType().Name}] ResizeSessionToBounds: decoder={_decoder is not null}, configured={_rendererConfigured}, RenderSize={renderSize}, Actual={ActualWidth}x{ActualHeight}");
         if (_decoder is null || !_rendererConfigured)
             return;
 
         if (renderSize.Width <= 0 || renderSize.Height <= 0)
         {
-            Debug.WriteLine($"[{GetType().Name}] ResizeSessionToBounds: render size is zero/negative, skipping");
             return;
         }
 
         Size cell = _renderer.CellSize;
         if (cell.Width <= 0 || cell.Height <= 0)
         {
-            Debug.WriteLine($"[{GetType().Name}] ResizeSessionToBounds: cell size is zero/negative, skipping");
             return;
         }
 
         double availW = Math.Max(0, renderSize.Width - Padding.Left - Padding.Right);
         double availH = Math.Max(0, renderSize.Height - Padding.Top - Padding.Bottom);
         ushort cols = (ushort)Math.Max(MinimumColumns, Math.Floor(availW / cell.Width));
-        ushort rows = (ushort)Math.Max(MinimumRows, Math.Floor(availH / cell.Height));
-
-        Debug.WriteLine($"[{GetType().Name}] ResizeSessionToBounds: cell={cell.Width}x{cell.Height}, cols={cols}, rows={rows}, current={_decoder.Buffer.Columns}x{_decoder.Buffer.Rows}");
+        ushort rows = (ushort)Math.Max(MinimumRows, Math.Floor(availH / cell.Height));
         if (_decoder.Buffer.Columns != cols || _decoder.Buffer.Rows != rows)
         {
-            Debug.WriteLine($"[{GetType().Name}] ResizeSessionToBounds: resizing session to {cols}x{rows}");
 
             int oldRows = _decoder.Buffer.Rows;
             Session?.Resize(cols, rows);
@@ -653,6 +635,7 @@ public partial class TerminalControl : Control, IDisposable
         base.OnGotKeyboardFocus(e);
         if (_decoder?.State.Modes.FocusReporting == true)
             Session?.Append("\x1b[I");
+
         InvalidateVisual();
     }
 
@@ -662,6 +645,7 @@ public partial class TerminalControl : Control, IDisposable
         base.OnLostKeyboardFocus(e);
         if (_decoder?.State.Modes.FocusReporting == true)
             Session?.Append("\x1b[O");
+
         InvalidateVisual();
     }
 
@@ -957,6 +941,7 @@ public partial class TerminalControl : Control, IDisposable
                 Session?.Append(MouseEncoder.EncodeButton(releasedButton, pressed: false, x, y,
                     ToTerminalModifier(Keyboard.Modifiers), _decoder.State.Modes.SgrMouseEncoding));
             }
+
             _trackedButton = null;
             e.Handled = true;
             return;
@@ -987,7 +972,6 @@ public partial class TerminalControl : Control, IDisposable
     protected override void OnPreviewMouseWheel(MouseWheelEventArgs e)
     {
         base.OnPreviewMouseWheel(e);
-        Debug.WriteLine($"[{GetType().Name}] OnPreviewMouseWheel: delta={e.Delta}, decoder={_decoder is not null}");
         if (_decoder is null || e.Handled)
             return;
 
@@ -1007,8 +991,12 @@ public partial class TerminalControl : Control, IDisposable
         {
             Point cell = GetCellPosition(e);
             if (cell.X >= 0)
-                Session?.Append(MouseEncoder.EncodeWheel(up: direction > 0, (int)cell.X, (int)cell.Y,
-                    ToTerminalModifier(modifiers), _decoder.State.Modes.SgrMouseEncoding));
+            {
+                int x = (int)cell.X, y = (int)cell.Y;
+                string encoded = MouseEncoder.EncodeWheel(up: direction > 0, x, y, ToTerminalModifier(modifiers), _decoder.State.Modes.SgrMouseEncoding);
+                Session?.Append(encoded);
+            }
+
             e.Handled = true;
             return;
         }
@@ -1027,13 +1015,11 @@ public partial class TerminalControl : Control, IDisposable
 
         int max = _decoder.Buffer.ScrollbackCount;
         int next = Math.Clamp(_scrollOffset + lines, 0, max);
-        Debug.WriteLine($"[{GetType().Name}] ScrollBy: requested={lines}, max={max}, current={_scrollOffset}, next={next}");
 
         if (next == _scrollOffset)
             return;
 
         _scrollOffset = next;
-        UpdateScrollDownVisibility();
         InvalidateVisual();
     }
 
@@ -1046,23 +1032,8 @@ public partial class TerminalControl : Control, IDisposable
             return;
 
         _scrollOffset = 0;
-        UpdateScrollDownVisibility();
         InvalidateVisual();
     }
-
-    private void UpdateScrollDownVisibility()
-    {
-        /*
-        if (PART_ScrollToBottomButton is null)
-            return;
-
-        PART_ScrollToBottomButton.Visibility = ScrollDownVisible && _scrollOffset > 0
-            ? Visibility.Visible : Visibility.Collapsed;
-        */
-    }
-
-    private void PART_ScrollToBottomButton_Click(object sender, RoutedEventArgs e)
-        => ScrollToBottom();
 
     private Point GetCellPosition(MouseEventArgs e)
     {
@@ -1156,13 +1127,11 @@ public partial class TerminalControl : Control, IDisposable
             _invalidatePending = true;
         }
 
-        Debug.WriteLine($"[{GetType().Name}] OnSessionBufferUpdated (thread={Environment.CurrentManagedThreadId}) -> scheduling invalidate");
         Dispatcher.BeginInvoke(() =>
         {
             lock (_invalidateLock)
                 _invalidatePending = false;
 
-            Debug.WriteLine($"[{GetType().Name}] OnSessionBufferUpdated -> InvalidateVisual");
             InvalidateVisual();
 
             // Notify automation clients that the terminal text has changed.
@@ -1247,39 +1216,25 @@ public partial class TerminalControl : Control, IDisposable
 
             // Do not dispose, we do not own the session
         }
+
         _renderer.Dispose();
         GC.SuppressFinalize(this);
     }
 
-    /// <summary>
-    /// Raised when the connected program changes the title (OSC 0/1/2).
-    /// </summary>
-    public event EventHandler<string>? TitleChanged;
+    private void OnDecoderTitleChanged(object? sender, string title)
+        => TitleChanged?.Invoke(this, title);
 
-    /// <summary>
-    /// Raised on BEL.
-    /// </summary>
-    public event EventHandler? Bell;
+    private void OnDecoderBell(object? sender, EventArgs e)
+        => Bell?.Invoke(this, e);
 
-    /// <summary>
-    /// Raised when an OSC 9 desktop notification is received.
-    /// </summary>
-    public event EventHandler<string>? NotificationReceived;
+    private void OnDecoderNotification(object? sender, string message)
+        => NotificationReceived?.Invoke(this, message);
 
-    /// <summary>
-    /// Raised when an OSC 133 shell-integration mark is received.
-    /// </summary>
-    public event EventHandler<string>? ShellIntegrationMark;
+    private void OnDecoderShellIntegrationMark(object? sender, string arguments)
+        => ShellIntegrationMark?.Invoke(this, arguments);
 
-    /// <summary>
-    /// Raised when an OSC 1337 iTerm2 annotation is received.
-    /// </summary>
-    public event EventHandler<string>? Iterm2Annotation;
-
-    /// <summary>Raised on the UI thread after the session buffer has been updated with new
-    /// output (same tick that invalidates the visual). Lets the host scan the visible
-    /// screen for sentinels (e.g. a "pregunta pendiente" marker) without polling.</summary>
-    public event EventHandler? ScreenUpdated;
+    private void OnDecoderIterm2Annotation(object? sender, string arguments)
+        => Iterm2Annotation?.Invoke(this, arguments);
 
     // ---- DependencyProperty registrations ----
     /// <summary>
@@ -1294,13 +1249,6 @@ public partial class TerminalControl : Control, IDisposable
     /// </summary>
     public static readonly DependencyProperty AllowDirectInputProperty = DependencyProperty.Register(
         nameof(AllowDirectInput), typeof(bool), typeof(TerminalControl),
-        new PropertyMetadata(defaultValue: true));
-
-    /// <summary>
-    /// Defines the <see cref="ScrollDownVisible"/> dependency property.
-    /// </summary>
-    public static readonly DependencyProperty ScrollDownVisibleProperty = DependencyProperty.Register(
-        nameof(ScrollDownVisible), typeof(bool), typeof(TerminalControl),
         new PropertyMetadata(defaultValue: true));
 
     /// <summary>

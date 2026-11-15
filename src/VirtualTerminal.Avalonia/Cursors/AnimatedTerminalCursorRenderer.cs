@@ -1,3 +1,6 @@
+using Avalonia;
+using Avalonia.Media;
+using Avalonia.Threading;
 using VirtualTerminal.Enums;
 using VirtualTerminal.Rendering;
 
@@ -24,6 +27,10 @@ public sealed class AnimatedTerminalCursorRenderer : TerminalCursorRenderer
     private bool _hasTarget;
     private bool _animating;
 
+    // Inverse-of-background brush, rebuilt only when the reported background changes.
+    private Color _brushSource;
+    private SolidColorBrush? _brush;
+
     /// <summary>
     /// How long the glide from A to B takes.
     /// </summary>
@@ -41,10 +48,6 @@ public sealed class AnimatedTerminalCursorRenderer : TerminalCursorRenderer
     /// to the new prompt end. Typing stays a stream of small glides. No timer involved.
     /// </summary>
     public double MaxGlideCells { get; set; } = -1;
-
-    // Inverse-of-background brush, rebuilt only when the reported background changes.
-    private Color _brushSource;
-    private SolidColorBrush? _brush;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AnimatedTerminalCursorRenderer"/> class.
@@ -197,7 +200,7 @@ public sealed class AnimatedTerminalCursorRenderer : TerminalCursorRenderer
     /// </summary>
     private static void DrawQuadrilateral(DrawingContext context, Rect a, Rect b, IBrush brush)
     {
-        var geometry = new StreamGeometry();
+        StreamGeometry geometry = new StreamGeometry();
         using (StreamGeometryContext ctx = geometry.Open())
         {
             if (b.X >= a.X)
