@@ -23,7 +23,6 @@ public enum TerminalKey
     /// <summary>
     /// Tab key.
     /// </summary>
-    /// <summary>
     Tab,
 
     /// <summary>
